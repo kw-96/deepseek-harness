@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+
+allowBuilds:
+  esbuild: true
+
+# DeepSeek Harness release candidates are consumed immediately during the pre-release cycle.
+minimumReleaseAge: 0

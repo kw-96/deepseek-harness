@@ -1790,6 +1790,41 @@ export interface JsonRpcConfig {
 
 来源：[`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
 
+<a id="deepseek-aidsh-session-import-codex"></a>
+
+## `@deepseek-ai/dsh-session-import-codex`
+
+需要：`sessions` · `sessionPersistence`
+
+```ts config-catalog
+/** Plugin configuration: Codex source location and import caps. */
+export interface Config {
+  /**
+   * Codex home directory (the directory containing `thread_history_1.sqlite`
+   * and `session_index.jsonl`). Omitted to resolve from `CODEX_HOME`, then
+   * `~/.codex`.
+   */
+  codexHome?: string
+  /**
+   * Absolute working directory recorded on imported session headers when a
+   * thread carries no command cwd of its own. Omitted to use the process cwd.
+   */
+  cwd?: string
+  /** Maximum UTF-16 code units of imported tool-result text. */
+  maxToolResultChars?: number
+  /** Maximum UTF-16 code units of an imported session title. */
+  maxTitleChars?: number
+  /**
+   * Periodic re-scan interval in milliseconds while the card's sync toggle is
+   * on. `0` (the default) disables the timer; the boot sweep and the manual
+   * button still run regardless.
+   */
+  syncIntervalMs?: number
+}
+```
+
+来源：[`packages/session/session-import-codex/src/index.ts:50`](../packages/session/session-import-codex/src/index.ts)
+
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
 ## `@deepseek-ai/dsh-session-log-deepseek`

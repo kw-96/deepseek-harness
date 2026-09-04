@@ -1,0 +1,9 @@
+# dsh-codex-shell bundle patch: insert the Codex-styled integrated shell.
+# The plugin ships one Host half (Typert Remote `codexShell` over fs/shell
+# services) and one Client half (sidebar browser + right panel + overlay).
+# Install:
+#   dsh plugin --profile <name> add dsh-codex-shell@<version>
+# or insert this row into the profile's cordis.patch.yml manually.
+- insert:
+    - id: codex-shell
+      name: dsh-codex-shell

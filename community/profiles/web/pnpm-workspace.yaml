@@ -1,0 +1,15 @@
+packages:
+  - .
+
+autoInstallPeers: false
+
+nodeLinker: hoisted
+
+allowBuilds:
+  '@webkong/dsh-plugin-sidebar@https://codeload.github.com/webkong/dsh-plugin-sidebar/tar.gz/eed642b18b178c2a453e228288e91d64e1cbdb6e': true
+
+publicHoistPattern: '@dap-dsh-plugins/netease-auth'
+minimumReleaseAgeExclude:
+  - dsh-ocr-local@0.2.7
+overrides:
+  '@xberg-io/xberg': 1.0.0-rc.15

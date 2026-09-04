@@ -29,6 +29,8 @@ const PLUGIN_SPECS = [
   'dsh-plugin-manager@^0.1.0',
 ]
 
+const LEGACY_MARKETPLACE_PACKAGE = 'ntes-dsh-market'
+
 /** pnpm-workspace.yaml 基础内容（与 app-boot initProfile 生成的模板一致）。 */
 const WORKSPACE_BASE = `packages:
   - .
@@ -67,6 +69,25 @@ function ensureWorkspace(dir) {
   writeFileSync(path, content)
 }
 
+/** 移除已下架市场插件的依赖与 bundle 残留，避免 pnpm 解析失败。 */
+function removeLegacyMarketplace(dir) {
+  const path = join(dir, 'package.json')
+  if (!existsSync(path)) return false
+  const manifest = JSON.parse(readFileSync(path, 'utf8'))
+  let changed = false
+  if (manifest.dependencies?.[LEGACY_MARKETPLACE_PACKAGE] !== undefined) {
+    delete manifest.dependencies[LEGACY_MARKETPLACE_PACKAGE]
+    changed = true
+  }
+  const bundles = manifest.dsh?.profile?.bundles
+  if (Array.isArray(bundles) && bundles.includes(LEGACY_MARKETPLACE_PACKAGE)) {
+    manifest.dsh.profile.bundles = bundles.filter(item => item !== LEGACY_MARKETPLACE_PACKAGE)
+    changed = true
+  }
+  if (changed) writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`)
+  return changed
+}
+
 /** 运行一次 dsh 命令（走与 `pnpm dsh` 相同的源码入口，无 shell 转义差异）。 */
 function runDsh(args) {
   const bin = join(process.cwd(), 'apps', 'cli', 'src', 'bin.ts')
@@ -87,6 +108,9 @@ function main() {
   const dir = profileDir()
   console.log(`[setup-web-profile] 目标 profile 目录：${dir}`)
   ensureWorkspace(dir)
+  if (removeLegacyMarketplace(dir)) {
+    console.log('[setup-web-profile] 已移除已下架的 ntes-dsh-market 配置')
+  }
   console.log('[setup-web-profile] 已确保 pnpm-workspace.yaml 含 overrides 与 minimumReleaseAgeExclude')
   console.log('[setup-web-profile] 安装外部插件（触发 pnpm install，override 随之生效）...')
   runDsh(['plugin', '--profile', 'web', 'add', ...PLUGIN_SPECS])

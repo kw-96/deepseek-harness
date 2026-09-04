@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto'
 import {
   closeSync,
   existsSync,
-  fstatSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -356,15 +355,14 @@ function lockOwnershipChangedError(lockPath) {
   return new Error(`Lefthook installer lock ownership changed for ${lockPath}; refusing to remove it`)
 }
 
-function releaseInstallLock(lockPath, ownedRecord, ownedStat) {
+function releaseInstallLock(lockPath, ownedRecord) {
   const currentStat = installLockStat(lockPath)
+  const currentRecord = readInstallLock(lockPath)
   if (
     currentStat === undefined
     || !currentStat.isFile()
     || currentStat.isSymbolicLink()
-    || currentStat.dev !== ownedStat.dev
-    || currentStat.ino !== ownedStat.ino
-    || readInstallLock(lockPath) !== ownedRecord
+    || currentRecord !== ownedRecord
   ) {
     throw lockOwnershipChangedError(lockPath)
   }
@@ -386,9 +384,7 @@ async function acquireInstallLock(commonDirectory) {
   while (true) {
     try {
       const lockHandle = openSync(lockPath, 'wx', 0o600)
-      let ownedStat
       try {
-        ownedStat = fstatSync(lockHandle)
         const writeDelay = Number(process.env.DSH_TEST_LEFTHOOK_LOCK_WRITE_DELAY_MS ?? 0)
         if (writeDelay > 0) {
           await new Promise(resolveWait => setTimeout(resolveWait, writeDelay))
@@ -402,12 +398,11 @@ async function acquireInstallLock(commonDirectory) {
         publishedStat === undefined
         || !publishedStat.isFile()
         || publishedStat.isSymbolicLink()
-        || publishedStat.dev !== ownedStat.dev
-        || publishedStat.ino !== ownedStat.ino
+        || readInstallLock(lockPath) !== ownedRecord
       ) {
         throw lockOwnershipChangedError(lockPath)
       }
-      return () => releaseInstallLock(lockPath, ownedRecord, ownedStat)
+      return () => releaseInstallLock(lockPath, ownedRecord)
     } catch (error) {
       if (errorCode(error) !== 'EEXIST') throw error
       const existingStat = installLockStat(lockPath)

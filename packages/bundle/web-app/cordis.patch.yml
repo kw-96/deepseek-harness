@@ -278,6 +278,11 @@
     - id: ui-message-feedback
       name: '@deepseek-ai/dsh-client-ui-message-feedback'
 
+    # Codex import: the Plugins-tab card with the sync toggle, manual import,
+    # and import history, over the codexImport Remote.
+    - id: ui-codex-import
+      name: '@deepseek-ai/dsh-client-ui-codex-import'
+
     # Model selection: the /model popupSelect + composer seat over session.models.
     - id: ui-model-selection
       name: '@deepseek-ai/dsh-client-ui-model-selection'

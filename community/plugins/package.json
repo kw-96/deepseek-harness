@@ -1,0 +1,22 @@
+{
+  "name": "deepseek-harness-plugin-manager-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "clean": "pnpm -r --if-present run clean",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "build": "pnpm -r run build",
+    "pack:check": "pnpm -r run pack:check",
+    "catalog:build": "pnpm --filter @ruihuahe/dsh-plugin-marketplace run catalog:build",
+    "generated:check": "pnpm --filter @ruihuahe/dsh-plugin-marketplace run catalog:check"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13",
+    "unrun": "^0.3.1"
+  }
+}

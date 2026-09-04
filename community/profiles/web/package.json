@@ -1,0 +1,33 @@
+{
+  "name": "dsh-profile-web",
+  "private": true,
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@dsh-external/dsh-kb-sieve",
+        "@huiliyi37/dsh-office",
+        "dsh-doc",
+        "dsh-ocr-local",
+        "dsh-plugin-manager",
+        "@ruihuahe/dsh-plugin-marketplace",
+        "ntes-dsh-market",
+        "@dap-dsh-plugins/netease-auth",
+        "dsh-codex-shell"
+      ],
+      "patchReload": "live"
+    }
+  },
+  "dependencies": {
+    "@dap-dsh-plugins/netease-auth": "^0.1.8",
+    "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
+    "@huiliyi37/dsh-office": "0.2.1",
+    "@ruihuahe/dsh-plugin-marketplace": "file:__COMMUNITY_TARBALLS__/ruihuahe-dsh-plugin-marketplace-0.1.0.tgz",
+    "dsh-codex-shell": "file:__COMMUNITY_TARBALLS__/dsh-codex-shell-0.4.0.tgz",
+    "dsh-doc": "0.1.1",
+    "dsh-ocr-local": "0.3.3",
+    "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.0.tgz",
+    "ntes-dsh-market": "^0.7.13"
+  }
+}

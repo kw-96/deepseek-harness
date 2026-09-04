@@ -1,0 +1,20 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+[
+  #Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+  {
+      id: ui-schedule,
+      name: "@deepseek-ai/dsh-client-ui-schedule",
+      disabled: false
+    },
+  # Import local Codex threads into DSH sessions on host start.
+  {
+      insert: [
+        {
+            id: session-import-codex,
+            name: "@deepseek-ai/dsh-session-import-codex"
+          }
+      ]
+    }
+]
