@@ -26,6 +26,7 @@ const PLUGIN_SPECS = [
   'dsh-doc@^0.1.1',
   'dsh-ocr-local@^0.2.7',
   '@dsh-external/dsh-kb-sieve@github:omdsh-dev/dsh-kb-sieve',
+  'dsh-plugin-manager@^0.1.0',
 ]
 
 /** pnpm-workspace.yaml 基础内容（与 app-boot initProfile 生成的模板一致）。 */
