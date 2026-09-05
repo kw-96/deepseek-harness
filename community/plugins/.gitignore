@@ -2,6 +2,8 @@ node_modules/
 lib/
 coverage/
 *.tgz
+# seed.mjs 依赖 tarballs/ 下的 pinned 安装产物，必须随仓库分发。
+!tarballs/*.tgz
 .tmp-*/
 .qa-home/
 .DS_Store
