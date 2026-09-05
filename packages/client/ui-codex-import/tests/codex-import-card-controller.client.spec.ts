@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
+import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { CodexImportHistoryValue, CodexImportRun } from '@deepseek-ai/dsh-session-import-codex/types'
 import { CodexImportCardController, type CodexImportSettings } from '../src/client/codex-import-card-controller.ts'
+
+/** `run` 远端方法解析出的携带信封。 */
+type RunResult = RemoteResult<CodexImportRun>
+/** `history` 远端方法解析出的携带信封。 */
+type HistoryResult = RemoteResult<CodexImportHistoryValue>
 
 function makeScope(autoSync: boolean | undefined) {
   let listener: (() => void) | undefined
@@ -31,14 +39,14 @@ function makeScope(autoSync: boolean | undefined) {
 }
 
 function makeContext() {
-  const ctx = new Context()
-  const remote = {
-    codexImport: {
-      run: vi.fn(async () => ({ ok: true, value: { at: 200, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [{ id: SessionId('codex-t1'), title: '标题' }] } })),
-      history: vi.fn(async () => ({ ok: true, value: { runs: [] } })),
-    },
-  }
+  const run = vi.fn(async (): Promise<RunResult> => ({
+    ok: true,
+    value: { at: 200, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [{ id: SessionId('codex-t1'), title: '标题' }] },
+  }))
+  const history = vi.fn(async (): Promise<HistoryResult> => ({ ok: true, value: { runs: [] } }))
+  const remote = { codexImport: { run, history } }
   const sessions = { open: vi.fn() }
+  const ctx = new Context()
   ctx.provide('remote', remote)
   ctx.provide('sessions', sessions)
   return { ctx, remote, sessions }
@@ -46,14 +54,14 @@ function makeContext() {
 
 describe('CodexImportCardController', () => {
   it('derives the toggle from the scope and loads history on construction', async () => {
-    const { ctx } = makeContext()
+    const { ctx, remote } = makeContext()
     const { scope, subscribe } = makeScope(false)
     const controller = new CodexImportCardController(ctx, scope)
     const face = controller.inject()
     expect(face.hooks.codexImportCard.getSnapshot().autoSync).toBe(false)
     expect(subscribe).toHaveBeenCalled()
     await vi.waitFor(() => {
-      expect(ctx.get('remote').codexImport.history).toHaveBeenCalled()
+      expect(remote.codexImport.history).toHaveBeenCalled()
     })
     controller.dispose()
   })
@@ -103,8 +111,8 @@ describe('CodexImportCardController', () => {
 
   it('ignores a second run while one is already in flight', async () => {
     const { ctx, remote } = makeContext()
-    let resolve: ((value: unknown) => void) | undefined
-    remote.codexImport.run = vi.fn(() => new Promise((r) => { resolve = r }))
+    let resolve: ((value: RunResult) => void) | undefined
+    remote.codexImport.run = vi.fn(() => new Promise<RunResult>((r) => { resolve = r }))
     const controller = new CodexImportCardController(ctx, makeScope(true).scope)
     const face = controller.inject()
     face.runImport()
@@ -119,7 +127,7 @@ describe('CodexImportCardController', () => {
 
   it('keeps the previous history when the remote run fails', async () => {
     const { ctx, remote } = makeContext()
-    remote.codexImport.run = vi.fn(async () => ({ ok: false, error: { code: 'x', message: 'boom' } }))
+    remote.codexImport.run = vi.fn(async (): Promise<RunResult> => ({ ok: false, error: new RemoteError('gateway/internal', 'boom', {}) }))
     const controller = new CodexImportCardController(ctx, makeScope(true).scope)
     const face = controller.inject()
     face.runImport()
@@ -132,7 +140,7 @@ describe('CodexImportCardController', () => {
 
   it('keeps the previous history when the history read fails', async () => {
     const { ctx, remote } = makeContext()
-    remote.codexImport.history = vi.fn(async () => ({ ok: false, error: { code: 'x', message: 'boom' } }))
+    remote.codexImport.history = vi.fn(async (): Promise<HistoryResult> => ({ ok: false, error: new RemoteError('gateway/internal', 'boom', {}) }))
     const controller = new CodexImportCardController(ctx, makeScope(true).scope)
     await vi.waitFor(() => {
       expect(remote.codexImport.history).toHaveBeenCalled()
@@ -151,12 +159,11 @@ describe('CodexImportCardController', () => {
   })
 
   it('ignores later updates and late settlements after disposal', async () => {
-    const { ctx } = makeContext()
-    let resolveHistory: ((value: unknown) => void) | undefined
-    let resolveRun: ((value: unknown) => void) | undefined
-    const remote = ctx.get('remote')
-    remote.codexImport.history = vi.fn(() => new Promise((r) => { resolveHistory = r }))
-    remote.codexImport.run = vi.fn(() => new Promise((r) => { resolveRun = r }))
+    const { ctx, remote } = makeContext()
+    let resolveHistory: ((value: HistoryResult) => void) | undefined
+    let resolveRun: ((value: RunResult) => void) | undefined
+    remote.codexImport.history = vi.fn(() => new Promise<HistoryResult>((r) => { resolveHistory = r }))
+    remote.codexImport.run = vi.fn(() => new Promise<RunResult>((r) => { resolveRun = r }))
     const { scope, notify } = makeScope(true)
     const controller = new CodexImportCardController(ctx, scope)
     const face = controller.inject()
