@@ -21,7 +21,9 @@ const MODE = webSnapshotMode()
 const PROMPT = 'Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt '
   + 'catching its error in the program. Return an object with both outcomes. Then reply DONE and stop.'
 
-describe('web e2e: PTC mode round renders nested sub-calls', () => {
+// run_code dispatches bash sub-calls, which the shipped presets mount only on
+// POSIX (Windows composes pwsh instead), so this suite is Linux/macOS-only.
+describe.skipIf(process.platform === 'win32')('web e2e: PTC mode round renders nested sub-calls', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page

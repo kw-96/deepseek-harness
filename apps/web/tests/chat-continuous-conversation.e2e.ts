@@ -170,7 +170,9 @@ function assistantKey(event: SessionEvent<'assistant/message'>): string {
   return conversationContextKey('assistant-step', `${event.data.turn}:${event.data.step}`)
 }
 
-describe('web e2e: continuous conversation grown through the composer', () => {
+// The recorded turns call the bash tool, which the shipped presets mount only
+// on POSIX (Windows composes pwsh instead), so this suite is Linux/macOS-only.
+describe.skipIf(process.platform === 'win32')('web e2e: continuous conversation grown through the composer', () => {
   let browser: Browser
   let page: Page
   let replayDir: string

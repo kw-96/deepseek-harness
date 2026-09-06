@@ -20,6 +20,9 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/plugin-config', import.me
 const SECTION_EXPECTED = join(SNAPSHOT_DIR, 'section.expected.md')
 const MODE = webSnapshotMode()
 
+/** Composed terminal timeout default: bash-sandbox ships 60s on POSIX; the Windows pwsh-sandbox inherits pwsh-local's 120s. */
+const TERMINAL_TIMEOUT_DEFAULT = process.platform === 'win32' ? '120000' : '60000'
+
 describe('web e2e: plugin configuration section', () => {
   let scaffold: WebScaffold
   let browser: Browser
@@ -137,7 +140,7 @@ describe('web e2e: plugin configuration section', () => {
     const timeout = dialog.getByLabel('命令超时（毫秒）')
     await timeout.waitFor({ timeout: 10_000 })
     // The composed default this deployment ships, before any user layer.
-    expect(await timeout.inputValue()).toBe('60000')
+    expect(await timeout.inputValue()).toBe(TERMINAL_TIMEOUT_DEFAULT)
     await timeout.fill('12000')
     await timeout.blur()
 
@@ -204,7 +207,7 @@ describe('web e2e: plugin configuration section', () => {
     // The reset stages the composed default; the document still carries the
     // override until the save lands.
     await dialog.getByRole('button', { name: '恢复默认' }).click()
-    await expect.poll(() => timeout.inputValue(), { timeout: 5_000 }).toBe('60000')
+    await expect.poll(() => timeout.inputValue(), { timeout: 5_000 }).toBe(TERMINAL_TIMEOUT_DEFAULT)
     expect(await settingsDocument()).toContain('timeoutMs: 12000')
 
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
@@ -214,7 +217,7 @@ describe('web e2e: plugin configuration section', () => {
     const expandTerminal = dialog.getByRole('button', { name: '展开设置: 终端' })
     await expandTerminal.waitFor({ timeout: 5_000 })
     await expandTerminal.click()
-    expect(await timeout.inputValue()).toBe('60000')
+    expect(await timeout.inputValue()).toBe(TERMINAL_TIMEOUT_DEFAULT)
     expect(await dialog.getByText('已覆盖').count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)

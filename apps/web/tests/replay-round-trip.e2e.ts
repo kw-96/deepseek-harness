@@ -40,7 +40,9 @@ const MODE = webSnapshotMode()
 // drift apart.
 const PROMPT = 'Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop.'
 
-describe('web e2e: fresh round trip through the real assembly', () => {
+// The scenario drives the bash tool, which the shipped presets mount only on
+// POSIX (Windows composes pwsh instead), so this suite is Linux/macOS-only.
+describe.skipIf(process.platform === 'win32')('web e2e: fresh round trip through the real assembly', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page

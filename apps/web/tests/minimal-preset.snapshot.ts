@@ -26,7 +26,9 @@ const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
 const MODE = webSnapshotMode()
 const PROMPT = "Use the bash tool to run exactly: printf 'MINIMAL_BASH_CARD_OK\\n'. Then reply exactly MINIMAL_PRESET_REQUEST_OK and stop."
 
-describe('minimal agent preset', () => {
+// The scenario drives the bash tool, which the shipped presets mount only on
+// POSIX (Windows composes pwsh instead), so this suite is Linux/macOS-only.
+describe.skipIf(process.platform === 'win32')('minimal agent preset', () => {
   let scaffold: WebScaffold
   let agentHandle: AgentHandle
   let disposeInjectedPrompt: () => void

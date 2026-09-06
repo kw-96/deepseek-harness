@@ -30,7 +30,9 @@ const PROMPT = `Write a file named notes.txt in the workspace containing exactly
 /** Draft used to measure the composer's own text cap: enough lines to pass it. */
 const CAP_PROBE = Array.from({ length: 40 }, (_, index) => `line ${index}`).join('\n')
 
-describe('web e2e: approval takeover keeps its actions reachable', () => {
+// Escalation rides the bash tool's sandbox_permissions field, which the shipped
+// presets mount only on POSIX (Windows composes pwsh instead).
+describe.skipIf(process.platform === 'win32')('web e2e: approval takeover keeps its actions reachable', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page
