@@ -1,7 +1,7 @@
 - tree "Sessions":
-  - treeitem "dsh-web-e2e-ws-6efhEm" [expanded]:
+  - treeitem "{{workspace}}" [expanded]:
     - img
-    - text: dsh-web-e2e-ws-6efhEm
+    - text: {{workspace}}
   - treeitem "Review deepseek-harness/deepseek-harness#314 Session actions for Review deepseek-harness/deepseek-harness#314" [selected]:
     - text: Review deepseek-harness/deepseek-harness#314
     - button "Session actions for Review deepseek-harness/deepseek-harness#314":
@@ -49,8 +49,6 @@
   - text: Ran for {{duration}}
 - text: {{clock}}
 - textbox "Message or run a task... / commands, @ files or sessions"
-- button "Attach image":
-  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Read Only"': Read Only

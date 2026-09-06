@@ -78,7 +78,7 @@
         - text: 删除
       - paragraph:
         - text: 预设文件：
-        - code: C:\Users\53043\AppData\Local\Temp\dsh-web-e2e-presets-MpXO1Q\my-agent
+        - code: {{presetRoot}}/my-agent
   - button "用「创造模式」创作自定义预设":
     - img
     - text: 用「创造模式」创作自定义预设

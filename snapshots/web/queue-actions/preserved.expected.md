@@ -53,8 +53,6 @@
     - button "Steer queued message" [disabled]:
       - img
 - textbox "Message or run a task... / commands, @ files or sessions"
-- button "Attach image":
-  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

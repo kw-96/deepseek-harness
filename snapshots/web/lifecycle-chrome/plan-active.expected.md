@@ -30,8 +30,6 @@
   - text: Standard mode
   - img
 - textbox "Describe what you want to build... / commands, @ files or sessions"
-- button "Attach image":
-  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

@@ -27,10 +27,15 @@
   - img
   - img
   - text: "Think The user wants me to write a single `run_code` program that:"
-- text: Failed
-- 'button "Code Error: code run failed (exception): TypeError: tools.bash is not a function"':
+- button "Code Run bash echo and catch missing file read":
   - img
-  - text: "Code Error: code run failed (exception): TypeError: tools.bash is not a function"
+  - img
+  - text: Code Run bash echo and catch missing file read
+- img
+- text: Bash Echo CODE_ROUND_OK Failed
+- 'button "Read Error: cannot read \"{{cwd}}/workspace/missing.txt\": not found"':
+  - img
+  - text: "Read Error: cannot read \"{{cwd}}/workspace/missing.txt\": not found"
 - button "Think The program ran successfully. Let me now reply DONE as instructed.":
   - img
   - img
@@ -49,8 +54,6 @@
   - text: Ran for {{duration}}
 - text: {{clock}}
 - textbox "Message or run a task... / commands, @ files or sessions"
-- button "Attach image":
-  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

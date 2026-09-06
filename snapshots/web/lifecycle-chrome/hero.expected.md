@@ -31,8 +31,6 @@
   - img
 - textbox "Describe what you want to build... / commands, @ files or sessions":
   - paragraph
-- button "Attach image":
-  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
