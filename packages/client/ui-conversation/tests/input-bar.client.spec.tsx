@@ -374,6 +374,24 @@ describe('image draft rail', () => {
     expect(attachmentOwner(result.slotCalls).canAcceptDrop).toBe(false)
   })
 
+  it('attaches picked files through the paperclip button', () => {
+    const addImages = vi.fn(() => null)
+    const { view } = bench({ addImages })
+    const attach = view.getByLabelText('上传图片') as HTMLButtonElement
+    expect(attach.disabled).toBe(false)
+    const fileInput = view.container.querySelector<HTMLInputElement>('input[type="file"]')!
+    const png = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
+    fireEvent.click(attach)
+    Object.defineProperty(fileInput, 'files', { value: [png] })
+    fireEvent.change(fileInput)
+    expect(addImages).toHaveBeenCalledWith([png])
+  })
+
+  it('disables the paperclip while the composer is locked', () => {
+    const { view } = bench({ inert: true })
+    expect((view.getByLabelText('上传图片') as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('sends an image-only draft and exposes removal through the attachment slot', async () => {
     const file = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
     const extra = new File([Uint8Array.of(2)], 'extra.png', { type: 'image/png' })
