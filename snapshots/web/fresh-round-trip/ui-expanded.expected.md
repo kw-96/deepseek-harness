@@ -27,10 +27,9 @@
   - img
   - img
   - text: Think The user wants me to run a simple bash command and reply with "DONE".
-- button "Bash Echo the test string":
+- 'button "Failed Bash Error: unknown tool \"bash\""':
   - img
-  - img
-  - text: Bash Echo the test string
+  - text: "Failed Bash Error: unknown tool \"bash\""
 - button "Think The command executed successfully and output \"WEB_E2E_OK\". I just need to reply with \"DONE\".":
   - img
   - img
@@ -49,6 +48,8 @@
   - text: Ran for {{duration}}
 - text: {{clock}}
 - textbox "Message or run a task... / commands, @ files or sessions"
+- button "Attach image":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

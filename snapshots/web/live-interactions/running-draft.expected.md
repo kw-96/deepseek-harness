@@ -24,6 +24,8 @@
 - status: Deep diving...
 - textbox "Message or run a task... / commands, @ files or sessions":
   - paragraph: Queue this follow-up while the current turn is running.
+- button "Attach image":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write

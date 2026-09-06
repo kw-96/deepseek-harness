@@ -25,6 +25,8 @@
 - code: "const first: number = 1 const second = \"two\" let tail"
 - status: Deep diving...
 - textbox "Message or run a task... / commands, @ files or sessions"
+- button "Attach image":
+  - img
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
