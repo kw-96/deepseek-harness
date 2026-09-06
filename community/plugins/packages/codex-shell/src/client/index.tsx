@@ -1,22 +1,23 @@
 /**
- * Browser entry for dsh-codex-shell: mounts the codexShell Remote and
- * registers the Codex-styled sidebar browser, the right-edge panel overlay,
- * and the conversation-header toggle.
+ * dsh-codex-shell 浏览器入口：挂载 codexShell Remote 并注册界面 ——
+ * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、侧栏页脚的添加工作区
+ * 入口、停靠进宿主 details 第三列的右侧工作台面板、以及会话头的面板
+ * 开合按钮。面板开合通过 ctx.layout 与宿主第三列双向同步。
  *
- * Compiles against local structural faces (see faces.ts) instead of the
- * harness client type lines, which move faster than community plugins; the
- * runtime slot core still validates every name fail-loud at load.
+ * 对宿主编译采用本地结构面（faces.ts）而非宿主编排类型线；运行时的
+ * 槽位核心仍会对每个名字做加载期强校验。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import remoteContribution from 'dsh-codex-shell/remote'
 import { SessionMetaStore } from './session-meta.js'
 import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
-import { CodexRightPanel, type CodexPanelInjected, type CommandPrompt } from './RightPanel.js'
+import { CodexRightPanel, type CodexPanelInjected, type CodexMcpManager, type CodexSkillsManager, type CommandPrompt } from './RightPanel.js'
 import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
+import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
 import { PanelController } from './panel-controller.js'
 import { en, zh } from './locales.js'
 import type {
-  CodexShellRemoteFace, HostObservableLike, LocaleFace, RemoteFace, SessionsFace, SlotsFace, TFn, WorkspacesFace,
+  CodexShellRemoteFace, LayoutFace, LocaleFace, RemoteFace, SessionsFace, SlotsFace, TFn, WorkspacesFace,
 } from './faces.js'
 
 export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces', 'connection']
@@ -42,7 +43,7 @@ interface ConnectionProbeLike {
   }
 }
 
-/** Durable user prompts for one session; absent or failing transport yields none. */
+/** 某会话的持久用户指令；传输缺失或失败时返回空列表。 */
 async function readPrompts(connection: unknown, sessionId: string): Promise<readonly CommandPrompt[]> {
   const probe = connection as ConnectionProbeLike
   const history = probe.api?.sessions?.history
@@ -72,8 +73,8 @@ async function readPrompts(connection: unknown, sessionId: string): Promise<read
 }
 
 /**
- * Mount the Remote contribution and register all codex-shell surfaces.
- * @param ctx - Client root context.
+ * 挂载 Remote 并注册全部 codex-shell 界面。
+ * @param ctx - 客户端根上下文。
  */
 export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const remote = ctx.get('remote') as RemoteFace
@@ -82,6 +83,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const sessions = ctx.get('sessions') as SessionsFace
   const workspaces = ctx.get('workspaces') as WorkspacesFace
   const connection = ctx.get('connection')
+  const layout = ctx.get('layout') as LayoutFace | undefined
 
   const disposeRemote = await remote.$mount(remoteContribution)
   const disposeLocale = locale.register('codex-shell', { zh, en } as Record<string, Record<string, string>>)
@@ -95,24 +97,21 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const codexRemote = ctx.get('remote.codexShell') as CodexShellRemoteFace
   const pluginManager = probeRemote(ctx, 'pluginManager') as CodexPanelInjected['pluginManager']
   const marketplace = probeRemote(ctx, 'marketplace') as CodexPanelInjected['marketplace']
+  const mcpManager = probeMcpManager(pluginManager)
+  const skillsManager = probeSkillsManager(pluginManager)
 
-  const browserFlowSource = (hole: string): HostObservableLike<boolean> => ({
-    getSnapshot: () => slots.entries(hole).length > 0,
-    subscribe: listener => slots.subscribe(hole, listener),
-  })
+  /** 面板开合与宿主 details 列同步；布局服务缺失时降级为纯本地状态。 */
+  const setColumnOpen = (open: boolean): void => {
+    if (layout === undefined) return
+    if (open) layout.openDetails()
+    else layout.closeDetails()
+  }
 
   const browserInject = (): CodexBrowserInjected => ({
-    hooks: {
-      directoryFlow: browserFlowSource('sidebar.workspaces.directoryFlow'),
-      hostInfo: {
-        getSnapshot: () => (remote as unknown as { $host?: unknown }).$host,
-        subscribe: listener => (ctx.on as (event: string, listener: () => void) => () => void)('connection/reset', listener),
-      },
-    },
     startSession: (workspaceId?: string) => {
       sessions.create(workspaceId === undefined ? {} : { workspaceId })
         .then(sessionId => { sessions.open(sessionId) })
-        .catch(() => { /* create failure leaves the current selection */ })
+        .catch(() => { /* 创建失败保持当前选择 */ })
     },
     open: sessionId => { sessions.open(sessionId) },
     searchSessions: async (query, signal) => {
@@ -130,7 +129,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     forkSession: (sessionId) => {
       sessions.fork({ sessionId, increaseTitle: true })
         .then(childId => { sessions.open(childId) })
-        .catch(() => { /* fork failure leaves the current selection */ })
+        .catch(() => { /* 派生失败保持当前选择 */ })
     },
     renameWorkspace: async (workspaceId, title) => { await workspaces.rename(workspaceId, title) },
     deleteWorkspace: async (workspaceId) => { await workspaces.delete(workspaceId) },
@@ -141,8 +140,12 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
       await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
-    createWorkspace: input => workspaces.create(input),
     meta,
+  })
+
+  const addWorkspaceInject = (): AddWorkspaceInjected => ({
+    fsList: async path => unwrap(await codexRemote.fsList(path)),
+    createWorkspace: input => workspaces.create(input),
   })
 
   const panelInject = (): CodexPanelInjected => ({
@@ -169,24 +172,32 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     },
     pluginManager,
     marketplace,
+    mcpManager,
+    skillsManager,
     history: sessionId => readPrompts(connection, sessionId),
+    setColumnOpen,
   })
 
-  const toggleInject = (): PanelToggleInjected => ({ panel, meta })
+  const toggleInject = (): PanelToggleInjected => ({ panel, meta, setColumnOpen })
 
-  // Each registration waits on its declaration through slots.inject: owner
-  // apply order is unconstrained, and the shipped owners declare these holes.
-  // NOTE: no `children` here — the shipped WorkspaceBrowser already declares
-  // 'sidebar.workspaces.directoryFlow' and shadowing does not collapse that
-  // declaration, so redeclaring it would throw at load.
+  // 每处注册都通过 slots.inject 等待宿主声明（apply 顺序不受约束）。
   const disposeBrowser = slots.inject('sidebar.workspaces', () => slots.register({
     name: 'sidebar.workspaces',
     priority: -1,
     locale: 'codex-shell',
     inject: browserInject,
   }, CodexBrowser))
-  const disposePanel = slots.inject('shell.overlay', () => slots.register({
-    name: 'shell.overlay', id: 'codex-panel', order: 0, locale: 'codex-shell',
+  // 添加工作区入口放在侧栏页脚（root 作用域，宽/窄两态均可用）。
+  const disposeAddWorkspace = slots.inject('sidebar.footer.action', () => slots.register({
+    name: 'sidebar.footer.action', id: 'codex-add-workspace', order: 0,
+    locale: 'codex-shell',
+    inject: addWorkspaceInject,
+  }, AddWorkspaceAction))
+  // 停靠进宿主第三列：priority -1 遮蔽原生工具详情面板，列宽/拖拽/动画由宿主布局接管。
+  const disposePanel = slots.inject('details', () => slots.register({
+    name: 'details',
+    priority: -1,
+    locale: 'codex-shell',
     inject: panelInject,
   }, CodexRightPanel))
   const disposeToggle = slots.inject('conversation.session.header.utilities', () => slots.register({
@@ -198,13 +209,38 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   return async () => {
     disposeToggle()
     disposePanel()
+    disposeAddWorkspace()
     disposeBrowser()
     disposeLocale()
     await disposeRemote()
   }
 }
 
-/** Access one optional remote namespace (plugin-manager / marketplace bundles). */
+/** 读取一个可选 remote 命名空间（插件管家/市场包）。 */
 function probeRemote(ctx: Context, name: string): unknown {
   return ctx.get(`remote.${name}`)
+}
+
+/** 探测 pluginManager 命名空间上的 MCP 方法；任一缺失即整体不可用。 */
+function probeMcpManager(pluginManager: unknown): CodexMcpManager | undefined {
+  const candidate = pluginManager as Partial<CodexMcpManager> | undefined
+  if (
+    candidate === undefined
+    || typeof candidate.listMcpServers !== 'function'
+    || typeof candidate.saveMcpServer !== 'function'
+    || typeof candidate.removeMcpServer !== 'function'
+    || typeof candidate.setMcpServerEnabled !== 'function'
+  ) return undefined
+  return candidate as CodexMcpManager
+}
+
+/** 探测 pluginManager 命名空间上的 Skills 方法；任一缺失即整体不可用。 */
+function probeSkillsManager(pluginManager: unknown): CodexSkillsManager | undefined {
+  const candidate = pluginManager as Partial<CodexSkillsManager> | undefined
+  if (
+    candidate === undefined
+    || typeof candidate.listSkills !== 'function'
+    || typeof candidate.setSkillModelInvocation !== 'function'
+  ) return undefined
+  return candidate as CodexSkillsManager
 }

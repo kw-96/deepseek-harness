@@ -144,6 +144,12 @@ export type RenderSlotFn = (
   options?: { fallback?: ReactNode },
 ) => ReactNode
 
+/** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动 details 第三列开合。 */
+export interface LayoutFace {
+  openDetails(): void
+  closeDetails(): void
+}
+
 export type TFn = (key: string, params?: Record<string, unknown>) => string
 
 /** Minimal observable source shape (renderer-bound hooks and occupancy sources). */

@@ -1,9 +1,11 @@
 /**
- * Right-edge Codex panel (shell.overlay occupant): tabbed files/git/projects/
- * plugins/commands/summary/browser surface, floating over the conversation.
+ * 右侧 Codex 面板（details 列 occupant）：标签式文件/Git/项目/插件/命令/
+ * 摘要/浏览器工作台，停靠进宿主第三列。关闭按钮同步收起 details 列；
+ * 会话切换后自动重新展开，保持三栏工作区的持续存在感。
  */
+import { useEffect } from 'react'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import { X, Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe } from 'lucide-react'
+import { X, Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe, Server, Sparkles } from 'lucide-react'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
@@ -15,13 +17,15 @@ import type { SelectorHook, SessionId, SessionListStateLike, TFn, WorkspaceSnaps
 import { FilesPanel } from './panels/FilesPanel.js'
 import { GitPanel } from './panels/GitPanel.js'
 import { ProjectsPanel } from './panels/ProjectsPanel.js'
-import { PluginsPanel } from './panels/PluginsPanel.js'
+import { PluginsPanel } from './panels/plugins/PluginsPanel.js'
+import { McpPanel } from './panels/mcp/McpPanel.js'
+import { SkillsPanel } from './panels/skills/SkillsPanel.js'
 import { CommandsPanel } from './panels/CommandsPanel.js'
 import { SummaryPanel } from './panels/SummaryPanel.js'
 import { BrowserPanel } from './panels/BrowserPanel.js'
 import css from './styles.module.css'
 
-/** Host-facing API surface the panel tabs consume. */
+/** 面板标签页消费的宿主 API 面。 */
 export interface CodexApi {
   fsList: (path: string) => Promise<FsListResponse>
   fsRead: (path: string, maxBytes?: number) => Promise<FsReadResponse>
@@ -42,46 +46,130 @@ export interface CodexApi {
   projectAddDir: (workspaceId: string, path: string) => Promise<ProjectAddDirResponse>
 }
 
-/** One inventory row projected from the plugin-manager remote. */
+/** 插件管家 remote 投射的一条清单行。 */
 export interface InventoryEntryLike {
   entryId: string
+  configId: string
   packageName: string
   category: string
+  group: string
   description: string | null
   enabled: boolean
+  phase: string | null
   protected: boolean
   protectionReason: string | null
+  error: string | null
 }
 
 export interface InventorySnapshotLike {
   entries: readonly InventoryEntryLike[]
 }
 
-/** Optional plugin-manager bundle face, probed at render time. */
+/** 可选的插件管家 remote 面，渲染时探测。 */
 export interface CodexPluginManager {
   list: () => Promise<RemoteResult<InventorySnapshotLike>>
   setEnabled: (entryId: string, enabled: boolean) => Promise<RemoteResult<{ snapshot: InventorySnapshotLike }>>
 }
 
-/** One installable market entry projected from the marketplace remote. */
+/** MCP 服务行投射。 */
+export interface McpServerLike {
+  id: string
+  serverName: string
+  transport: 'stdio' | 'streamable-http'
+  command: string | null
+  args: readonly string[]
+  env: Readonly<Record<string, string>>
+  cwd: string | null
+  url: string | null
+  headers: Readonly<Record<string, string>>
+  toolCallTimeoutMs: number | null
+  disabled: boolean
+  managed: boolean
+}
+
+export interface McpServersSnapshotLike {
+  profileName: string
+  servers: readonly McpServerLike[]
+}
+
+/** 新增/更新 MCP 服务的提交输入。 */
+export interface McpServerInputLike {
+  serverName: string
+  transport: 'stdio' | 'streamable-http'
+  command: string | null
+  args: readonly string[]
+  env: Readonly<Record<string, string>>
+  cwd: string | null
+  url: string | null
+  headers: Readonly<Record<string, string>>
+  toolCallTimeoutMs: number | null
+}
+
+export interface McpReceiptLike {
+  status: 'changed' | 'removed' | 'restart-required' | 'failed'
+  message: string | null
+  snapshot: McpServersSnapshotLike
+}
+
+/** 可选的 MCP 管家 remote 面（挂在 pluginManager 命名空间上，渲染时探测）。 */
+export interface CodexMcpManager {
+  listMcpServers: () => Promise<RemoteResult<McpServersSnapshotLike>>
+  saveMcpServer: (input: McpServerInputLike, enabled: boolean) => Promise<RemoteResult<McpReceiptLike>>
+  removeMcpServer: (serverName: string) => Promise<RemoteResult<McpReceiptLike>>
+  setMcpServerEnabled: (serverName: string, enabled: boolean) => Promise<RemoteResult<McpReceiptLike>>
+}
+
+/** 技能条目投射。 */
+export interface SkillLike {
+  name: string
+  directory: string
+  description: string | null
+  modelInvocable: boolean
+  source: string
+}
+
+export interface SkillsSnapshotLike {
+  skillsRoot: string
+  skills: readonly SkillLike[]
+}
+
+export interface SkillReceiptLike {
+  status: 'changed' | 'failed'
+  message: string | null
+  snapshot: SkillsSnapshotLike
+}
+
+/** 可选的 Skills 管家 remote 面（挂在 pluginManager 命名空间上，渲染时探测）。 */
+export interface CodexSkillsManager {
+  listSkills: () => Promise<RemoteResult<SkillsSnapshotLike>>
+  setSkillModelInvocation: (skillName: string, enabled: boolean) => Promise<RemoteResult<SkillReceiptLike>>
+}
+
+/** 市场条目投射（与市场包的目录条目字段一致）。 */
 export interface MarketEntryLike {
+  id: string
   displayName: { 'zh-CN': string; en: string }
+  summary: { 'zh-CN': string; en: string }
   packageName: string | null
   version: string | null
+  category: string
+  license: string | null
   availability: string
+  installedVersion: string | null
+  repositoryUrl: string
 }
 
 export interface MarketSnapshotLike {
   entries: readonly MarketEntryLike[]
 }
 
-/** Optional marketplace bundle face, probed at render time. */
+/** 可选的市场 remote 面，渲染时探测。 */
 export interface CodexMarketplace {
   list: (refresh: boolean) => Promise<RemoteResult<MarketSnapshotLike>>
   installPlugin: (packageName: string, version: string) => Promise<RemoteResult<unknown>>
 }
 
-/** One durable user prompt pulled from the session history. */
+/** 会话历史里的一条用户指令。 */
 export interface CommandPrompt {
   seq: number
   text: string
@@ -93,7 +181,11 @@ export interface CodexPanelInjected {
   api: CodexApi
   pluginManager: CodexPluginManager | undefined
   marketplace: CodexMarketplace | undefined
+  mcpManager: CodexMcpManager | undefined
+  skillsManager: CodexSkillsManager | undefined
   history: (sessionId: SessionId) => Promise<readonly CommandPrompt[]>
+  /** 同步宿主 details 列开合（layout.openDetails / closeDetails）。 */
+  setColumnOpen: (open: boolean) => void
 }
 
 export interface CodexRightPanelProps extends CodexPanelInjected {
@@ -109,18 +201,21 @@ interface TabSpec {
 }
 
 export function CodexRightPanel({
-  panel, meta, api, pluginManager, marketplace, history, useSessions, useWorkspaces, t,
+  panel, meta, api, pluginManager, marketplace, mcpManager, skillsManager, history, setColumnOpen,
+  useSessions, useWorkspaces, t,
 }: CodexRightPanelProps) {
   const [state, controller] = usePanelState(panel)
   const currentId = useSessions(s => s.current)
   const sessionCwd = useSessions(s => (s.current === undefined ? undefined : s.byId[s.current]?.cwd))
-  const workspaceId = useWorkspaces(s => {
-    if (currentId === undefined) return undefined
-    for (const workspace of s.items) {
-      if (workspace.sessionIds.includes(currentId)) return workspace.workspaceId
-    }
-    return undefined
-  })
+  const workspaceId = useWorkspaces(s => (
+    currentId === undefined ? undefined : s.items.find(workspace => workspace.sessionIds.includes(currentId))?.workspaceId
+  ))
+
+  // 挂载即同步列开合：覆盖首个会话出现与会话切换后框架自动收起两种情形
+  // （会话作用域条目随切换重挂载；被动 effect 晚于框架布局 effect）。
+  useEffect(() => {
+    if (state.open) setColumnOpen(true)
+  }, [])
 
   if (!state.open) return null
 
@@ -130,6 +225,8 @@ export function CodexRightPanel({
     { id: 'git', label: t('panelGit'), icon: <GitBranch {...icon()} /> },
     { id: 'projects', label: t('panelProjects'), icon: <FolderTree {...icon()} /> },
     { id: 'plugins', label: t('panelPlugins'), icon: <Blocks {...icon()} /> },
+    { id: 'mcp', label: t('panelMcp'), icon: <Server {...icon()} /> },
+    { id: 'skills', label: t('panelSkills'), icon: <Sparkles {...icon()} /> },
     { id: 'commands', label: t('panelCommands'), icon: <Terminal {...icon()} /> },
     { id: 'summary', label: t('panelSummary'), icon: <StickyNote {...icon()} /> },
     { id: 'browser', label: t('panelBrowser'), icon: <Globe {...icon()} /> },
@@ -137,8 +234,13 @@ export function CodexRightPanel({
 
   const activeLabel = tabs.find(tab => tab.id === state.tab)?.label ?? ''
 
+  const closePanel = (): void => {
+    controller.close()
+    setColumnOpen(false)
+  }
+
   return (
-    <aside className={css.panel} role="complementary">
+    <aside className={css.panel} role="complementary" aria-label={t('panelTool')}>
       <nav className={css.tabRail} aria-label={t('panelTool')}>
         {tabs.map(tab => (
           <button
@@ -155,7 +257,7 @@ export function CodexRightPanel({
         ))}
         <button type="button" className={`${css.tab} ${css.railEnd}`} title={t('closePanel')}
           aria-label={t('closePanel')}
-          onClick={() => { controller.close() }}>
+          onClick={closePanel}>
           <X size={15} />
         </button>
       </nav>
@@ -179,8 +281,10 @@ export function CodexRightPanel({
             <ProjectsPanel api={api} t={t} workspaceId={workspaceId} workspacePath={sessionCwd} />
           )}
           {state.tab === 'plugins' && (
-            <PluginsPanel pluginManager={pluginManager} marketplace={marketplace} t={t} />
+            <PluginsPanel pluginManager={pluginManager} marketplace={marketplace} t={t} locale={t('localeId')} />
           )}
+          {state.tab === 'mcp' && <McpPanel mcpManager={mcpManager} t={t} />}
+          {state.tab === 'skills' && <SkillsPanel skillsManager={skillsManager} t={t} />}
           {state.tab === 'commands' && (
             <CommandsPanel history={history} sessionId={currentId} t={t} />
           )}

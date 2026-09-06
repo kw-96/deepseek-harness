@@ -1,10 +1,12 @@
 /**
- * Load-time regression coverage against the REAL SlotCore: the shipped shell
- * declares the sidebar/conversation/settings tree, then the codex-shell
- * client apply registers into the shipped holes. A duplicate child
- * declaration (e.g. re-declaring sidebar.workspaces.directoryFlow while the
- * native browser still owns it) throws here instead of silently in the
- * browser.
+ * 针对真实 SlotCore 的加载期回归覆盖：先播种宿主外壳的槽位树
+ * （侧栏/会话/设置/详情列），再让 codex-shell 客户端 apply 注册进
+ * 宿主洞口。重复子槽声明（例如重复声明 sidebar.workspaces.directoryFlow）
+ * 会在这里直接抛出，而不是在浏览器里静默失败。
+ *
+ * v4 起右侧面板停靠进宿主 details 列（priority -1 遮蔽原生工具详情），
+ * 本测试同时验证：遮蔽后原生条目仍持有 conversation.details.tool 的
+ * 声明（子槽不随优先级落选而坍塌）。
  */
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import { describe, expect, it } from 'vitest'
@@ -21,7 +23,7 @@ interface StubOptions {
   children?: Record<string, { kind: 'single' | 'list'; scope: 'root' | 'session' | 'session-maybe' }>
 }
 
-/** Declare + occupy the shipped composition the way the harness shell does. */
+/** 声明并占用宿主外壳组合，与真实装配一致。 */
 function seedShippedComposition(core: SlotCore): void {
   const declare = (parent: string, entry: StubOptions): void => {
     core.register(entry as never, dummy)
@@ -39,12 +41,17 @@ function seedShippedComposition(core: SlotCore): void {
     'sidebar.settings': { kind: 'single', scope: 'root' },
     'sidebar.footer.action': { kind: 'list', scope: 'root' },
   } })
-  // The shipped WorkspaceBrowser occupies the browser hole and declares the
-  // directory-flow child — exactly what runs in the real composition.
+  // 原生 WorkspaceBrowser 占据浏览器洞口并声明 directory-flow 子槽。
   declare('sidebar.workspaces', {
     name: 'sidebar.workspaces',
     priority: 0,
     children: { 'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' } },
+  })
+  // 原生 DetailsPanel 占据详情列并声明工具详情子槽。
+  declare('details', {
+    name: 'details',
+    priority: 0,
+    children: { 'conversation.details.tool': { kind: 'single', scope: 'session' } },
   })
   declare('conversation', { name: 'conversation', children: {
     'conversation.session': { kind: 'single', scope: 'session' },
@@ -60,7 +67,7 @@ function seedShippedComposition(core: SlotCore): void {
   } })
 }
 
-/** Minimal SlotRegistry-like wrapper over the real core for the client apply. */
+/** 客户端 apply 使用的最小 SlotRegistry 包装。 */
 function slotsFace(core: SlotCore): {
   inject: (key: string, cb: () => (() => void) | void) => () => void
   register: typeof core.register
@@ -102,6 +109,7 @@ function fakeCtx(core: SlotCore): unknown {
           insertSessionBefore: async () => {}, create: async () => ({}),
         },
         connection: { api: { sessions: { history: async () => ({ ok: true, value: { records: [] } }) } } },
+        layout: { openDetails: () => {}, closeDetails: () => {} },
       }
       return services[name]
     },
@@ -111,7 +119,7 @@ function fakeCtx(core: SlotCore): unknown {
 }
 
 describe('codex-shell registration against the real SlotCore', () => {
-  it('shadows the shipped browser and adds the panel/toggle entries without throwing', async () => {
+  it('遮蔽原生浏览器、停靠 details 列并注册头部按钮，不抛出', async () => {
     const core = new SlotCore()
     seedShippedComposition(core)
     const disposer = await apply(fakeCtx(core) as never)
@@ -122,17 +130,24 @@ describe('codex-shell registration against the real SlotCore', () => {
     expect(browserWinners[0]?.component).not.toBe(dummy)
     expect(browserWinners[0]?.options.priority).toBe(-1)
 
-    expect(core.entries('shell.overlay').some(entry => entry.options.id === 'codex-panel')).toBe(true)
+    // 右侧面板停靠进宿主第三列（不再使用 shell.overlay 浮层）。
+    const detailsWinners = core.entriesOfSlot('details')
+    expect(detailsWinners).toHaveLength(1)
+    expect(detailsWinners[0]?.component).not.toBe(dummy)
+    expect(detailsWinners[0]?.options.priority).toBe(-1)
+    expect(core.entries('shell.overlay').some(entry => entry.options.id === 'codex-panel')).toBe(false)
     expect(core.entries('conversation.session.header.utilities').some(entry => entry.options.id === 'codex-panel-toggle')).toBe(true)
+    // 添加工作区入口停靠在侧栏页脚（root 作用域）。
+    expect(core.entries('sidebar.footer.action').some(entry => entry.options.id === 'codex-add-workspace')).toBe(true)
 
     disposer()
   })
 
-  it('does not redeclare the shipped directory-flow hole (the regression)', async () => {
+  it('遮蔽原生条目后其子槽声明保持存活（directoryFlow 与工具详情）', async () => {
     const core = new SlotCore()
     seedShippedComposition(core)
-    // The shipped declaration must survive the shadowing registration.
     await apply(fakeCtx(core) as never)
     expect(core.specDynamic('sidebar.workspaces.directoryFlow')).toBeDefined()
+    expect(core.specDynamic('conversation.details.tool')).toBeDefined()
   })
 })

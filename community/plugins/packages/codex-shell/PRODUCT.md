@@ -4,44 +4,72 @@ Product truth only. Visual decisions live in DESIGN.md.
 
 ## What it is
 
-A DeepSeek Harness web-profile bundle plugin: one integrated Codex-style
-workspace shell replacing the native sidebar browser and adding a right-edge
-workbench panel over the Web GUI.
+A DeepSeek Harness web-profile bundle plugin: one integrated workspace shell
+replacing the native sidebar browser and docking a right-side workbench into
+the product's `details` third column, turning the Web GUI into a persistent
+three-column workspace (sidebar | conversation | workbench).
 
 ## Surfaces and functions
 
 1. **Sidebar browser** (occupies `sidebar.workspaces`, shadows the native
-   browser at priority -1):
-   - Workspace groups (title, collapse, right-click rename/delete-registration)
-   - Session rows: two-line (title + cwd/relative time), status dot
-     (running/completed/idle/archived), pin + unread markers, hover-revealed
-     kebab menu
-   - Session context menu: fork / rename / archive / copy cwd / copy id /
-     copy deep link / open in new window
+   browser at priority -1, Codex-style quiet layout on host tokens):
+   - Persistent rounded search box
+   - Sessions are grouped by workspace first, then ordered most-recently-used
+     first within each group (ungrouped/archived also by recency)
+   - Workspace label rows: leading folder icon (open when expanded, closed
+     when collapsed), tiny 11px label, click to collapse, hover reveals `...`
+     menu (new session here / rename / delete)
+   - Session rows: fixed 32px height, single line (title only, ellipsized),
+     running-dot when active, pin + unread as small persistent markers,
+     relative time and `...` menu revealed on hover
+   - Workspace and session names truncate with an ellipsis
+   - Session menu: fork / rename / archive / copy cwd / copy id / copy deep
+     link / open in new window
    - Subagent sessions nest under their parent as an expandable tree
-   - New-session button; add-workspace via the native directory-flow slot
-     (never redeclared); session search
-2. **Right-edge panel** (occupies `shell.overlay`, tabbed, closable):
+   - Collapsed rail keeps one 36px search control
+2. **Add-workspace action** (`sidebar.footer.action`, root scope): footer
+   button (wide: labeled row; rail: icon) opening a centered directory-picker
+   dialog over the `codexShell.fsList` remote; it never touches the native
+   directory-flow slot (whose declaration stays owned by the shadowed native
+   browser)
+3. **Right workbench panel** (occupies `details` at priority -1; the native
+   tool-details panel is shadowed while the plugin is active and restored on
+   uninstall):
    - Files: directory tree, name search, text preview + save (512KB cap)
    - Git: status/staged/unstaged, diff, stage/unstage/discard (confirmed),
      commit, branches, log
    - Projects: per-workspace additional directories (add/remove/browse),
      persisted under `$DSH_HOME/storages/dsh-codex-shell/dirs.json`
-   - Plugins: runtime plugin inventory (enable/disable, protected entries
-     locked) + marketplace install list
+   - Plugins: two segmented views — installed runtime inventory (enable/
+     disable, protected entries locked) and the plugin market, grouped by
+     functional category with a docked detail pane (selection shows facts and
+     actions instead of appending rows below the list); market install uses a
+     two-step inline confirm
+   - MCP: manager-owned `@deepseek-ai/dsh-mcp-client` patch rows — list, add,
+     edit, remove, enable/disable (stdio and streamable-http transports);
+     user-authored rows are listed read-only and never rewritten
+   - Skills: list the user skill root (`$DSH_HOME/skills`) with search, and
+     toggle each skill's model invocation by editing the SKILL.md
+     `disable-model-invocation` frontmatter flag
    - Commands: current session's user prompts, newest first
    - Summary: per-session pinned notes (localStorage)
    - Browser: URL bar + sandboxed iframe
-3. **Header utility** (`conversation.session.header.utilities`): toggles the
-   right panel.
+   - Opens by default on first activation; the conversation-header toggle and
+     the rail close button drive the host column through `ctx.layout`
+     (`openDetails`/`closeDetails`); session switches re-open the column so
+     the three-column layout persists
+4. **Header utility** (`conversation.session.header.utilities`): toggles the
+   right workbench panel.
 
 ## Constraints
 
-- Style only through CSS Modules and `--cx-*` custom properties with `--dsw-*`
-  fallbacks; never touch host globals or host shell.
+- Style only through CSS Modules and `--cx-*` custom properties mapped onto
+  `--dsw-*` host theme tokens (light/dark); never touch host globals or host
+  shell DOM.
 - Never redeclare `sidebar.workspaces.directoryFlow` (the native owner keeps
-  the declaration alive under shadowing).
+  the declaration alive under shadowing). Never declare
+  `conversation.details.tool` — the shadowed DetailsPanel keeps it, so tool
+  cards stay registered and return when the plugin is removed.
 - Host data only through the `codexShell` Typert Remote (fs/git/project dirs);
   plugin-manager and marketplace remotes are optional, probed at render time.
-- Platform: web desktop, dark. The panel is a floating overlay by design so
-  the native `details` column and tool details stay available.
+- Platform: web desktop, light and dark themes.
