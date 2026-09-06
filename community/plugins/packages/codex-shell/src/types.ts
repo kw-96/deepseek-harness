@@ -39,7 +39,10 @@ export const codexOk = z.object({ ok: z.literal(true) }).readonly()
 export const gitStatusValue = z.object({
   isRepo: z.boolean(),
   branch: z.string().nullable(),
-  entries: z.array(z.object({ path: z.string(), xy: z.string() }).readonly()).readonly(),
+  upstream: z.string().nullable(),
+  ahead: z.number(),
+  behind: z.number(),
+  entries: z.array(z.object({ path: z.string(), origPath: z.string().nullable(), xy: z.string() }).readonly()).readonly(),
 }).readonly()
 
 export const gitLogEntry = z.object({
@@ -72,7 +75,14 @@ export interface FsContentSearchResponse {
   truncated: boolean
 }
 export interface GitStatusRequest { cwd: string }
-export interface GitStatusResponse { isRepo: boolean; branch: string | null; entries: readonly { path: string; xy: string }[] }
+export interface GitStatusResponse {
+  isRepo: boolean
+  branch: string | null
+  upstream: string | null
+  ahead: number
+  behind: number
+  entries: readonly { path: string; origPath: string | null; xy: string }[]
+}
 export interface GitLogRequest { cwd: string; count?: number }
 export interface GitLogResponse { entries: readonly { hash: string; subject: string; author: string; date: string; refs: string }[] }
 export interface GitDiffRequest { cwd: string; path?: string; staged?: boolean }

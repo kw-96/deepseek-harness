@@ -451,6 +451,14 @@
   flex: none;
 }
 
+/* 非运行行的隐形占位槽：与状态点同尺寸，保证标题水平对齐。 */
+.dotSlot {
+  width: 7px;
+  height: 7px;
+  background: transparent;
+  flex: none;
+}
+
 .dotRunning {
   composes: dot;
   border-color: var(--cx-info);
@@ -679,29 +687,41 @@
   color: var(--cx-text-hi);
 }
 
-.tabRail {
+/* ── 顶部居中标签条（Cursor 式：5 个主标签 + 溢出菜单） ── */
+
+.tabBar {
+  position: relative;
   display: flex;
   align-items: center;
+  min-height: 44px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 6px 0 4px;
   flex: none;
-  flex-direction: column;
-  gap: 4px;
-  width: 44px;
-  border-right: 0.5px solid var(--cx-line);
-  padding: 8px 6px;
+}
+
+.tabStrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  gap: 6px;
   height: 32px;
+  min-width: 32px;
   border: 0;
   border-radius: 8px;
-  padding: 0;
+  padding: 0 8px;
   background: transparent;
   color: var(--cx-text-low);
   cursor: pointer;
+  flex: none;
   transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
 }
 
@@ -716,37 +736,36 @@
   color: var(--cx-accent);
 }
 
-.railEnd {
-  margin-top: auto;
-}
-
-.workbench {
-  display: flex;
+.tabLabel {
   min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.panelHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  border-bottom: 0.5px solid var(--cx-line);
-  padding: 0 14px;
-  flex: none;
-}
-
-.panelTitle {
-  min-width: 0;
-  flex: 1;
+  max-width: 72px;
   overflow: hidden;
-  color: var(--cx-text-hi);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+.tabClose:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
 }
 
 .panelBody {
@@ -951,28 +970,323 @@
   background: #ffffff;
 }
 
-/* 状态徽标（git 已暂存 / 已变更） */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  border-radius: 6px;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 16px;
+/* ── Git 面板（Cursor 式源代码管理） ─────────────── */
+
+.gitToolbar {
+  composes: header;
+  border-bottom: 0.5px solid var(--cx-line);
 }
 
-.chipStaged {
-  composes: chip;
+.branchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 168px;
+  height: 28px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-mid);
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+
+.branchButton:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.branchButton span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchDelta {
+  color: var(--cx-text-low);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.gitSummary {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commitArea {
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 8px 10px;
+  flex: none;
+}
+
+.commitBox {
+  width: 100%;
+  min-height: 56px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: 0;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: border-color 140ms var(--ds-ease-in-out, ease), box-shadow 140ms var(--ds-ease-in-out, ease);
+}
+
+.commitBox:focus {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+.commitRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.commitButton {
+  composes: primaryButton;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin: 8px 10px 4px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 8px;
+  padding: 0 8px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-low);
+  flex: none;
+}
+
+.filterRow:focus-within {
+  border-color: var(--cx-accent-strong);
+}
+
+.gitFilterInput {
+  composes: search;
+  font-size: 12px;
+}
+
+.gitScroll {
+  composes: scroll;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 4px 12px 0;
+}
+
+.gitFilePath {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitLogMeta {
+  flex: none;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文件行悬停才显露操作（与侧栏行一致）。 */
+.fileRow .reveal {
+  opacity: 0;
+  transition: opacity 120ms var(--ds-ease-in-out, ease);
+}
+
+.fileRow:hover .reveal,
+.fileRow:focus-within .reveal {
+  opacity: 1;
+}
+
+/* 单字母状态徽标（VSCode 配色）。 */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+.statusModified {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-business-tertiary, rgba(65, 118, 230, 0.12));
+  color: var(--cx-info);
+}
+
+.statusAdded {
+  composes: statusBadge;
   background: var(--dsw-alias-state-success-tertiary, rgba(34, 197, 94, 0.12));
   color: var(--cx-success);
 }
 
-.chipChanged {
-  composes: chip;
-  background: var(--dsw-alias-state-business-tertiary, rgba(65, 118, 230, 0.12));
-  color: var(--cx-info);
+.statusDeleted {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-error-tertiary, rgba(236, 19, 19, 0.1));
+  color: var(--cx-error);
+}
+
+.statusRenamed {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-warn-tertiary, rgba(245, 158, 11, 0.12));
+  color: var(--cx-warn);
+}
+
+.statusUnmerged {
+  composes: statusDeleted;
+}
+
+.statusUntracked {
+  composes: statusBadge;
+  border: 0.5px solid var(--cx-line-strong);
+  background: var(--cx-bg-raised);
+  color: var(--cx-text-mid);
+}
+
+.statusBlank {
+  composes: statusBadge;
+}
+
+/* 提交历史折叠头。 */
+.historyHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  border-radius: 7px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--cx-text-low);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.historyHead:hover {
+  color: var(--cx-text-mid);
+}
+
+/* 下拉菜单小标题与自适应标签。 */
+.menuCaption {
+  padding: 6px 8px 4px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.menuLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 内联着色差异视图。 */
+.diffWrap {
+  display: flex;
+  border-top: 0.5px solid var(--cx-line);
+  flex-direction: column;
+}
+
+.diffHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 10px;
+  color: var(--cx-text-mid);
+  flex: none;
+}
+
+.diffPath {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffBody {
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.diffLine {
+  padding: 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diffAdd {
+  composes: diffLine;
+  background: var(--dsw-alias-state-success-tertiary, rgba(34, 197, 94, 0.12));
+  color: var(--cx-success);
+}
+
+.diffDel {
+  composes: diffLine;
+  background: var(--dsw-alias-state-error-tertiary, rgba(236, 19, 19, 0.08));
+  color: var(--cx-error);
+}
+
+.diffMeta {
+  composes: diffLine;
+  color: var(--cx-text-low);
+}
+
+.diffHunk {
+  composes: diffLine;
+  background: var(--cx-accent-muted);
+  color: var(--cx-text-mid);
+}
+
+.diffContext {
+  composes: diffLine;
+  color: var(--cx-text-hi);
+}
+
+.diffNote {
+  padding: 6px 10px;
+  color: var(--cx-text-low);
+  font-size: 11px;
 }
 
 .skeleton {
@@ -1009,7 +1323,11 @@
 .crumb:focus-visible,
 .row:focus-visible,
 .fileRow:focus-visible,
-.tab:focus-visible {
+.tab:focus-visible,
+.tabClose:focus-visible,
+.branchButton:focus-visible,
+.commitBox:focus-visible,
+.historyHead:focus-visible {
   outline: 2px solid var(--cx-accent);
   outline-offset: 2px;
 }

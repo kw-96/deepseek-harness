@@ -78,6 +78,11 @@ export interface CodexShellRemoteFace {
   gitCommit(cwd: string, message: string): Promise<RemoteResult<{ ok: true }>>
   gitBranches(cwd: string): Promise<RemoteResult<GitBranchesResponse>>
   gitCheckout(cwd: string, branch: string): Promise<RemoteResult<{ ok: true }>>
+  gitFetch(cwd: string): Promise<RemoteResult<{ ok: true }>>
+  gitPull(cwd: string): Promise<RemoteResult<{ ok: true }>>
+  gitPush(cwd: string): Promise<RemoteResult<{ ok: true }>>
+  gitStageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
+  gitUnstageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
   projectDirs(workspaceId: string): Promise<RemoteResult<ProjectDirsResponse>>
   projectSetDirs(workspaceId: string, dirs: readonly string[]): Promise<RemoteResult<ProjectDirsResponse>>
   projectAddDir(workspaceId: string, path: string): Promise<RemoteResult<ProjectAddDirResponse>>

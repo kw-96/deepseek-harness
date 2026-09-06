@@ -5,7 +5,8 @@ import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-shell'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
-  gitBranches, gitCheckout, gitCommit, gitDiff, gitDiscard, gitLog, gitStage, gitStatus, gitUnstage,
+  gitBranches, gitCheckout, gitCommit, gitDiff, gitDiscard, gitFetch, gitLog, gitPull, gitPush, gitStage,
+  gitStageAll, gitStatus, gitUnstage, gitUnstageAll,
   searchContent,
 } from './host/gitops.js'
 import { listDirectory, readTextFile, searchNames, writeTextFile } from './host/fsops.js'
@@ -94,6 +95,31 @@ export class CodexShell extends TypertRemoteService {
   @Remote('gitCheckout')
   async gitCheckout(cwd: string, branch: string): Promise<{ ok: true }> {
     return await gitCheckout(this.ctx.shell, cwd, branch)
+  }
+
+  @Remote('gitFetch')
+  async gitFetch(cwd: string): Promise<{ ok: true }> {
+    return await gitFetch(this.ctx.shell, cwd)
+  }
+
+  @Remote('gitPull')
+  async gitPull(cwd: string): Promise<{ ok: true }> {
+    return await gitPull(this.ctx.shell, cwd)
+  }
+
+  @Remote('gitPush')
+  async gitPush(cwd: string): Promise<{ ok: true }> {
+    return await gitPush(this.ctx.shell, cwd)
+  }
+
+  @Remote('gitStageAll')
+  async gitStageAll(cwd: string): Promise<{ ok: true }> {
+    return await gitStageAll(this.ctx.shell, cwd)
+  }
+
+  @Remote('gitUnstageAll')
+  async gitUnstageAll(cwd: string): Promise<{ ok: true }> {
+    return await gitUnstageAll(this.ctx.shell, cwd)
   }
 
   @Remote('projectDirs')

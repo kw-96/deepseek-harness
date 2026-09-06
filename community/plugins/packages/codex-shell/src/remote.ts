@@ -38,6 +38,11 @@ const descriptors = [
   descriptor('gitCommit', [parameter('cwd', z.string()), parameter('message', z.string())], codexOk, 'GitCommitResponse'),
   descriptor('gitBranches', [parameter('cwd', z.string())], gitBranchValue, 'GitBranchesResponse'),
   descriptor('gitCheckout', [parameter('cwd', z.string()), parameter('branch', z.string())], codexOk, 'GitCheckoutResponse'),
+  descriptor('gitFetch', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
+  descriptor('gitPull', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
+  descriptor('gitPush', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
+  descriptor('gitStageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
+  descriptor('gitUnstageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('projectDirs', [parameter('workspaceId', z.string())], projectDirsValue, 'ProjectDirsResponse'),
   descriptor('projectSetDirs', [parameter('workspaceId', z.string()), parameter('dirs', z.array(z.string()))], projectDirsValue, 'ProjectSetDirsResponse'),
   descriptor('projectAddDir', [parameter('workspaceId', z.string()), parameter('path', z.string())], projectAddValue, 'ProjectAddDirResponse'),
@@ -65,6 +70,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/gitCommit': (cwd: string, message: string) => Promise<RemoteResult<GitCommitResponse>>
     'codexShell/gitBranches': (cwd: string) => Promise<RemoteResult<GitBranchesResponse>>
     'codexShell/gitCheckout': (cwd: string, branch: string) => Promise<RemoteResult<GitCheckoutResponse>>
+    'codexShell/gitFetch': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+    'codexShell/gitPull': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+    'codexShell/gitPush': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+    'codexShell/gitStageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+    'codexShell/gitUnstageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/projectDirs': (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
     'codexShell/projectSetDirs': (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
     'codexShell/projectAddDir': (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>
@@ -85,6 +95,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       gitCommit: (cwd: string, message: string) => Promise<RemoteResult<GitCommitResponse>>
       gitBranches: (cwd: string) => Promise<RemoteResult<GitBranchesResponse>>
       gitCheckout: (cwd: string, branch: string) => Promise<RemoteResult<GitCheckoutResponse>>
+      gitFetch: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+      gitPull: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+      gitPush: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+      gitStageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+      gitUnstageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       projectDirs: (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
       projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
       projectAddDir: (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>

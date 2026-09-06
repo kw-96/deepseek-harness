@@ -1,21 +1,23 @@
 /**
- * 右侧 Codex 面板（details 列 occupant）：标签式文件/Git/项目/插件/命令/
- * 摘要/浏览器工作台，停靠进宿主第三列。关闭按钮同步收起 details 列；
+ * 右侧 Codex 面板（details 列 occupant）：顶部居中标签条（Cursor 式，
+ * 5 个主标签 + 溢出菜单）+ 文件/Git/项目/插件/MCP/Skills/命令/摘要/
+ * 浏览器工作台，停靠进宿主第三列。关闭按钮同步收起 details 列；
  * 会话切换后自动重新展开，保持三栏工作区的持续存在感。
  */
 import { useEffect } from 'react'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import { X, Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe, Server, Sparkles } from 'lucide-react'
+import { Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe, Server, Sparkles } from 'lucide-react'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
   ProjectAddDirResponse, ProjectDirsResponse,
 } from 'dsh-codex-shell/types'
 import type { SessionMetaStore } from './session-meta.js'
-import { PanelController, usePanelState, type PanelKind } from './panel-controller.js'
+import { PanelController, usePanelState } from './panel-controller.js'
+import { TabBar, type TabBarTab } from './panel-tabs.js'
 import type { SelectorHook, SessionId, SessionListStateLike, TFn, WorkspaceSnapshotLike } from './faces.js'
 import { FilesPanel } from './panels/FilesPanel.js'
-import { GitPanel } from './panels/GitPanel.js'
+import { GitPanel } from './panels/git/GitPanel.js'
 import { ProjectsPanel } from './panels/ProjectsPanel.js'
 import { PluginsPanel } from './panels/plugins/PluginsPanel.js'
 import { McpPanel } from './panels/mcp/McpPanel.js'
@@ -41,6 +43,11 @@ export interface CodexApi {
   gitCommit: (cwd: string, message: string) => Promise<{ ok: true }>
   gitBranches: (cwd: string) => Promise<GitBranchesResponse>
   gitCheckout: (cwd: string, branch: string) => Promise<{ ok: true }>
+  gitFetch: (cwd: string) => Promise<{ ok: true }>
+  gitPull: (cwd: string) => Promise<{ ok: true }>
+  gitPush: (cwd: string) => Promise<{ ok: true }>
+  gitStageAll: (cwd: string) => Promise<{ ok: true }>
+  gitUnstageAll: (cwd: string) => Promise<{ ok: true }>
   projectDirs: (workspaceId: string) => Promise<ProjectDirsResponse>
   projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<ProjectDirsResponse>
   projectAddDir: (workspaceId: string, path: string) => Promise<ProjectAddDirResponse>
@@ -194,12 +201,6 @@ export interface CodexRightPanelProps extends CodexPanelInjected {
   t: TFn
 }
 
-interface TabSpec {
-  id: PanelKind
-  label: string
-  icon: React.ReactNode
-}
-
 export function CodexRightPanel({
   panel, meta, api, pluginManager, marketplace, mcpManager, skillsManager, history, setColumnOpen,
   useSessions, useWorkspaces, t,
@@ -220,7 +221,7 @@ export function CodexRightPanel({
   if (!state.open) return null
 
   const icon = (size = 15) => ({ size })
-  const tabs: readonly TabSpec[] = [
+  const tabs: readonly TabBarTab[] = [
     { id: 'files', label: t('panelFiles'), icon: <Files {...icon()} /> },
     { id: 'git', label: t('panelGit'), icon: <GitBranch {...icon()} /> },
     { id: 'projects', label: t('panelProjects'), icon: <FolderTree {...icon()} /> },
@@ -232,8 +233,6 @@ export function CodexRightPanel({
     { id: 'browser', label: t('panelBrowser'), icon: <Globe {...icon()} /> },
   ]
 
-  const activeLabel = tabs.find(tab => tab.id === state.tab)?.label ?? ''
-
   const closePanel = (): void => {
     controller.close()
     setColumnOpen(false)
@@ -241,31 +240,14 @@ export function CodexRightPanel({
 
   return (
     <aside className={css.panel} role="complementary" aria-label={t('panelTool')}>
-      <nav className={css.tabRail} aria-label={t('panelTool')}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            className={state.tab === tab.id ? css.tabActive : css.tab}
-            title={tab.label}
-            aria-label={tab.label}
-            aria-current={state.tab === tab.id ? 'true' : undefined}
-            onClick={() => { controller.open(tab.id) }}
-          >
-            {tab.icon}
-          </button>
-        ))}
-        <button type="button" className={`${css.tab} ${css.railEnd}`} title={t('closePanel')}
-          aria-label={t('closePanel')}
-          onClick={closePanel}>
-          <X size={15} />
-        </button>
-      </nav>
-      <div className={css.workbench}>
-        <div className={css.panelHeader}>
-          <span className={css.panelTitle}>{activeLabel}</span>
-        </div>
-        <div className={css.panelBody}>
+      <TabBar
+        tabs={tabs}
+        activeId={state.tab}
+        onSelect={tab => { controller.open(tab) }}
+        onClose={closePanel}
+        t={t}
+      />
+      <div className={css.panelBody}>
           {state.tab === 'files' && (
             <FilesPanel
               api={api}
@@ -290,7 +272,6 @@ export function CodexRightPanel({
           )}
           {state.tab === 'summary' && <SummaryPanel meta={meta} sessionId={currentId} t={t} />}
           {state.tab === 'browser' && <BrowserPanel t={t} />}
-        </div>
       </div>
     </aside>
   )

@@ -48,7 +48,8 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
         aria-selected={props.current}
         onClick={props.onOpen}
         title={props.cwd ?? props.sessionId}>
-        {props.running && <span className={css.dotRunning} />}
+        {/* 状态槽位固定渲染：非运行行也占位，保证标题在各行间水平对齐。 */}
+        <span aria-hidden="true" className={props.running ? css.dotRunning : css.dotSlot} />
         {props.renaming
           ? <input
             className={css.search}
