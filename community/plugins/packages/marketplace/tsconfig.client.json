@@ -6,5 +6,5 @@
     "types": [],
     "noEmit": false
   },
-  "include": ["src/types.ts", "src/remote.ts", "src/client/**/*.ts", "src/client/**/*.tsx", "src/**/*.d.ts"]
+  "include": ["src/types.ts", "src/category.ts", "src/remote.ts", "src/client/**/*.ts", "src/client/**/*.tsx", "src/**/*.d.ts"]
 }

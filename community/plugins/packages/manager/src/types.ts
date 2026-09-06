@@ -61,3 +61,84 @@ export interface MutationReceipt {
   /** Fresh authoritative snapshot after the operation settles. */
   readonly snapshot: PluginManagerSnapshot
 }
+
+/** MCP 传输类型：本地进程或可流式 HTTP。 */
+export type McpTransport = 'stdio' | 'streamable-http'
+
+/** 一条由插件管家维护的 MCP 服务行（投射自 profile patch）。 */
+export interface McpServerRecord {
+  /** Patch 行 id：`mcp-<serverName>`。 */
+  readonly id: string
+  /** MCP 命名空间名，同时是工具名前缀。 */
+  readonly serverName: string
+  readonly transport: McpTransport
+  /** stdio 传输的启动命令；HTTP 传输为 null。 */
+  readonly command: string | null
+  readonly args: readonly string[]
+  readonly env: Readonly<Record<string, string>>
+  readonly cwd: string | null
+  /** streamable-http 传输的端点；stdio 传输为 null。 */
+  readonly url: string | null
+  readonly headers: Readonly<Record<string, string>>
+  /** 单次工具调用超时（毫秒），未配置时为 null。 */
+  readonly toolCallTimeoutMs: number | null
+  readonly disabled: boolean
+  /** 是否由插件管家维护（自带标记行可编辑；用户手写行只读展示）。 */
+  readonly managed: boolean
+}
+
+/** MCP 服务的即时快照。 */
+export interface McpServersSnapshot {
+  readonly profileName: string
+  readonly servers: readonly McpServerRecord[]
+}
+
+/** 新增或更新一条 MCP 服务时提交的传输无关输入。 */
+export interface McpServerInput {
+  readonly serverName: string
+  readonly transport: McpTransport
+  readonly command: string | null
+  readonly args: readonly string[]
+  readonly env: Readonly<Record<string, string>>
+  readonly cwd: string | null
+  readonly url: string | null
+  readonly headers: Readonly<Record<string, string>>
+  readonly toolCallTimeoutMs: number | null
+}
+
+/** MCP 服务写操作的回执。 */
+export interface McpMutationReceipt {
+  /** 操作结果。 */
+  readonly status: 'changed' | 'removed' | 'restart-required' | 'failed'
+  /** 失败说明或重启提示，成功且立即生效时为 null。 */
+  readonly message: string | null
+  /** 操作后最新快照。 */
+  readonly snapshot: McpServersSnapshot
+}
+
+/** 用户技能根中的一个技能条目。 */
+export interface SkillRecord {
+  /** 前言声明的技能名，缺失时回退为目录名。 */
+  readonly name: string
+  /** 技能目录名（稳定定位键）。 */
+  readonly directory: string
+  readonly description: string | null
+  /** 是否允许模型调用（!disable-model-invocation）。 */
+  readonly modelInvocable: boolean
+  /** SKILL.md 的绝对路径。 */
+  readonly source: string
+}
+
+/** 技能即时快照。 */
+export interface SkillsSnapshot {
+  /** 被扫描的用户技能根目录。 */
+  readonly skillsRoot: string
+  readonly skills: readonly SkillRecord[]
+}
+
+/** 技能写操作回执。 */
+export interface SkillMutationReceipt {
+  readonly status: 'changed' | 'failed'
+  readonly message: string | null
+  readonly snapshot: SkillsSnapshot
+}

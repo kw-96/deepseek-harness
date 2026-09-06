@@ -3,8 +3,11 @@ export interface LocalizedText {
   readonly en: string
 }
 
+import type { CatalogCategory } from './category.js'
+
 export type CatalogAvailability = 'installable' | 'unavailable'
 export type CatalogCompatibility = 'declared' | 'unverified'
+export type { CatalogCategory } from './category.js'
 
 /** Stable marketplace ordering: installable entries first, then entries with a reason they cannot be installed. */
 export function compareCatalogEntries(
@@ -33,6 +36,7 @@ export interface MarketplaceEntry {
   readonly displayName: LocalizedText
   readonly summary: LocalizedText
   readonly keywords: readonly string[]
+  readonly category: CatalogCategory
   readonly license: string | null
   readonly repositoryDirectory: string | null
   readonly homepage: string | null

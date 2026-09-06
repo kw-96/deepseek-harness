@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PluginMarketplaceTab, type PluginMarketplaceTabProps } from '../src/client/PluginMarketplaceTab.js'
 import { en, type LocaleKey } from '../src/client/locales.js'
@@ -7,13 +7,14 @@ import type { MarketplaceEntry, MarketplaceSnapshot } from '../src/types.js'
 
 const queryKey = 'dsh-plugin-marketplace.marketplace.global.query.v1'
 const statusKey = 'dsh-plugin-marketplace.marketplace.global.status_filter.v3'
+const categoryKey = 'dsh-plugin-marketplace.marketplace.global.category.v1'
 const t = (value: LocaleKey): string => en[value]
 
 const available: MarketplaceEntry = {
   id: 'hrhgit/deepseek-harness-plugin-manager:packages/manager', repositoryFullName: 'hrhgit/deepseek-harness-plugin-manager',
   repositoryUrl: 'https://github.com/hrhgit/deepseek-harness-plugin-manager', packageName: 'dsh-plugin-manager', version: '0.1.0',
   displayName: { 'zh-CN': '插件管理器', en: 'Plugin Manager' }, summary: { 'zh-CN': '管理插件。', en: 'Manage installed plugins.' },
-  keywords: ['manager'], license: 'MIT', repositoryDirectory: 'packages/manager', homepage: null,
+  keywords: ['manager', 'plugin-manager'], category: 'plugin-manager', license: 'MIT', repositoryDirectory: 'packages/manager', homepage: null,
   manifestUrl: 'https://example.test/manager/package.json', availability: 'installable', compatibility: 'declared', issueCode: null, issue: null,
   installedVersion: null,
 }
@@ -23,7 +24,7 @@ const unavailable: MarketplaceEntry = {
   packageName: 'dsh-unavailable', version: '1.0.0', displayName: { 'zh-CN': '不可安装插件', en: 'Unavailable Plugin' },
   summary: { 'zh-CN': 'npm 尚未发布。', en: 'npm package is not published.' }, repositoryDirectory: null,
   manifestUrl: 'https://example.test/unavailable/package.json', availability: 'unavailable', compatibility: 'unverified', issueCode: 'package-unpublished',
-  issue: 'dsh-unavailable@1.0.0 is not published on npm',
+  issue: 'dsh-unavailable@1.0.0 is not published on npm', category: 'other',
 }
 const snapshot: MarketplaceSnapshot = {
   profileName: 'web', stale: false, warnings: [], generatedAt: '2026-08-14T00:00:00.000Z', fetchedAt: '2026-08-14T00:01:00.000Z',
@@ -56,6 +57,10 @@ describe('PluginMarketplaceTab', () => {
     ])
     expect(screen.getAllByText(en.installableStatus).length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: en.repository })).toHaveProperty('href', available.repositoryUrl)
+    // 列表按分类分组：组头带计数，详情区展示分类事实。
+    expect(screen.getByRole('group', { name: 'Plugin Management' }).textContent).toContain('1')
+    expect(screen.getByRole('group', { name: 'Other' }).textContent).toContain('1')
+    expect(screen.getAllByText('Plugin Management').length).toBeGreaterThan(1)
   })
 
   it('persists the normal query and filters the downloaded catalog without another remote search', async () => {
@@ -110,6 +115,24 @@ describe('PluginMarketplaceTab', () => {
     fireEvent.click(screen.getByRole('button', { name: en.confirmInstall }))
     await waitFor(() => expect(install).toHaveBeenCalledWith('dsh-plugin-manager', '0.1.0'))
     expect((await screen.findByRole('status')).textContent).toContain(en.restartRequired)
+  })
+
+  it('renders one tab per category and filters the list to that category', async () => {
+    render(<PluginMarketplaceTab {...props()} />)
+    await screen.findAllByText('Plugin Manager')
+    const bar = screen.getByRole('group', { name: en.categories })
+    expect(bar.textContent).toContain('All')
+    expect(bar.textContent).toContain('Plugin Management')
+    expect(bar.textContent).toContain('Other')
+    // 点分类标签后列表变平铺，只保留该分类条目，组头消失。
+    fireEvent.click(screen.getByRole('button', { name: /Plugin Management/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getAllByRole('listitem')[0]?.textContent).toContain('Plugin Manager')
+    expect(screen.queryByRole('group', { name: 'Plugin Management' })).toBeNull()
+    expect(JSON.parse(window.localStorage.getItem(categoryKey) ?? 'null')).toBe('plugin-manager')
+    // 回到全部恢复分组视图（作用域限定在分类标签栏内，避开状态栏的同名按钮）。
+    fireEvent.click(within(bar).getByRole('button', { name: /All/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
   })
 
   it('keeps the page usable with catalog warnings and failed installs', async () => {

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { isMap, isSeq, parseDocument, type Document, type YAMLMap, type YAMLSeq } from 'yaml'
 
 const PATCH_FILENAME = 'cordis.patch.yml'
-const OWNER_MARKER = 'Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.'
+export const OWNER_MARKER = 'Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.'
 
 /** Profile patch location inferred from the running Loader tree. */
 export interface ProfileLocation {
@@ -29,7 +29,7 @@ function emptyDocument(): Document.Parsed {
   return parseDocument('[]\n')
 }
 
-async function readDocument(filename: string): Promise<Document.Parsed> {
+export async function readDocument(filename: string): Promise<Document.Parsed> {
   let source: string
   try {
     source = await readFile(filename, 'utf8')
@@ -78,7 +78,7 @@ export async function writeDesiredState(
   await atomicWrite(location.filename, String(document))
 }
 
-async function atomicWrite(filename: string, content: string): Promise<void> {
+export async function atomicWrite(filename: string, content: string): Promise<void> {
   await mkdir(dirname(filename), { recursive: true })
   const temporary = join(dirname(filename), `.${basename(filename)}.${process.pid}.${randomUUID()}.tmp`)
   await writeFile(temporary, content.endsWith('\n') ? content : `${content}\n`, 'utf8')

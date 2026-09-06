@@ -9,13 +9,22 @@ import { packageRoot } from './host/package-name.js'
 import { AUTOMATIC_CATEGORIES, declaredGroup, OFFICIAL_CATEGORY, packageDescription, pluginCategory } from './host/plugin-category.js'
 import { officialDescription, officialGroup } from './host/official-package-index.js'
 import { profileLocation, writeDesiredState, type ProfileLocation } from './host/profile-patches.js'
+import {
+  listMcpServers, mcpConfigId, removeMcpServer, saveMcpServer, setMcpServerEnabled,
+} from './host/mcp-servers.js'
+import { listSkills, setSkillModelInvocation } from './host/skills.js'
 import type {
   ManagedPluginEntry,
+  McpMutationReceipt,
+  McpServerInput,
+  McpServersSnapshot,
   MutationItem,
   MutationReceipt,
   PluginCategory,
   PluginManagerSnapshot,
   PluginPhase,
+  SkillMutationReceipt,
+  SkillsSnapshot,
 } from './types.js'
 
 export type * from './types.js'
@@ -133,6 +142,69 @@ export class PluginManager extends TypertRemoteService {
     })
   }
 
+  /** List every mcp-client patch row (managed and user-authored). */
+  @Remote('listMcpServers')
+  async listMcpServersRemote(): Promise<McpServersSnapshot> {
+    return await listMcpServers(this.location)
+  }
+
+  /** Create or update one manager-owned MCP server row and settle it live. */
+  @Remote('saveMcpServer')
+  async saveMcpServerRemote(input: McpServerInput, enabled: boolean): Promise<McpMutationReceipt> {
+    return await this.serialize(async () => {
+      const receipt = await saveMcpServer(this.location, input, enabled)
+      if (receipt.status !== 'changed') return receipt
+      if (!enabled) return { ...receipt, message: null }
+      try {
+        await this.waitForMcp(input.serverName, enabled)
+        return receipt
+      } catch (error) {
+        return {
+          status: 'restart-required',
+          message: `The MCP row was saved but did not settle at runtime. Restart the ${this.location.profileName} profile to apply it. ${error instanceof Error ? error.message : String(error)}`,
+          snapshot: receipt.snapshot,
+        }
+      }
+    })
+  }
+
+  /** Remove one manager-owned MCP server row. */
+  @Remote('removeMcpServer')
+  async removeMcpServerRemote(serverName: string): Promise<McpMutationReceipt> {
+    return await this.serialize(async () => removeMcpServer(this.location, serverName))
+  }
+
+  /** Enable or disable one manager-owned MCP server row and settle it live. */
+  @Remote('setMcpServerEnabled')
+  async setMcpServerEnabledRemote(serverName: string, enabled: boolean): Promise<McpMutationReceipt> {
+    return await this.serialize(async () => {
+      const receipt = await setMcpServerEnabled(this.location, serverName, enabled)
+      if (receipt.status !== 'changed') return receipt
+      try {
+        await this.waitForMcp(serverName, enabled)
+        return receipt
+      } catch (error) {
+        return {
+          status: 'restart-required',
+          message: `The desired state was saved but did not settle at runtime. Restart the ${this.location.profileName} profile to apply it. ${error instanceof Error ? error.message : String(error)}`,
+          snapshot: receipt.snapshot,
+        }
+      }
+    })
+  }
+
+  /** List every skill under the user skill root. */
+  @Remote('listSkills')
+  async listSkillsRemote(): Promise<SkillsSnapshot> {
+    return await listSkills()
+  }
+
+  /** Enable or disable model invocation for one skill. */
+  @Remote('setSkillModelInvocation')
+  async setSkillModelInvocationRemote(skillName: string, enabled: boolean): Promise<SkillMutationReceipt> {
+    return await this.serialize(async () => setSkillModelInvocation(skillName, enabled))
+  }
+
   private project(entry: Entry): ManagedPluginEntry {
     const self = packageRoot(entry.options.name) === SELF_MODULE
     const protectedById = this.protectedIds.has(entry.options.id)
@@ -215,6 +287,24 @@ export class PluginManager extends TypertRemoteService {
       await new Promise(resolve => setTimeout(resolve, 25))
     }
     throw new Error(`Timed out waiting for ${entryId} to become ${enabled ? 'enabled' : 'disabled'}.`)
+  }
+
+  /** 等待 mcp-<serverName> 条目在 Loader 中达到目标启停状态（热应用或判定需重启）。 */
+  private async waitForMcp(serverName: string, enabled: boolean): Promise<void> {
+    const entryId = mcpConfigId(serverName)
+    const deadline = Date.now() + this.settleTimeoutMs
+    while (Date.now() < deadline) {
+      let resolved: boolean
+      try {
+        const entry = this.ctx.loader.resolve(entryId)
+        resolved = !entry.disabled === enabled && entry._initTask === undefined && entry._disposing === 0
+      } catch {
+        resolved = !enabled
+      }
+      if (resolved) return
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    throw new Error(`Timed out waiting for MCP server ${serverName} to become ${enabled ? 'enabled' : 'disabled'}.`)
   }
 
   private async serialize<T>(operation: () => Promise<T>): Promise<T> {

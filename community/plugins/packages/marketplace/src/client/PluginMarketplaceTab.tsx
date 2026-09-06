@@ -1,6 +1,7 @@
 import { AlertTriangle, Ban, Check, Download, ExternalLink, Info, RefreshCw, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { compareCatalogEntries, type CatalogAvailability, type CatalogCompatibility, type CatalogIssueCode, type InstallReceipt, type MarketplaceEntry, type MarketplaceSnapshot } from '../types.js'
+import { compareCatalogEntries, type CatalogAvailability, type CatalogCategory, type CatalogCompatibility, type CatalogIssueCode, type InstallReceipt, type MarketplaceEntry, type MarketplaceSnapshot } from '../types.js'
+import { CATEGORY_DISPLAY_ORDER, CATEGORY_LABELS } from '../category.js'
 import type { LocaleKey } from './locales.js'
 import { usePersistedState, type PersistPolicy } from './persistence.js'
 import css from './PluginMarketplaceTab.module.css'
@@ -27,6 +28,16 @@ const statusFilterPolicy: PersistPolicy<StatusFilter> = {
   },
 }
 
+const categoryFilterPolicy: PersistPolicy<string> = {
+  key: 'dsh-plugin-marketplace.marketplace.global.category.v1',
+  kind: 'normal',
+  defaultValue: 'all',
+  deserializer: raw => {
+    const value = JSON.parse(raw) as unknown
+    return typeof value === 'string' && value.length <= 40 ? value : 'all'
+  },
+}
+
 const issueLocaleKey: Record<CatalogIssueCode, LocaleKey> = {
   'repository-unavailable': 'issueRepositoryUnavailable',
   'manifest-unavailable': 'issueManifestUnavailable',
@@ -45,6 +56,26 @@ const availabilityLocaleKey: Record<CatalogAvailability, LocaleKey> = {
 const compatibilityLocaleKey: Record<CatalogCompatibility, LocaleKey> = {
   declared: 'compatibilityDeclared',
   unverified: 'compatibilityUnverified',
+}
+
+/** 分类的本地化显示名；未知分类回退为分类 id 本身。 */
+function categoryLabel(category: CatalogCategory, locale: string): string {
+  return CATEGORY_LABELS[category][locale === 'zh-CN' ? 'zh-CN' : 'en']
+}
+
+/** 已按目录稳定序排序的分类分组。 */
+type CategoryGroup = { readonly category: CatalogCategory; readonly entries: readonly MarketplaceEntry[] }
+
+function groupByCategory(entries: readonly MarketplaceEntry[]): readonly CategoryGroup[] {
+  const byCategory = new Map<CatalogCategory, MarketplaceEntry[]>()
+  for (const entry of entries) {
+    const list = byCategory.get(entry.category) ?? []
+    list.push(entry)
+    byCategory.set(entry.category, list)
+  }
+  return CATEGORY_DISPLAY_ORDER
+    .filter(category => byCategory.has(category))
+    .map(category => ({ category, entries: byCategory.get(category) ?? [] }))
 }
 
 export interface PluginMarketplaceTabApi {
@@ -73,6 +104,7 @@ function localizeWarning(code: string, message: string, t: (key: LocaleKey) => s
 export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketplaceTabProps): ReactNode {
   const [query, setQuery] = usePersistedState(queryPolicy)
   const [statusFilter, setStatusFilter] = usePersistedState(statusFilterPolicy)
+  const [categoryFilter, setCategoryFilter] = usePersistedState(categoryFilterPolicy)
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [selected, setSelected] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<MarketplaceEntry | null>(null)
@@ -92,10 +124,16 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
   }, [list])
 
   const entries = state.status === 'ready' ? state.snapshot.entries : []
+  /** 当前目录中实际存在的分类（按展示顺序），供分类标签栏渲染。 */
+  const categoryTabs = useMemo(() => {
+    const present = new Set(entries.map(entry => entry.category))
+    return CATEGORY_DISPLAY_ORDER.filter(category => present.has(category))
+  }, [entries])
   const visibleEntries = useMemo(() => {
     const value = query.trim().toLocaleLowerCase()
     return entries.filter(entry => {
       if (statusFilter !== 'all' && entry.availability !== statusFilter) return false
+      if (categoryFilter !== 'all' && entry.category !== categoryFilter) return false
       if (value === '') return true
       const searchable = [
         entry.repositoryFullName,
@@ -109,7 +147,9 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
       ]
       return searchable.some(item => item.toLocaleLowerCase().includes(value))
     }).sort(compareCatalogEntries)
-  }, [entries, query, statusFilter])
+  }, [entries, query, statusFilter, categoryFilter])
+
+  const grouped = useMemo(() => groupByCategory(visibleEntries), [visibleEntries])
 
   useEffect(() => {
     setSelected(current => current !== null && visibleEntries.some(entry => entry.id === current)
@@ -141,6 +181,23 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
     }
   }
 
+  const renderRow = (entry: MarketplaceEntry): ReactNode => (
+    <button
+      type="button"
+      role="listitem"
+      key={entry.id}
+      className={css.pluginRow}
+      data-selected={entry.id === selected || undefined}
+      data-availability={entry.availability}
+      onClick={() => { setSelected(entry.id); setFeedback(null) }}
+    >
+      <span className={css.rowMain}><strong>{entry.displayName[locale === 'zh-CN' ? 'zh-CN' : 'en']}</strong><code>{entry.packageName ?? entry.repositoryFullName}</code></span>
+      <span className={css.rowMeta}><small>{entry.version ?? t('unknown')}</small>{entry.installedVersion !== null
+        ? <small data-installed="true">{t('installed')}</small>
+        : <small data-availability={entry.availability}>{t(availabilityLocaleKey[entry.availability])}</small>}</span>
+    </button>
+  )
+
   const count = (availability: CatalogAvailability): number => entries.filter(entry => entry.availability === availability).length
 
   return <section className={css.marketplace}>
@@ -161,6 +218,15 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
       ] as const).map(([value, label, total]) => <button type="button" key={value} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}><span>{label}</span><small>{total}</small></button>)}
     </div> : null}
 
+    {state.status === 'ready' && categoryTabs.length > 1 ? <div className={css.filters} role="group" aria-label={t('categories')}>
+      <button type="button" aria-pressed={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')}>
+        <span>{t('filterAll')}</span><small>{entries.length}</small>
+      </button>
+      {categoryTabs.map(category => <button type="button" key={category} aria-pressed={categoryFilter === category} onClick={() => setCategoryFilter(category)}>
+        <span>{categoryLabel(category, locale)}</span><small>{entries.filter(entry => entry.category === category).length}</small>
+      </button>)}
+    </div> : null}
+
     {state.status === 'loading' ? <p className={css.message}>{t('loading')}</p> : null}
     {state.status === 'error' ? <div className={css.error} role="alert"><span>{t('loadFailed')} {state.message}</span><button type="button" onClick={() => { setState({ status: 'loading' }); void list(true).then(adopt, error => setState({ status: 'error', message: String(error) })) }}>{t('retry')}</button></div> : null}
     {state.status === 'ready' && (state.snapshot.stale || state.snapshot.warnings.length > 0) ? (() => {
@@ -175,20 +241,12 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
 
     {state.status === 'ready' ? <div className={css.workspace}>
       <div className={css.listPane} role="list" aria-label={t('title')}>
-        {visibleEntries.length === 0 ? <p className={css.empty}>{query.trim() === '' ? t('empty') : t('emptySearch')}</p> : visibleEntries.map(entry => <button
-          type="button"
-          role="listitem"
-          key={entry.id}
-          className={css.pluginRow}
-          data-selected={entry.id === selected || undefined}
-          data-availability={entry.availability}
-          onClick={() => { setSelected(entry.id); setFeedback(null) }}
-        >
-          <span className={css.rowMain}><strong>{entry.displayName[locale === 'zh-CN' ? 'zh-CN' : 'en']}</strong><code>{entry.packageName ?? entry.repositoryFullName}</code></span>
-          <span className={css.rowMeta}><small>{entry.version ?? t('unknown')}</small>{entry.installedVersion !== null
-            ? <small data-installed="true">{t('installed')}</small>
-            : <small data-availability={entry.availability}>{t(availabilityLocaleKey[entry.availability])}</small>}</span>
-        </button>)}
+        {visibleEntries.length === 0 ? <p className={css.empty}>{query.trim() === '' ? t('empty') : t('emptySearch')}</p> : categoryFilter === 'all'
+          ? grouped.map(group => <section key={group.category} className={css.categorySection} role="group" aria-label={categoryLabel(group.category, locale)}>
+            <header className={css.categoryHeader}><h4>{categoryLabel(group.category, locale)}</h4><small>{group.entries.length}</small></header>
+            {group.entries.map(renderRow)}
+          </section>)
+          : visibleEntries.map(renderRow)}
       </div>
 
       <div className={css.detailPane}>
@@ -203,6 +261,7 @@ export function PluginMarketplaceTab({ list, install, t, locale }: PluginMarketp
           <p className={css.summary}>{active.summary[locale === 'zh-CN' ? 'zh-CN' : 'en']}</p>
           <dl className={css.facts}>
             <div><dt>{t('version')}</dt><dd>{active.version ?? t('unknown')}</dd></div>
+            <div><dt>{t('category')}</dt><dd>{categoryLabel(active.category, locale)}</dd></div>
             <div><dt>{t('status')}</dt><dd>{active.installedVersion !== null ? t('installed') : t(availabilityLocaleKey[active.availability])}</dd></div>
             <div><dt>{t('compatibility')}</dt><dd>{t(compatibilityLocaleKey[active.compatibility])}</dd></div>
             <div><dt>{t('license')}</dt><dd>{active.license ?? t('unknown')}</dd></div>

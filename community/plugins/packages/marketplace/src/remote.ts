@@ -1,6 +1,6 @@
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
-import type { InstallReceipt, MarketplaceSnapshot } from './types.js'
+import type { CatalogCategory, InstallReceipt, MarketplaceSnapshot } from './types.js'
 
 const localized = z.object({ 'zh-CN': z.string(), en: z.string() }).readonly()
 const issueCode = z.union([
@@ -9,9 +9,14 @@ const issueCode = z.union([
 ])
 const availability = z.union([z.literal('installable'), z.literal('unavailable')])
 const compatibility = z.union([z.literal('declared'), z.literal('unverified')])
+const category: z.ZodType<CatalogCategory> = z.union([
+  z.literal('agent'), z.literal('tool'), z.literal('ui'), z.literal('mcp'), z.literal('skill'), z.literal('llm'),
+  z.literal('workflow'), z.literal('memory'), z.literal('web'), z.literal('cost'), z.literal('security'),
+  z.literal('plugin-manager'), z.literal('other'),
+])
 const entry = z.object({
   id: z.string(), repositoryFullName: z.string(), repositoryUrl: z.string(), packageName: z.string().nullable(), version: z.string().nullable(),
-  displayName: localized, summary: localized, keywords: z.array(z.string()).readonly(), license: z.string().nullable(),
+  displayName: localized, summary: localized, keywords: z.array(z.string()).readonly(), category, license: z.string().nullable(),
   repositoryDirectory: z.string().nullable(), homepage: z.string().nullable(), manifestUrl: z.string().nullable(), availability, compatibility,
   issueCode: issueCode.nullable(), issue: z.string().nullable(), installedVersion: z.string().nullable(),
 }).readonly()

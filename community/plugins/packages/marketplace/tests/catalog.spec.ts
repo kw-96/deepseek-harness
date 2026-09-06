@@ -78,6 +78,7 @@ describe('generated marketplace catalog', () => {
     expect(state.warnings.at(-1)?.code).toBe('catalog-unavailable')
     const snapshot = snapshotWithProfile(state, 'web', { 'dsh-plugin-manager': '0.1.0' })
     expect(snapshot.entries[0]?.installedVersion).toBe('0.1.0')
+    expect(snapshot.entries[0]?.category).toBe('other')
   })
 
   it('keeps the first run usable when the generated catalog is unavailable', async () => {

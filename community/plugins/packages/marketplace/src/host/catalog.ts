@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { catalogDocumentSchema, type CatalogDocument, type CatalogEntry } from '../manifest.js'
 import { compareCatalogEntries, type DiscoveryWarning, type MarketplaceSnapshot } from '../types.js'
+import { deriveCategory } from '../category.js'
 
 // The GitHub API raw media type is reachable in environments where the raw
 // content host does not have a configured Node proxy.
@@ -142,6 +143,7 @@ export function snapshotWithProfile(
     profileName,
     entries: [...state.entries].sort(compareCatalogEntries).map(entry => ({
       ...entry,
+      category: deriveCategory(entry.keywords),
       installedVersion: entry.packageName === null ? null : dependencies[entry.packageName] ?? null,
     })),
     warnings: state.warnings,

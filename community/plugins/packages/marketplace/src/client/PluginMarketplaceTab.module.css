@@ -19,8 +19,13 @@
 .filters button:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .filters button[aria-pressed='true'] { background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-weight: 600; }
 .filters small { min-width: 16px; color: var(--dsw-alias-label-tertiary); font-size: 9px; line-height: 14px; text-align: right; }
-.workspace { display: grid; min-height: 390px; grid-template-columns: minmax(250px, 38%) minmax(0, 1fr); overflow: hidden; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; background: var(--dsw-alias-bg-module-platform); }
-.listPane { min-width: 0; overflow: auto; border-right: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-3); }
+.workspace { display: grid; height: clamp(360px, 62vh, 560px); min-height: 360px; grid-template-columns: minmax(250px, 38%) minmax(0, 1fr); overflow: hidden; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; background: var(--dsw-alias-bg-module-platform); }
+.listPane { min-width: 0; min-height: 0; overflow: auto; border-right: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-3); }
+.categorySection { padding-bottom: 2px; }
+.categorySection + .categorySection { border-top: 1px solid var(--dsw-alias-border-l2); }
+.categoryHeader { position: sticky; z-index: 1; top: 0; display: flex; height: 30px; align-items: center; justify-content: space-between; padding: 0 12px; background: var(--dsw-alias-bg-layer-3); border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.categoryHeader h4 { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 600; line-height: 17px; }
+.categoryHeader small { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 15px; }
 .pluginRow { display: grid; width: 100%; min-height: 67px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--dsw-alias-border-l2); padding: 9px 12px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .pluginRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .pluginRow[data-selected='true'] { box-shadow: inset 3px 0 0 var(--dsw-alias-state-business-primary); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent); }
@@ -32,7 +37,7 @@
 .rowMeta small[data-installed='true'] { color: var(--dsw-alias-state-success-primary); }
 .rowMeta small[data-availability='installable'] { color: #16836b; }
 .rowMeta small[data-availability='unavailable'] { color: var(--dsw-alias-state-error-primary); }
-.detailPane { min-width: 0; padding: 18px 20px; }
+.detailPane { min-width: 0; min-height: 0; overflow: auto; padding: 18px 20px; }
 .detailTitle { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .detailTitle h4 { margin: 0 0 3px; font-size: 16px; line-height: 23px; font-weight: 650; letter-spacing: 0; overflow-wrap: anywhere; }
 .detailTitle code { color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
@@ -82,14 +87,4 @@
 .dialog footer button:last-child { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-state-business-primary); color: white; }
 .iconButton:focus-visible, .filters button:focus-visible, .pluginRow:focus-visible, .installButton:focus-visible, .dialog button:focus-visible, .links a:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@container (max-width: 680px) {
-  .workspace { min-height: 0; grid-template-columns: minmax(0, 1fr); }
-  .listPane { max-height: 250px; border-right: 0; border-bottom: 1px solid var(--dsw-alias-border-l2); }
-  .detailPane { padding: 14px; }
-  .detailTitle { align-items: stretch; flex-direction: column; gap: 12px; }
-  .installButton { align-self: stretch; }
-  .facts { grid-template-columns: minmax(0, 1fr); }
-  .facts div { border-bottom: 1px solid var(--dsw-alias-border-l2); }
-  .facts div:last-child { border-bottom: 0; }
-}
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
