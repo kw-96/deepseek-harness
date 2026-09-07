@@ -19,10 +19,9 @@ function Get-DshWebPids {
 }
 
 function Get-DesktopExePids {
+  # Match by image name only — CommandLine also matches this smoke script's argv.
   Get-CimInstance Win32_Process | Where-Object {
-    $_.Name -eq 'DeepSeek Harness.exe' -or (
-      $_.CommandLine -and $_.CommandLine -match 'DeepSeek Harness\.exe|dsh-web-desktop\.exe'
-    )
+    $_.Name -eq 'DeepSeek Harness.exe' -or $_.Name -eq 'dsh-web-desktop.exe'
   } | ForEach-Object { $_.ProcessId }
 }
 

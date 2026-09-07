@@ -36,12 +36,16 @@ impl HarnessChild {
         .stderr(Stdio::null());
       apply_no_window(&mut taskkill);
       let _ = taskkill.status();
+      // taskkill /F already reaps the tree. A blocking wait() here can stall
+      // Tauri's close/exit path and leave DeepSeek Harness.exe alive with no
+      // listener.
+      let _ = self.child.try_wait();
     }
     #[cfg(not(windows))]
     {
       let _ = self.child.kill();
+      let _ = self.child.wait();
     }
-    let _ = self.child.wait();
     if let Some(index) = self.dist_snapshot.take() {
       snapshot::remove_snapshot(&index);
     }
@@ -200,19 +204,23 @@ pub fn run() {
       });
       Ok(())
     })
-    .on_window_event(move |window, event| {
+    .on_window_event(move |_window, event| {
       if let WindowEvent::CloseRequested { .. } = event {
-        // Undecorated windows can leave the process alive after WM_CLOSE unless
-        // we tear down the harness and force App exit here.
+        // Tear down dsh web, then hard-exit. Undecorated WebView2 shells can
+        // otherwise linger as a window-less process after WM_CLOSE.
         shutdown_harness(&child_for_window);
-        window.app_handle().exit(0);
+        std::process::exit(0);
       }
     })
     .build(tauri::generate_context!())
     .expect("error while building DeepSeek Harness desktop shell");
 
   app.run(move |_app_handle, event| {
-    if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
+    if matches!(event, RunEvent::ExitRequested { .. }) {
+      shutdown_harness(&child_for_exit);
+      std::process::exit(0);
+    }
+    if matches!(event, RunEvent::Exit) {
       shutdown_harness(&child_for_exit);
     }
   });
