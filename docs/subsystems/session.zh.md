@@ -666,6 +666,28 @@ interface TurnEndReasonMap {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxcodeximport--codeximportcontroller"></a>
+
+### `ctx.codexImport` — `CodexImportController`
+
+Remote business surface for the card: trigger a run and read history. The controller owns the durable `codex_import` domain and never touches the session log beyond what the sweep already wrote.
+
+```ts cordis-catalog
+/**
+ * Run one import sweep now and record its outcome as the newest history run.
+ * @returns the recorded run.
+ */
+@Remote('run') async run(): Promise<CodexImportRun>
+
+/**
+ * Read recorded import runs, newest first.
+ * @returns the complete history list.
+ */
+@Remote('history') async history(): Promise<CodexImportHistoryValue>
+```
+
+Source: [`packages/session/session-import-codex/src/remote.ts`](../../packages/session/session-import-codex/src/remote.ts)
+
 <a id="ctxsessioncontroller--sessioncontroller"></a>
 
 ### `ctx.sessionController` — `SessionController`

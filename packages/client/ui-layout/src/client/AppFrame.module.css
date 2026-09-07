@@ -1,8 +1,18 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+}
+
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
   grid-template-rows: minmax(0, 1fr) 0;
   height: 100%;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve

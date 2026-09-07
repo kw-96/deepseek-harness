@@ -259,6 +259,12 @@ class StubPtySession implements TerminalBackendSession {
     return Promise.resolve({ delivered: true as const, targetPgid: 123 })
   }
 
+  async write(_data: string): Promise<void> {}
+
+  async resize(_cols: number, _rows: number): Promise<void> {}
+
+  async *followOutput(_signal: AbortSignal) {}
+
   status() {
     return this.statusValue
   }

@@ -59,7 +59,7 @@ CLI 解析顺序：`DSH_DESKTOP_CLI` → 自本 exe 向上查找 → 自进程 c
 <a id="dev-note"></a>
 ## 开发备忘
 
-决策记录：[实验性 Web 桌面壳](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.zh.md)。
+Decision record: [experimental Web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.zh.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.zh.md).
 
 -----
 
@@ -82,4 +82,5 @@ CLI 解析顺序：`DSH_DESKTOP_CLI` → 自本 exe 向上查找 → 自进程 c
 - **CI 不把 `tauri build` 当作门禁** — 在分配 Rust/WebView2 runner 之前，由本地或可选任务负责原生编译。
 - **已提交的 exe 可能过期** — 改了壳源码却未再跑 `pnpm run desktop:web` 并提交新的 `DeepSeek Harness.exe` 时，对端仍会用旧二进制。
 - **exe 文件图标不能随主题变色** — Windows 资源管理器不会按系统浅色/深色重绘 PE 图标；当前交付为深色底 + 白色小鱼，保证两主题都可读。
+- **自定义顶栏依赖 Tauri IPC** — 窗口关闭系统装饰后，启动页与 Web 顶栏通过 `withGlobalTauri` 与 remote capability 调用最小化/最大化/关闭；普通浏览器打开同一 Web 时不显示该顶栏。
 - **前端冻结仅针对 dist** — Host 仍经 checkout 的 `dsh`（源码）启动；仅 Web 资源树会按会话重建并快照。

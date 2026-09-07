@@ -123,7 +123,7 @@ Sessions get their cwd at create time from whoever creates them, not from this r
 
 ## Consumers
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD and Session membership (`attachSession` / `detachSession` / `insertSessionBefore`) to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -224,6 +224,20 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the updated Workspace projection.
  */
 @Remote('insertSessionBefore') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>
+
+/**
+ * Account one Session whose stored cwd matches the Workspace path.
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('attachSession') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>
+
+/**
+ * Remove one Session from a Workspace account (Ungrouped).
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('detachSession') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>
 
 /**
  * Hide one known Session from Workspace grouping surfaces.

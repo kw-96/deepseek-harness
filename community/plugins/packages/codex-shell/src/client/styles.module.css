@@ -265,6 +265,7 @@
 }
 
 .workspaceHead {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -574,6 +575,170 @@
   height: 0.5px;
   margin: 5px 8px;
   background: var(--cx-line-strong);
+}
+
+.menuItemDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menuItemDisabled:hover {
+  background: transparent;
+}
+
+.menuItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuChevron {
+  flex: none;
+  opacity: 0.55;
+}
+
+.submenuAnchor {
+  position: relative;
+}
+
+.submenuFlyout {
+  position: absolute;
+  top: 0;
+  left: calc(100% - 4px);
+  z-index: 1;
+  min-width: 196px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+}
+
+.menuHint {
+  margin: 6px 8px 2px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.menuGroupLabel {
+  margin: 4px 8px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.rowHoverActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.sectionHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 4px 8px 2px;
+  padding: 0 4px;
+}
+
+.sectionTitle {
+  flex: 1;
+  min-width: 0;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.sectionMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+}
+
+.projectInfoAnchor {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  z-index: 30;
+}
+
+.projectInfoCard {
+  width: 260px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+  color: var(--cx-text-hi);
+}
+
+.projectInfoHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.projectInfoTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectInfoMeta {
+  margin-top: 6px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+}
+
+.projectInfoPath {
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--cx-text-mid);
+  font-size: 11px;
+  line-height: 15px;
+  word-break: break-all;
+}
+
+.projectInfoPin {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.projectInfoPin:hover {
+  background: var(--cx-active);
 }
 
 /* ── 空状态 ───────────────────────────────────────────── */
@@ -2329,6 +2494,160 @@
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bottomTabStrip {
+  display: flex;
+  min-height: 28px;
+  align-items: stretch;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 4px;
+  flex: none;
+  background: color-mix(in srgb, var(--cx-bg) 92%, #000);
+}
+
+.bottomTabList {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.bottomTab,
+.bottomTabActive {
+  display: inline-flex;
+  max-width: 200px;
+  min-width: 72px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--cx-text-mid);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.bottomTab:hover {
+  background: color-mix(in srgb, var(--cx-line) 40%, transparent);
+}
+
+.bottomTabActive {
+  background: #0d0d0d;
+  color: var(--cx-text-hi);
+}
+
+.bottomTabLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomTabBadge {
+  margin-left: 4px;
+  border-radius: 3px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--cx-accent, #3b82f6) 25%, transparent);
+  color: var(--cx-text-mid);
+  font-size: 10px;
+}
+
+.bottomTabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0.55;
+}
+
+.bottomTabClose:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--cx-line) 55%, transparent);
+}
+
+.bottomTabActions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.bottomTabMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 140px;
+  border: 0.5px solid var(--cx-line);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--cx-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.bottomTabMenuItem {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--cx-text-hi);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.bottomTabMenuItem:hover {
+  background: color-mix(in srgb, var(--cx-line) 45%, transparent);
+}
+
+.bottomTerminalEmpty {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  text-align: center;
+  background: #0d0d0d;
+}
+
+.bottomTerminalStack {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+
+.bottomTerminalPane,
+.bottomTerminalPaneHidden {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bottomTerminalPaneHidden {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bottomTerminalPane {
+  position: relative;
+  z-index: 1;
 }
 
 .bottomTerminalXterm {

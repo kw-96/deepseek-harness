@@ -129,6 +129,16 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     setOpen(true)
   }, [])
 
+  // Desktop title-bar Edit → Settings dispatches this window event.
+  useEffect(() => {
+    const onCommand = (event: Event): void => {
+      const detail = (event as CustomEvent<{ command?: string }>).detail
+      if (detail?.command === 'open-settings') setOpen(true)
+    }
+    window.addEventListener('dsh-desktop:command', onCommand)
+    return () => { window.removeEventListener('dsh-desktop:command', onCommand) }
+  }, [])
+
   // The ledger tick keeps the nav rows fresh: registrants re-register with
   // freshly localized text on locale change, and the trigger/header/close
   // seats re-render through their own outlets' subscriptions.

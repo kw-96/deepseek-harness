@@ -13,7 +13,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 const READY_PREFIX: &str = "dsh web: http";
 const READY_TIMEOUT: Duration = Duration::from_secs(180);
@@ -40,8 +40,8 @@ impl HarnessChild {
     #[cfg(not(windows))]
     {
       let _ = self.child.kill();
-      let _ = self.child.wait();
     }
+    let _ = self.child.wait();
     if let Some(index) = self.dist_snapshot.take() {
       snapshot::remove_snapshot(&index);
     }
@@ -51,6 +51,15 @@ impl HarnessChild {
 impl Drop for HarnessChild {
   fn drop(&mut self) {
     self.kill_tree();
+  }
+}
+
+/// Stop the spawned `dsh web` tree if it is still held in `slot`.
+fn shutdown_harness(slot: &Arc<Mutex<Option<HarnessChild>>>) {
+  if let Ok(mut guard) = slot.lock() {
+    if let Some(mut child) = guard.take() {
+      child.kill_tree();
+    }
   }
 }
 
@@ -156,6 +165,7 @@ fn passthrough_args() -> Vec<String> {
 pub fn run() {
   let child_slot: Arc<Mutex<Option<HarnessChild>>> = Arc::new(Mutex::new(None));
   let child_for_setup = Arc::clone(&child_slot);
+  let child_for_window = Arc::clone(&child_slot);
   let child_for_exit = Arc::clone(&child_slot);
   let extra_args = passthrough_args();
 
@@ -190,16 +200,20 @@ pub fn run() {
       });
       Ok(())
     })
+    .on_window_event(move |window, event| {
+      if let WindowEvent::CloseRequested { .. } = event {
+        // Undecorated windows can leave the process alive after WM_CLOSE unless
+        // we tear down the harness and force App exit here.
+        shutdown_harness(&child_for_window);
+        window.app_handle().exit(0);
+      }
+    })
     .build(tauri::generate_context!())
     .expect("error while building DeepSeek Harness desktop shell");
 
   app.run(move |_app_handle, event| {
     if matches!(event, RunEvent::Exit | RunEvent::ExitRequested { .. }) {
-      if let Ok(mut guard) = child_for_exit.lock() {
-        if let Some(mut child) = guard.take() {
-          child.kill_tree();
-        }
-      }
+      shutdown_harness(&child_for_exit);
     }
   });
 }

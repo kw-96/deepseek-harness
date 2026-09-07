@@ -10,10 +10,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import remoteContribution from 'dsh-codex-shell/remote'
 import { SessionMetaStore } from './session-meta.js'
+import { BrowserPrefsStore } from './sidebar/prefs.js'
 import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
 import { CodexRightPanel, type CodexPanelInjected, type CodexMcpManager, type CodexSkillsManager, type CommandPrompt } from './RightPanel.js'
 import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
-import { BottomTerminalPanel } from './BottomTerminalPanel.js'
+import { BottomTerminalPanel } from './bottom/BottomTerminalPanel.js'
 import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
 import { PanelController } from './panel-controller.js'
 import { en, zh } from './locales.js'
@@ -42,6 +43,37 @@ interface ConnectionProbeLike {
         beforeSeq?: number
       }) => Promise<{ ok: true; value: SessionHistoryValueLike } | { ok: false }>
     }
+  }
+}
+
+/** 尽力导出会话用户/助手文本为 Markdown；失败返回 null。 */
+async function exportSessionMarkdown(connection: unknown, sessionId: string): Promise<string | null> {
+  const probe = connection as ConnectionProbeLike
+  const history = probe.api?.sessions?.history
+  if (history === undefined) return null
+  try {
+    const result = await history({ sessionId, maxMessages: 400 })
+    if (!result.ok) return null
+    const lines: string[] = []
+    for (const record of result.value.records ?? []) {
+      const event = record as {
+        type?: string
+        data?: { content?: readonly { type?: string; text?: string }[]; source?: { kind?: string } }
+      }
+      const text = (event.data?.content ?? [])
+        .filter(block => block.type === 'text')
+        .map(block => block.text ?? '')
+        .join('')
+        .trim()
+      if (text === '') continue
+      if (event.type === 'user/message') lines.push(`## User\n\n${text}`)
+      else if (event.type === 'assistant/message' || event.type === 'model/message') {
+        lines.push(`## Assistant\n\n${text}`)
+      }
+    }
+    return lines.length === 0 ? null : lines.join('\n\n')
+  } catch {
+    return null
   }
 }
 
@@ -93,10 +125,14 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
 
   const panel = new PanelController()
   const meta = new SessionMetaStore()
+  const prefs = new BrowserPrefsStore()
 
   ctx.effect(() => () => { panel.dispose() }, 'codex-shell: panel controller')
 
   const codexRemote = ctx.get('remote.codexShell') as CodexShellRemoteFace
+  const sessionRemote = ctx.get('remote.session') as {
+    openWorkspacePath?: (request: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>
+  } | undefined
   const pluginManager = probeRemote(ctx, 'pluginManager') as CodexPanelInjected['pluginManager']
   const marketplace = probeRemote(ctx, 'marketplace') as CodexPanelInjected['marketplace']
   const mcpManager = probeMcpManager(pluginManager)
@@ -147,7 +183,26 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
       await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
+    attachSession: async (workspaceId, sessionId) => {
+      await workspaces.attachSession(workspaceId, sessionId)
+    },
+    detachSession: async (workspaceId, sessionId) => {
+      await workspaces.detachSession(workspaceId, sessionId)
+    },
+    openWorkspacePath: async (path) => {
+      const openPath = sessionRemote?.openWorkspacePath
+      if (openPath === undefined) throw new Error('session.openWorkspacePath unavailable')
+      const result = await openPath({ path })
+      if (!result.ok) throw new Error(result.error?.message ?? 'openWorkspacePath failed')
+    },
+    openTerminalForSession: async (sessionId, cwd) => {
+      setBottomOpen(true)
+      await unwrap(await codexRemote.terminalOpen(sessionId, cwd === undefined || cwd === '' ? {} : { cwd }))
+    },
+    exportSessionMarkdown: (sessionId) => exportSessionMarkdown(connection, sessionId),
+    canExportMarkdown: (connection as ConnectionProbeLike).api?.sessions?.history !== undefined,
     meta,
+    prefs,
   })
 
   const addWorkspaceInject = (): AddWorkspaceInjected => ({
@@ -178,7 +233,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       gitPush: async cwd => unwrap(await codexRemote.gitPush(cwd)),
       gitStageAll: async cwd => unwrap(await codexRemote.gitStageAll(cwd)),
       gitUnstageAll: async cwd => unwrap(await codexRemote.gitUnstageAll(cwd)),
-      terminalOpen: async (sessionId, cwd) => unwrap(await codexRemote.terminalOpen(sessionId, cwd)),
+      terminalOpen: async (sessionId, options) => unwrap(await codexRemote.terminalOpen(sessionId, options)),
+      terminalList: async sessionId => unwrap(await codexRemote.terminalList(sessionId)),
       terminalSend: async (sessionId, terminalId, text) => unwrap(await codexRemote.terminalSend(sessionId, terminalId, text)),
       terminalFollow: (sessionId, terminalId, signal) => codexRemote.terminalFollow(sessionId, terminalId, signal),
       terminalWrite: async (sessionId, terminalId, data) => unwrap(await codexRemote.terminalWrite(sessionId, terminalId, data)),

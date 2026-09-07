@@ -29,4 +29,4 @@ Web 底栏是与现有行模式模型工具**并行**的 **交互 UI 面**：
 
 ## 后果
 
-底栏用户获得交互式 shell 输入/输出与 resize。模型 `terminal_*` 工具不变。Windows ConPTY 与浏览器 xterm 在部分序列上仍可能有差异；验收标准是交互 CLI 与合理的 resize 重绘，而非完整 TUI 保真。高频 PTY 输出在 follow 流上批处理，以免打爆 Remote mux。
+底栏用户获得交互式 shell 输入/输出与 resize。多 tab / 方言 / Agent 跟随工作台行为由 [底栏多 Tab 终端](2026-09-07-bottom-terminal-tabs.zh.md) 记录。模型 `terminal_*` 工具不变。Windows ConPTY 与浏览器 xterm 在部分序列上仍可能有差异；验收标准是交互 CLI 与合理的 resize 重绘，而非完整 TUI 保真。高频 PTY 输出在 follow 流上批处理，以免打爆 Remote mux。

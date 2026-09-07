@@ -1,7 +1,9 @@
-/** 侧栏会话行（Codex 式单行）：标题 + 悬停显露的相对时间、子代理
- * 展开与更多菜单；置顶/未读为常驻小标记，运行中会话点亮点。 */
+/**
+ * 侧栏会话行（Codex 式）：标题 + 悬停显露相对时间与置顶/归档/更多；
+ * 置顶/未读角标常驻；运行中会话点亮点。
+ */
 
-import { ChevronDown, ChevronRight, GitFork, MoreHorizontal, Pin } from 'lucide-react'
+import { Archive, ChevronDown, ChevronRight, GitFork, MoreHorizontal, Pin } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import { useSessionMeta } from './session-meta.js'
 import type { SessionId, TFn } from './faces.js'
@@ -32,6 +34,11 @@ export interface SessionRowProps {
   commitRename: () => void
   onOpen: () => void
   onMenu: (event: React.MouseEvent) => void
+  onArchive: () => void
+  draggable: boolean
+  onDragStart?: (event: React.DragEvent) => void
+  onDragOver?: (event: React.DragEvent) => void
+  onDrop?: (event: React.DragEvent) => void
   meta: SessionMetaStore
   open: (sessionId: SessionId) => void
   t: TFn
@@ -43,12 +50,17 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
   const className = props.archived ? css.rowArchived : props.current ? css.rowCurrent : css.row
   return (
     <>
-      <div className={className}
+      <div
+        className={className}
         role="treeitem"
         aria-selected={props.current}
+        draggable={props.draggable}
+        onDragStart={props.onDragStart}
+        onDragOver={props.onDragOver}
+        onDrop={props.onDrop}
         onClick={props.onOpen}
-        title={props.cwd ?? props.sessionId}>
-        {/* 状态槽位固定渲染：非运行行也占位，保证标题在各行间水平对齐。 */}
+        title={props.cwd ?? props.sessionId}
+      >
         <span aria-hidden="true" className={props.running ? css.dotRunning : css.dotSlot} />
         {props.renaming
           ? <input
@@ -64,10 +76,9 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
         <span className={css.rowMeta}>
           <span className={css.rowTime}>{props.timeLabel}</span>
           {rowMeta.pinned && (
-            <button type="button" className={css.pinMark} title={props.t('unpin')}
-              onClick={event => { event.stopPropagation(); updateMeta({ pinned: false }) }}>
+            <span className={css.pinMark} title={props.t('pin')} aria-hidden="true">
               <Pin size={11} />
-            </button>
+            </span>
           )}
           {rowMeta.unread && <span className={css.badge} aria-hidden="true" />}
           {props.subagents.length > 0 && (
@@ -77,11 +88,42 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
               {props.expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
           )}
-          <button type="button" className={`${css.iconButton} ${css.reveal}`}
-            aria-label={props.t('moreActions')}
-            onClick={props.onMenu}>
-            <MoreHorizontal size={14} />
-          </button>
+          {!props.archived && (
+            <span className={`${css.rowHoverActions} ${css.reveal}`}>
+              <button
+                type="button"
+                className={css.iconButton}
+                title={rowMeta.pinned ? props.t('unpin') : props.t('pin')}
+                aria-label={rowMeta.pinned ? props.t('unpin') : props.t('pin')}
+                onClick={event => {
+                  event.stopPropagation()
+                  updateMeta({ pinned: !rowMeta.pinned })
+                }}
+              >
+                <Pin size={13} />
+              </button>
+              <button
+                type="button"
+                className={css.iconButton}
+                title={props.t('archive')}
+                aria-label={props.t('archive')}
+                onClick={event => {
+                  event.stopPropagation()
+                  props.onArchive()
+                }}
+              >
+                <Archive size={13} />
+              </button>
+              <button
+                type="button"
+                className={css.iconButton}
+                aria-label={props.t('moreActions')}
+                onClick={props.onMenu}
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            </span>
+          )}
         </span>
       </div>
       {props.expanded && props.subagents.map(sub => (

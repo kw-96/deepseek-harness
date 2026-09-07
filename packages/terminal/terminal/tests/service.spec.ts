@@ -7,6 +7,7 @@ import TerminalSessionService, { TerminalBackendCleanupError, TerminalError, Ter
 import type {
   TerminalBackend,
   TerminalBackendSession,
+  TerminalBackendSpawnSpec,
   TerminalReadRequest,
   TerminalSendOperation,
   TerminalSendRequest,
@@ -112,15 +113,17 @@ class StubSession implements TerminalBackendSession {
 
 function backend(type = 'stub') {
   const sessions: StubSession[] = []
+  const specs: TerminalBackendSpawnSpec[] = []
   const provider: TerminalBackend = {
     type,
-    async spawn() {
+    async spawn(spec) {
+      specs.push(spec)
       const session = new StubSession()
       sessions.push(session)
       return session
     },
   }
-  return { provider, sessions }
+  return { provider, sessions, specs }
 }
 
 async function harness() {
@@ -176,6 +179,25 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     expect(() => ctx.terminals.read(foreign, created.sessionId)).toThrow('belongs to another agent')
     expect(() => ctx.terminals.signal(foreign, created.sessionId, 'SIGINT')).toThrow('belongs to another agent')
     await expect(Promise.resolve().then(() => ctx.terminals.kill(foreign, created.sessionId))).rejects.toThrow('belongs to another agent')
+  })
+
+  it('forwards per-session shellDialect to the backend spawn spec', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    await ctx.terminals.spawn(owner, {
+      type: 'stub',
+      name: 'ui-pwsh-1',
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })
+    expect(b.specs[0]).toMatchObject({
+      name: 'ui-pwsh-1',
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })
   })
 
   it('rejects unknown backends, non-live owners, duplicate names, and active sends', async () => {

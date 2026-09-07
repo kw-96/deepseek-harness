@@ -1613,7 +1613,7 @@ describe('LocalPtySession bounds, signals, and teardown', () => {
 describe('LocalPtySession interactive UI bypass', () => {
   it('write and followOutput deliver raw CSI text; resize reaches the provider', async () => {
     const terminal = new FakeTerminal()
-    const session = makeSession(terminal, terminal.inspector)
+    const session = makeSession(terminal, terminal.inspector, config())
     const controller = new AbortController()
     const frames: string[] = []
     const consuming = (async () => {
@@ -1636,7 +1636,7 @@ describe('LocalPtySession interactive UI bypass', () => {
   it('rejects interactive write while a line-mode send is active', async () => {
     const terminal = new FakeTerminal()
     terminal.inspector.waiting = true
-    const session = makeSession(terminal, terminal.inspector)
+    const session = makeSession(terminal, terminal.inspector, config())
     await initialize(session, terminal)
     const operation = session.startSend({ text: 'sleep', submit: true })
     await expect(session.write('x')).rejects.toMatchObject({ code: 'SEND_ACTIVE' })

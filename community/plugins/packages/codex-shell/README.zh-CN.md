@@ -4,16 +4,16 @@ Codex 工作流风格的一体化 DeepSeek Harness Web 插件，把工作区/会
 
 ## 功能
 
-- **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布）：常驻圆角搜索框；会话先按工作区收纳、组内按最近使用向下排列；工作区标题行（名称前是文件夹图标，展开=打开/收起=闭合；折叠/重命名/删除/在此工作区新建会话）；单行会话固定行高（运行态亮点、置顶/未读小标记、悬停显露时间与 `…` 菜单：派生/重命名/归档/复制 cwd/id/深链接/新窗口打开）；工作区与会话名称超长省略；子代理嵌套树。
-- **添加工作区**（`sidebar.footer.action` 页脚入口）：居中目录选择弹窗（路径输入 + 目录浏览 + 创建，基于 `codexShell.fsList`），不复用原生 directoryFlow 槽。
-- **右侧与底部工作台**：右侧 `details` 列提供文件树、Git 变更分组/差异/提交/时间线历史/分支、附加目录管理、插件管家、摘要和浏览器；底部独立交互终端使用当前会话的持久 PTY（`@xterm/xterm` 渲染、按键直达、输出流式跟随、面板 resize），与模型侧行模式 `terminal_*` 工具并行。列宽/拖拽/动画由宿主布局接管。
+- **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布）：常驻圆角搜索框；「项目」标题栏提供整理（按项目/扁平）与排序（置顶优先/最近更新/手动拖拽）；会话悬停置顶/归档/更多；嵌套菜单（项目迁移仅同 cwd、复制、分叉、打开方式）；项目行悬停信息卡与更多菜单；工作区标题行（文件夹图标、折叠/重命名）；子代理嵌套树。
+- **添加工作区**（`sidebar.footer.action` 页脚入口 + 标题栏 `+`）：居中目录选择弹窗（路径输入 + 目录浏览 + 创建，基于 `codexShell.fsList`），不复用原生 directoryFlow 槽。
+- **右侧与底部工作台**：右侧 `details` 列提供文件树、Git 变更分组/差异/提交/时间线历史/分支、附加目录管理、插件管家、摘要和浏览器；底部独立多 tab 交互终端（`pwsh`/`bash` 新建、Agent `terminal_*` 会话可跟随；`@xterm/xterm` 渲染），与模型侧行模式工具并行。列宽/拖拽/动画由宿主布局接管。
 - **会话头工具按钮**（`conversation.session.header.utilities`）：一键开合右侧工作台面板，与宿主列双向同步。
 - **视觉**：完全映射宿主 `--dsw-*` 主题令牌，亮/暗主题自动跟随；侧栏为 Codex 式极简排布（安静分组、单行会话、悬停显露操作）。
 
 ## 安装
 
 ```sh
-dsh plugin --profile web add dsh-codex-shell@0.5.1
+dsh plugin --profile web add dsh-codex-shell@0.6.4
 ```
 
 或手动在 profile 的 `cordis.patch.yml` 里 insert：
@@ -32,14 +32,15 @@ dsh plugin --profile web add dsh-codex-shell@0.5.1
 
 - `fsList/fsRead/fsWrite/fsSearchName/fsSearchContent`
 - `gitStatus/gitLog/gitDiff/gitStage/gitUnstage/gitDiscard/gitCommit/gitBranches/gitCheckout`
-- `terminalOpen/terminalFollow/terminalWrite/terminalResize/terminalClose`（底栏交互终端；`terminalSend`/`terminalRead` 仍保留）
+- `terminalOpen/terminalList/terminalFollow/terminalWrite/terminalResize/terminalClose`（底栏多 tab；`terminalSend`/`terminalRead` 仍保留）
 - `projectDirs/projectSetDirs/projectAddDir`
 
 文件操作经 `ctx.fs`，git 经 `ctx.shell`（30s 超时）。
 
 ## 已知限制与后续工作
 
-- 文件预览上限 512KB；内容搜索走 `git grep`（只搜已跟踪文件）。
+- 跨目录「迁项目」需改会话 cwd（本期不做）；同目录归入匹配工作区（`attachSession`）与「移到未分组」（`detachSession`）已闭环。永久工作树 / Cursor 打开器仍待 Host。
+- 文件预览上限 512KB（`fsRead` 截断）；内容搜索走 `git grep`（只搜已跟踪文件）。
 - 右侧面板占用宿主 `details` 列：插件激活期间原生工具详情面板被遮蔽（对话内的工具卡片仍完整展示参数与结果）；卸载后自动恢复。若需工具详情与插件面板并存，需宿主为 details 列提供扩展标签槽，属宿主侧后续工作。
 - `gitDiscard` 为破坏性操作，客户端有确认弹窗，宿主端不做二次校验。
 - 附加目录仅登记路径，不接管沙箱权限（不替换 `fs-sandbox`）。

@@ -4,13 +4,14 @@ import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions, FsWriteResponse,
   GitBranchesResponse, GitCheckoutResponse, GitCommitResponse, GitDiffResponse, GitLogResponse,
   GitSimpleResponse, GitStatusResponse, ProjectAddDirResponse, ProjectDirsResponse, ProjectSetDirsResponse,
-  TerminalFollowFrame, TerminalOpenResponse, TerminalReadResponse, TerminalResizeResponse, TerminalSendResponse,
-  TerminalWriteResponse,
+  TerminalFollowFrame, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse, TerminalReadResponse,
+  TerminalResizeResponse, TerminalSendResponse, TerminalWriteResponse,
 } from './types.js'
 import {
   codexOk, fsContentSearchValue, fsListValue, fsNameSearchValue, fsReadValue, fsSearchOptions,
   gitBranchValue, gitLogValue, gitStatusValue, projectAddValue, projectDirsValue,
-  terminalFollowValue, terminalOkValue, terminalOpenValue, terminalReadValue, terminalSendValue,
+  terminalFollowValue, terminalListValue, terminalOkValue, terminalOpenOptions, terminalOpenValue,
+  terminalReadValue, terminalSendValue,
 } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
@@ -56,7 +57,11 @@ const descriptors = [
   descriptor('gitPush', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('gitStageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('gitUnstageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
-  descriptor('terminalOpen', [parameter('sessionId', z.string()), parameter('cwd', optString)], terminalOpenValue, 'TerminalOpenResponse'),
+  descriptor('terminalOpen', [
+    parameter('sessionId', z.string()),
+    parameter('options', terminalOpenOptions.optional()),
+  ], terminalOpenValue, 'TerminalOpenResponse'),
+  descriptor('terminalList', [parameter('sessionId', z.string())], terminalListValue, 'TerminalListResponse'),
   descriptor('terminalSend', [parameter('sessionId', z.string()), parameter('terminalId', z.string()), parameter('text', z.string())], terminalSendValue, 'TerminalSendResponse'),
   streamDescriptor('terminalFollow', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalFollowValue, 'TerminalFollowFrame'),
   descriptor('terminalWrite', [parameter('sessionId', z.string()), parameter('terminalId', z.string()), parameter('data', z.string())], terminalOkValue, 'TerminalWriteResponse'),
@@ -100,7 +105,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/gitPush': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/gitStageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/gitUnstageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
-    'codexShell/terminalOpen': (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
+    'codexShell/terminalOpen': (sessionId: string, options?: TerminalOpenOptions) => Promise<RemoteResult<TerminalOpenResponse>>
+    'codexShell/terminalList': (sessionId: string) => Promise<RemoteResult<TerminalListResponse>>
     'codexShell/terminalSend': (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
     'codexShell/terminalFollow': (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<TerminalFollowFrame>
     'codexShell/terminalWrite': (sessionId: string, terminalId: string, data: string) => Promise<RemoteResult<TerminalWriteResponse>>
@@ -132,7 +138,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       gitPush: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       gitStageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       gitUnstageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
-      terminalOpen: (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
+      terminalOpen: (sessionId: string, options?: TerminalOpenOptions) => Promise<RemoteResult<TerminalOpenResponse>>
+      terminalList: (sessionId: string) => Promise<RemoteResult<TerminalListResponse>>
       terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
       terminalFollow: (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<TerminalFollowFrame>
       terminalWrite: (sessionId: string, terminalId: string, data: string) => Promise<RemoteResult<TerminalWriteResponse>>

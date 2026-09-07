@@ -6,11 +6,19 @@ import { spawnSync } from 'node:child_process'
 const archive = resolve(process.argv[2] ?? '')
 const flavor = process.argv[3]
 if (process.argv[2] === undefined) throw new Error('usage: node scripts/verify-package.mjs <package.tgz>')
-if (flavor !== 'manager' && flavor !== 'marketplace' && flavor !== 'codex-shell') throw new Error('package flavor must be manager, marketplace, or codex-shell')
+const flavors = ['manager', 'marketplace', 'codex-shell', 'workorder-agent']
+if (!flavors.includes(flavor)) throw new Error(`package flavor must be one of ${flavors.join(', ')}`)
 const packageNames = {
   manager: 'dsh-plugin-manager',
   marketplace: '@ruihuahe/dsh-plugin-marketplace',
   'codex-shell': 'dsh-codex-shell',
+  'workorder-agent': 'workorder-agent',
+}
+const entryFiles = {
+  manager: ['client.js', 'index.js', 'remote.js'],
+  marketplace: ['client.js', 'index.js', 'remote.js'],
+  'codex-shell': ['client.js', 'index.js', 'remote.js'],
+  'workorder-agent': ['harness/host.js'],
 }
 
 const directory = await mkdtemp(join(tmpdir(), 'dsh-plugin-manager-pack-'))
@@ -21,9 +29,12 @@ try {
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
   if (manifest.name !== packageNames[flavor]) throw new Error(`unexpected package name ${manifest.name}`)
   if (typeof manifest.dsh?.bundle?.patch !== 'string') throw new Error('package does not declare dsh.bundle')
-  await Promise.all(['client.js', 'index.js', 'remote.js'].map(file => readFile(join(packageRoot, 'lib', file))))
-  await Promise.all(['cordis.patch.yml', 'README.md', 'README.zh-CN.md', 'LICENSE'].map(file => readFile(join(packageRoot, file))))
-  const pending = [join(packageRoot, 'lib', 'index.js'), join(packageRoot, 'lib', 'remote.js')]
+  await Promise.all(entryFiles[flavor].map(file => readFile(join(packageRoot, 'lib', file))))
+  const requiredDocs = flavor === 'workorder-agent'
+    ? ['cordis.patch.yml', 'README.md', 'README.zh-CN.md']
+    : ['cordis.patch.yml', 'README.md', 'README.zh-CN.md', 'LICENSE']
+  await Promise.all(requiredDocs.map(file => readFile(join(packageRoot, file))))
+  const pending = entryFiles[flavor].map(file => join(packageRoot, 'lib', file))
   const visited = new Set()
   while (pending.length > 0) {
     const filename = pending.pop()

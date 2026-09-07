@@ -100,6 +100,7 @@ function mountFrame() {
       useSessionPendingInteraction={useSessionPendingInteraction}
       useWorkspaces={((sel: (s: WorkspaceSnapshot) => unknown) => sel(workspaceState)) as never}
       SessionProvider={SessionProviderStub}
+      openSession={vi.fn()}
       t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
     />
   )

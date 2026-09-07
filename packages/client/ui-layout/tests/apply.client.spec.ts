@@ -23,6 +23,7 @@ async function bench() {
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  ctx.provide('sessions', { open: vi.fn() } as never)
   await ctx.plugin({ inject: themeInject, apply: themeApply }).await()
   await slotsFiber.await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry }
@@ -30,7 +31,7 @@ async function bench() {
 
 describe('ui-layout client apply', () => {
   it('declares its service dependencies', () => {
-    expect(inject).toEqual(['slots', 'theme', 'locale'])
+    expect(inject).toEqual(['slots', 'theme', 'locale', 'sessions'])
   })
 
   it('provides ctx.layout and registers AppFrame into root with the three child declarations', async () => {
@@ -46,15 +47,15 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('details')).toEqual({ kind: 'single', scope: 'session' })
   })
 
-  it('injects no business face and attaches the layout actions', async () => {
+  it('injects openSession and attaches the layout actions', async () => {
     const { ctx, slots } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     const actions = {
       setSidebar: vi.fn(), setDetails: vi.fn(), toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
     }
-    const injected = (slots.entries('root')[0]!.inject as (actions: never) => object)(actions as never)
-    expect(injected).toEqual({})
+    const injected = (slots.entries('root')[0]!.inject as (actions: never) => { openSession: (id: string) => void })(actions as never)
+    expect(typeof injected.openSession).toBe('function')
     const layout = ctx.get('layout') as LayoutController
     layout.toggleSidebar()
     expect(actions.toggleSidebar).toHaveBeenCalledOnce()

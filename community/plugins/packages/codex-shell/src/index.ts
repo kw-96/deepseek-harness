@@ -15,10 +15,12 @@ import {
 } from './host/gitops.js'
 import { listDirectory, readTextFile, searchNames, writeTextFile } from './host/fsops.js'
 import { projectAddDir, projectDirs, projectSetDirs } from './host/projects.js'
+import { mintUiTerminalName, terminalOrigin } from './host/terminal-identity.js'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse, TerminalOpenResponse, TerminalReadResponse, TerminalSendResponse,
+  ProjectAddDirResponse, ProjectDirsResponse, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse,
+  TerminalReadResponse, TerminalSendResponse,
 } from './types.js'
 
 export type * from './types.js'
@@ -132,20 +134,66 @@ export class CodexShell extends TypertRemoteService {
     return owner
   }
 
+  private mintUiName(owner: ReturnType<CodexShell['terminalOwner']>, dialect: 'bash' | 'pwsh'): string {
+    const taken = new Set(
+      this.ctx.terminals.list(owner).map(item => item.name).filter((name): name is string => name !== undefined),
+    )
+    return mintUiTerminalName(taken, dialect)
+  }
+
+  /**
+   * Open or reconnect one bottom-panel PTY for the live Agent.
+   * @param sessionId - live Agent session id.
+   * @param options - cwd, unique name, shell dialect, and initial size.
+   */
   @Remote('terminalOpen')
-  async terminalOpen(sessionId: string, cwd?: string): Promise<TerminalOpenResponse> {
+  async terminalOpen(sessionId: string, options?: TerminalOpenOptions): Promise<TerminalOpenResponse> {
     const owner = this.terminalOwner(sessionId)
-    const existing = this.ctx.terminals.list(owner).find(item => item.name === 'codex-bottom' && item.status.kind === 'running')
+    const dialect = options?.shellDialect ?? (process.platform === 'win32' ? 'pwsh' : 'bash')
+    const name = options?.name ?? this.mintUiName(owner, dialect)
+    const existing = this.ctx.terminals.list(owner).find(item => item.name === name && item.status.kind === 'running')
     if (existing !== undefined) {
-      return { terminalId: existing.sessionId, output: '', status: existing.status }
+      return {
+        terminalId: existing.sessionId,
+        output: '',
+        status: existing.status,
+        ...(existing.name !== undefined ? { name: existing.name } : {}),
+        origin: terminalOrigin(existing.name),
+      }
     }
     const created = await this.ctx.terminals.spawn(owner, {
       type: 'shell',
-      name: 'codex-bottom',
+      name,
       interaction: 'interactive',
-      ...(cwd !== undefined ? { cwd } : {}),
+      shellDialect: dialect,
+      ...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
+      ...(options?.cols !== undefined ? { cols: options.cols } : {}),
+      ...(options?.rows !== undefined ? { rows: options.rows } : {}),
     })
-    return { terminalId: created.sessionId, output: created.motd, status: created.status }
+    return {
+      terminalId: created.sessionId,
+      output: created.motd,
+      status: created.status,
+      ...(created.name !== undefined ? { name: created.name } : {}),
+      origin: terminalOrigin(created.name),
+    }
+  }
+
+  /**
+   * List owner-scoped PTY sessions for the bottom panel.
+   * @param sessionId - live Agent session id.
+   */
+  @Remote('terminalList')
+  async terminalList(sessionId: string): Promise<TerminalListResponse> {
+    const owner = this.terminalOwner(sessionId)
+    return {
+      terminals: this.ctx.terminals.list(owner).map(item => ({
+        terminalId: item.sessionId,
+        ...(item.name !== undefined ? { name: item.name } : {}),
+        status: item.status,
+        origin: terminalOrigin(item.name),
+      })),
+    }
   }
 
   @Remote('terminalSend')

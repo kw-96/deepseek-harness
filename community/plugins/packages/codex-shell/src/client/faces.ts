@@ -83,7 +83,27 @@ export interface CodexShellRemoteFace {
   gitPush(cwd: string): Promise<RemoteResult<{ ok: true }>>
   gitStageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
   gitUnstageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
-  terminalOpen(sessionId: string, cwd?: string): Promise<RemoteResult<{ terminalId: string; output: string; status: { kind: string } }>>
+  terminalOpen(sessionId: string, options?: {
+    cwd?: string
+    name?: string
+    shellDialect?: 'bash' | 'pwsh'
+    cols?: number
+    rows?: number
+  }): Promise<RemoteResult<{
+    terminalId: string
+    output: string
+    status: { kind: string }
+    name?: string
+    origin: 'ui' | 'agent'
+  }>>
+  terminalList(sessionId: string): Promise<RemoteResult<{
+    terminals: readonly {
+      terminalId: string
+      name?: string
+      status: { kind: string }
+      origin: 'ui' | 'agent'
+    }[]
+  }>>
   terminalSend(sessionId: string, terminalId: string, text: string): Promise<RemoteResult<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>>
   terminalFollow(sessionId: string, terminalId: string, signal?: AbortSignal): AsyncIterable<{ seq: number; chunk: string }>
   terminalWrite(sessionId: string, terminalId: string, data: string): Promise<RemoteResult<{ ok: true }>>
@@ -146,6 +166,8 @@ export interface WorkspacesFace {
   insertBefore(workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId): Promise<void>
   archiveSession(sessionId: SessionId): Promise<void>
   insertSessionBefore(workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>
+  attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
+  detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
   create(input: { path: string }): Promise<WorkspaceViewLike>
 }
 

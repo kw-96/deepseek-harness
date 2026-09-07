@@ -57,6 +57,11 @@ export interface TerminalSpawnRequest {
   cols?: number
   /** Initial rows for interactive spawns; backends own defaults when omitted. */
   rows?: number
+  /**
+   * Optional per-session shell dialect for backends that support more than one
+   * (bash | pwsh). When omitted, the backend plugin Config dialect applies.
+   */
+  shellDialect?: 'bash' | 'pwsh'
 }
 
 /** Fully identified request handed from the registry to a backend. */

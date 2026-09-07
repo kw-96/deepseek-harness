@@ -162,6 +162,32 @@ read(owner: Agent, id: TerminalSessionId, request: TerminalReadRequest = {}): Te
 signal(owner: Agent, id: TerminalSessionId, signal: TerminalSignal): Promise<TerminalSignalResult>
 
 /**
+ * Write raw text to an owned PTY without Enter or line-mode exclusivity.
+ * @param owner - exact session owner.
+ * @param id - target PTY identity.
+ * @param data - UTF-8 text delivered without implicit newline conversion.
+ */
+async write(owner: Agent, id: TerminalSessionId, data: string): Promise<void>
+
+/**
+ * Resize an owned PTY window.
+ * @param owner - exact session owner.
+ * @param id - target PTY identity.
+ * @param cols - positive column count.
+ * @param rows - positive row count.
+ */
+async resize(owner: Agent, id: TerminalSessionId, cols: number, rows: number): Promise<void>
+
+/**
+ * Follow decoded PTY output for UI rendering (CSI preserved).
+ * @param owner - exact session owner.
+ * @param id - target PTY identity.
+ * @param signal - cancels the subscription.
+ * @returns frames in delivery order.
+ */
+followOutput( owner: Agent, id: TerminalSessionId, signal: AbortSignal, ): AsyncIterable<TerminalFollowFrame>
+
+/**
  * Close one owned session and remove it only after quiescent backend cleanup.
  * @param owner - exact session owner.
  * @param id - target PTY identity.

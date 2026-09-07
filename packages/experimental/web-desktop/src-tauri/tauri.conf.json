@@ -1,19 +1,22 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DeepSeek Harness",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "identifier": "ai.deepseek.dsh.experimental.web-desktop",
   "build": {
     "frontendDist": "../ui"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "DeepSeek Harness",
         "width": 1280,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": false,
+        "shadow": true
       }
     ],
     "security": {

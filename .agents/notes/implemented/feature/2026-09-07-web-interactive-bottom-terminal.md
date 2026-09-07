@@ -29,4 +29,4 @@ This partially supersedes the “line-oriented only” product stance of [Codex-
 
 ## Consequences
 
-Bottom panel users get interactive shell input/output and resize. Model `terminal_*` tools are unchanged. Windows ConPTY plus browser xterm may differ on some sequences; acceptance is interactive CLI use and reasonable resize redraw, not full TUI fidelity. High-rate PTY output is batched on the follow stream to protect the Remote mux.
+Bottom panel users get interactive shell input/output and resize. Multi-tab / shell-dialect / Agent-follow workbench behavior is owned by [Bottom terminal tabs](2026-09-07-bottom-terminal-tabs.md). Model `terminal_*` tools are unchanged. Windows ConPTY plus browser xterm may differ on some sequences; acceptance is interactive CLI use and reasonable resize redraw, not full TUI fidelity. High-rate PTY output is batched on the follow stream to protect the Remote mux.

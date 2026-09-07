@@ -615,6 +615,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'codexImport',
+    summary: 'Remote business surface for the card: trigger a run and read history.',
+    description: 'Remote business surface for the card: trigger a run and read history. The controller owns the durable `codex_import` domain and never touches the session log beyond what the sweep already wrote.',
+    methods: [
+      {
+        signature: '@Remote(\'run\') async run(): Promise<CodexImportRun>',
+        description: 'Run one import sweep now and record its outcome as the newest history run.',
+        parameters: [],
+        returns: 'the recorded run.',
+      },
+      {
+        signature: '@Remote(\'history\') async history(): Promise<CodexImportHistoryValue>',
+        description: 'Read recorded import runs, newest first.',
+        parameters: [],
+        returns: 'the complete history list.',
+      },
+    ],
+  },
+  {
     key: 'commands',
     summary: 'Human-command registry.',
     description: 'Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.',
@@ -2368,6 +2387,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'delivered foreground process-group identity.',
       },
       {
+        signature: 'async write(owner: Agent, id: TerminalSessionId, data: string): Promise<void>',
+        description: 'Write raw text to an owned PTY without Enter or line-mode exclusivity.',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'data', description: 'UTF-8 text delivered without implicit newline conversion.' }],
+      },
+      {
+        signature: 'async resize(owner: Agent, id: TerminalSessionId, cols: number, rows: number): Promise<void>',
+        description: 'Resize an owned PTY window.',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'cols', description: 'positive column count.' }, { name: 'rows', description: 'positive row count.' }],
+      },
+      {
+        signature: 'followOutput( owner: Agent, id: TerminalSessionId, signal: AbortSignal, ): AsyncIterable<TerminalFollowFrame>',
+        description: 'Follow decoded PTY output for UI rendering (CSI preserved).',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'signal', description: 'cancels the subscription.' }],
+        returns: 'frames in delivery order.',
+      },
+      {
         signature: 'async kill(owner: Agent, id: TerminalSessionId, reason: string = \'model request\'): Promise<boolean>',
         description: 'Close one owned session and remove it only after quiescent backend cleanup.',
         parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'reason', description: 'diagnostic cleanup reason.' }],
@@ -2763,6 +2798,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: '@Remote(\'insertSessionBefore\') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>',
         description: 'Move one accounted Session within a Workspace.',
         parameters: [{ name: 'request', description: 'Workspace, Session, and optional anchor identities.' }],
+        returns: 'the updated Workspace projection.',
+      },
+      {
+        signature: '@Remote(\'attachSession\') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>',
+        description: 'Account one Session whose stored cwd matches the Workspace path.',
+        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
+        returns: 'the updated Workspace projection.',
+      },
+      {
+        signature: '@Remote(\'detachSession\') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>',
+        description: 'Remove one Session from a Workspace account (Ungrouped).',
+        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
         returns: 'the updated Workspace projection.',
       },
       {
@@ -3611,6 +3658,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CodeRunResult',
     declaration: 'export interface CodeRunResult {\n    value?: CodeJsonValue;\n    logs: string[];\n    error?: CodeRunFailure;\n}',
+  },
+  {
+    name: 'CodexImportHistoryValue',
+    declaration: 'export interface CodexImportHistoryValue {\n    readonly runs: readonly CodexImportRun[];\n}',
+  },
+  {
+    name: 'CodexImportRun',
+    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly sessions: readonly CodexImportSession[];\n}',
+  },
+  {
+    name: 'CodexImportSession',
+    declaration: 'export interface CodexImportSession {\n    readonly id: SessionId;\n    readonly title: string;\n}',
   },
   {
     name: 'CollectedOutput',
@@ -5522,7 +5581,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessTerminalHandle',
-    declaration: 'export interface SubprocessTerminalHandle {\n    readonly pid: number;\n    readonly output: Readable;\n    readonly done: Promise<SubprocessOutcome>;\n    write(data: string): Promise<void>;\n    inspectForeground(): Promise<SubprocessTerminalForeground | undefined>;\n    signalForeground(signal: SubprocessTerminalSignal): Promise<number>;\n    terminate(): Promise<void>;\n}',
+    declaration: 'export interface SubprocessTerminalHandle {\n    readonly pid: number;\n    readonly output: Readable;\n    readonly done: Promise<SubprocessOutcome>;\n    write(data: string): Promise<void>;\n    resize(cols: number, rows: number): Promise<void>;\n    inspectForeground(): Promise<SubprocessTerminalForeground | undefined>;\n    signalForeground(signal: SubprocessTerminalSignal): Promise<number>;\n    terminate(): Promise<void>;\n}',
   },
   {
     name: 'SubprocessTerminalSignal',
@@ -5530,7 +5589,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessTerminalSpawnSpec',
-    declaration: 'export interface SubprocessTerminalSpawnSpec {\n    argv: readonly string[];\n    cwd: string;\n    env?: Record<string, string> | undefined;\n    rows: number;\n    cols: number;\n    graceMs: number;\n    signal?: AbortSignal | undefined;\n}',
+    declaration: 'export interface SubprocessTerminalSpawnSpec {\n    argv: readonly string[];\n    cwd: string;\n    env?: Record<string, string> | undefined;\n    name?: string | undefined;\n    rows: number;\n    cols: number;\n    graceMs: number;\n    signal?: AbortSignal | undefined;\n}',
   },
   {
     name: 'SurfaceEvent',
@@ -5610,7 +5669,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalBackendSession',
-    declaration: 'export interface TerminalBackendSession {\n    readonly motd: string;\n    readonly pid?: number;\n    startSend(request: TerminalSendRequest): TerminalSendOperation;\n    read(request: TerminalReadRequest): TerminalReadResult;\n    signal(signal: TerminalSignal): Promise<TerminalSignalResult>;\n    status(): TerminalSessionStatus;\n    close(reason: string): Promise<void>;\n}',
+    declaration: 'export interface TerminalBackendSession {\n    readonly motd: string;\n    readonly pid?: number;\n    startSend(request: TerminalSendRequest): TerminalSendOperation;\n    read(request: TerminalReadRequest): TerminalReadResult;\n    signal(signal: TerminalSignal): Promise<TerminalSignalResult>;\n    status(): TerminalSessionStatus;\n    write(data: string): Promise<void>;\n    resize(cols: number, rows: number): Promise<void>;\n    followOutput(signal: AbortSignal): AsyncIterable<TerminalFollowFrame>;\n    close(reason: string): Promise<void>;\n}',
   },
   {
     name: 'TerminalBackendSpawnSpec',
@@ -5619,6 +5678,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalCallView',
     declaration: 'export interface TerminalCallView {\n    card: \'terminal\';\n    title: string;\n    description?: string;\n    cwd?: string;\n}',
+  },
+  {
+    name: 'TerminalFollowFrame',
+    declaration: 'export interface TerminalFollowFrame {\n    readonly seq: number;\n    readonly chunk: string;\n}',
   },
   {
     name: 'TerminalReadRequest',
@@ -5674,7 +5737,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalSpawnRequest',
-    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    cwd?: string;\n}',
+    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    cwd?: string;\n    interaction?: \'line\' | \'interactive\';\n    cols?: number;\n    rows?: number;\n    shellDialect?: \'bash\' | \'pwsh\';\n}',
   },
   {
     name: 'TerminalSpawnResult',
@@ -6097,6 +6160,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WorkspaceArchiveValue {\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
   {
+    name: 'WorkspaceAttachSessionRequest',
+    declaration: 'export interface WorkspaceAttachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
     name: 'WorkspaceBaseline',
     declaration: 'export interface WorkspaceBaseline {\n    readonly items: readonly WorkspaceView[];\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
@@ -6115,6 +6182,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceDeleteValue',
     declaration: 'export interface WorkspaceDeleteValue {\n    readonly deleted: true;\n}',
+  },
+  {
+    name: 'WorkspaceDetachSessionRequest',
+    declaration: 'export interface WorkspaceDetachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'WorkspaceFollowFrame',

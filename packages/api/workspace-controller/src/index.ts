@@ -8,10 +8,12 @@ import { WorkspaceFeed } from './feed.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
+  WorkspaceAttachSessionRequest,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
+  WorkspaceDetachSessionRequest,
   WorkspaceFollowFrame,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
@@ -97,6 +99,26 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote('insertSessionBefore')
   insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue> {
     return this.commands.insertSessionBefore(request)
+  }
+
+  /**
+   * Account one Session whose stored cwd matches the Workspace path.
+   * @param request - Workspace and Session identities.
+   * @returns the updated Workspace projection.
+   */
+  @Remote('attachSession')
+  attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue> {
+    return this.commands.attachSession(request)
+  }
+
+  /**
+   * Remove one Session from a Workspace account (Ungrouped).
+   * @param request - Workspace and Session identities.
+   * @returns the updated Workspace projection.
+   */
+  @Remote('detachSession')
+  detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue> {
+    return this.commands.detachSession(request)
   }
 
   /**

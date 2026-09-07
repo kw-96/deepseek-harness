@@ -178,6 +178,7 @@ export class TerminalSessionService extends Service {
         ...request.interaction !== undefined ? { interaction: request.interaction } : {},
         ...request.cols !== undefined ? { cols: request.cols } : {},
         ...request.rows !== undefined ? { rows: request.rows } : {},
+        ...request.shellDialect !== undefined ? { shellDialect: request.shellDialect } : {},
         signal: backendSignal,
       })
       signal?.throwIfAborted()

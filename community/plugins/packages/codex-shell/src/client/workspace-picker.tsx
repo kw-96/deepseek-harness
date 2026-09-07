@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Folder, FolderPlus, FolderSearch, X } from 'lucide-react'
 import type { FsListEntry, FsListResponse } from 'dsh-codex-shell/types'
 import type { SelectorHook, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
+import { registerAddWorkspaceOpener } from './sidebar/add-workspace-bus.js'
 import css from './styles.module.css'
 
 export interface AddWorkspaceInjected {
@@ -74,6 +75,12 @@ export function AddWorkspaceAction({ wide, useSessions, fsList, createWorkspace,
     setOpen(false)
   }
 
+  // 标题栏「+」与页脚入口共用打开器。
+  useEffect(() => {
+    registerAddWorkspaceOpener(openModal)
+    return () => { registerAddWorkspaceOpener(null) }
+  }, [currentCwd, browse])
+
   // 弹窗打开时 Esc 关闭。
   useEffect(() => {
     if (!open) return
@@ -82,6 +89,16 @@ export function AddWorkspaceAction({ wide, useSessions, fsList, createWorkspace,
     }
     window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('keydown', onKey) }
+  })
+
+  // Desktop title-bar File → Open Workspace.
+  useEffect(() => {
+    const onCommand = (event: Event): void => {
+      const detail = (event as CustomEvent<{ command?: string }>).detail
+      if (detail?.command === 'add-workspace') openModal()
+    }
+    window.addEventListener('dsh-desktop:command', onCommand)
+    return () => { window.removeEventListener('dsh-desktop:command', onCommand) }
   })
 
   const confirm = (): void => {

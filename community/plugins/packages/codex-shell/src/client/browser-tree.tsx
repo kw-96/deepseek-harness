@@ -1,17 +1,22 @@
-/** 侧栏树体：Codex 式安静排布 —— 细字工作区标题、单行会话、未分组/
- * 归档区与搜索结果态。纯渲染层，状态与动作全部来自 WorkspaceBrowser。 */
+/**
+ * 侧栏树体：项目分组 / 扁平列表 / 归档与搜索结果。
+ * 状态与动作来自 WorkspaceBrowser。
+ */
 
-import { Archive, Folder, FolderOpen, Inbox, MoreHorizontal } from 'lucide-react'
+import { Archive, Inbox } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
+import type { BrowserPrefsStore, OrganizeMode, SortMode } from './sidebar/prefs.js'
 import type { SearchResultLike, SessionId, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
 import { SessionRow } from './session-rows.js'
+import { WorkspaceHead } from './workspace-head.js'
 import css from './styles.module.css'
 
-/** 分组投影结果（浏览器 useMemo 产出）。 */
+/** 分组投影结果。 */
 export interface GroupsModel {
   grouped: { workspace: WorkspaceViewLike; sessions: SessionId[] }[]
   ungrouped: SessionId[]
   archived: SessionId[]
+  flat: SessionId[]
 }
 
 export interface BrowserTreeProps {
@@ -24,29 +29,38 @@ export interface BrowserTreeProps {
   searchLoading: boolean
   renaming: string | null
   renameDraft: string
+  organize: OrganizeMode
+  sort: SortMode
+  prefs: BrowserPrefsStore
   onToggleGroup: (key: string) => void
   onOpen: (sessionId: SessionId) => void
   onWorkspaceMenu: (event: React.MouseEvent, workspaceId: string) => void
   onSessionMenu: (event: React.MouseEvent, sessionId: SessionId) => void
+  onArchiveSession: (sessionId: SessionId) => void
+  onToggleWorkspacePin: (workspaceId: string) => void
+  onBeginWorkspaceRename: (workspaceId: string, title: string) => void
   onToggleSubagents: (key: string) => void
   setRenameDraft: (value: string) => void
   commitRename: (sessionId: SessionId) => void
   commitWorkspaceRename: (workspaceId: string) => void
+  onSessionDrop: (sessionId: SessionId, beforeSessionId: SessionId | undefined, workspaceId: string) => void
+  sessionWorkspaceId: (sessionId: SessionId) => string | undefined
   meta: SessionMetaStore
   t: TFn
 }
 
-/** 渲染树体：搜索态、空态与分组树。 */
+/** 渲染树体。 */
 export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const {
-    groups, list, collapsed, collapsedSubagents, searching, searchItems, searchLoading, renaming,
-    renameDraft, onToggleGroup, onOpen, onWorkspaceMenu, onSessionMenu, onToggleSubagents,
-    setRenameDraft, commitRename, commitWorkspaceRename, meta, t,
+    groups, list, collapsed, collapsedSubagents, searching, searchItems, searchLoading,
+    renaming, renameDraft, organize, sort, prefs, onToggleGroup, onOpen, onWorkspaceMenu,
+    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onBeginWorkspaceRename,
+    onToggleSubagents, setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
+    sessionWorkspaceId, meta, t,
   } = props
-
   const now = Date.now()
+  const manual = sort === 'manual'
 
-  /** 本地化相对时间（悬停显露）。 */
   const timeLabelFor = (updatedAt: number): string => {
     const seconds = Math.max(0, Math.floor((now - updatedAt) / 1000))
     if (seconds < 60) return t('timeNow')
@@ -59,7 +73,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     return new Date(updatedAt).toLocaleDateString()
   }
 
-  const sessionRow = (sessionId: SessionId, archived = false) => {
+  const sessionRow = (sessionId: SessionId, archived = false, workspaceId?: string) => {
     const summary = list.byId[sessionId]
     if (summary === undefined) return null
     const subagents = list.ids.flatMap(id => {
@@ -67,6 +81,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
       if (child === undefined || child.parentId !== sessionId || child.origin !== 'subagent' || child.blank) return []
       return [{ id, title: child.displayTitle, current: list.current === id, running: child.running }]
     })
+    const wsId = workspaceId ?? sessionWorkspaceId(sessionId)
     return <SessionRow
       key={sessionId}
       sessionId={sessionId}
@@ -85,55 +100,65 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
       commitRename={() => { commitRename(sessionId) }}
       onOpen={() => { onOpen(sessionId) }}
       onMenu={event => { onSessionMenu(event, sessionId) }}
+      onArchive={() => { onArchiveSession(sessionId) }}
+      draggable={manual && !archived && wsId !== undefined}
+      onDragStart={event => {
+        event.dataTransfer.setData('text/session-id', sessionId)
+        if (wsId !== undefined) event.dataTransfer.setData('text/workspace-id', wsId)
+      }}
+      onDragOver={event => {
+        if (!manual || archived) return
+        event.preventDefault()
+      }}
+      onDrop={event => {
+        if (!manual || archived || wsId === undefined) return
+        event.preventDefault()
+        const dragged = event.dataTransfer.getData('text/session-id') as SessionId
+        if (dragged === '' || dragged === sessionId) return
+        onSessionDrop(dragged, sessionId, wsId)
+      }}
       meta={meta}
       open={onOpen}
       t={t}
     />
   }
 
-  const renderGroup = (
-    key: string,
-    label: string,
-    rows: React.ReactNode,
-    kind: 'workspace' | 'ungrouped' | 'archived',
-    workspaceId?: string,
-  ): React.ReactNode => {
+  const renderWorkspace = (workspace: WorkspaceViewLike, sessions: SessionId[]): React.ReactNode => {
+    const key = `ws:${workspace.workspaceId}`
     const isCollapsed = collapsed.has(key)
-    const renameKey = workspaceId === undefined ? undefined : `ws:${workspaceId}`
-    const renamingWorkspace = renameKey !== undefined && renaming === renameKey
-    // 名称前的图标表示分组本身：工作区=文件夹（展开开/收起合），归档=归档盒。
-    const groupIcon = kind === 'archived'
-      ? <Archive size={13} className={css.workspaceIcon} />
-      : isCollapsed
-        ? <Folder size={13} className={css.workspaceIcon} />
-        : <FolderOpen size={13} className={css.workspaceIcon} />
+    return (
+      <div key={key} className={css.workspaceGroup}>
+        <WorkspaceHead
+          label={workspace.title}
+          path={workspace.path}
+          sessionCount={sessions.length}
+          pinned={prefs.workspacePinned(workspace.workspaceId)}
+          collapsed={isCollapsed}
+          renaming={renaming === `ws:${workspace.workspaceId}`}
+          renameDraft={renaming === `ws:${workspace.workspaceId}` ? renameDraft : ''}
+          setRenameDraft={setRenameDraft}
+          commitRename={() => { commitWorkspaceRename(workspace.workspaceId) }}
+          onToggle={() => { onToggleGroup(key) }}
+          onMenu={event => { onWorkspaceMenu(event, workspace.workspaceId) }}
+          onBeginRename={() => { onBeginWorkspaceRename(workspace.workspaceId, workspace.title) }}
+          onTogglePin={() => { onToggleWorkspacePin(workspace.workspaceId) }}
+          t={t}
+        />
+        {!isCollapsed && sessions.map(id => sessionRow(id, false, workspace.workspaceId))}
+      </div>
+    )
+  }
+
+  const renderBucket = (key: string, label: string, rows: SessionId[], archived = false): React.ReactNode => {
+    const isCollapsed = collapsed.has(key)
     return (
       <div key={key} className={css.workspaceGroup}>
         <div className={css.workspaceHead} role="treeitem" aria-expanded={!isCollapsed}
           onClick={() => { onToggleGroup(key) }}>
-          {groupIcon}
-          {renamingWorkspace
-            ? <input
-              className={css.search}
-              autoFocus
-              value={renameDraft}
-              onChange={event => { setRenameDraft(event.target.value) }}
-              onBlur={() => { commitWorkspaceRename(workspaceId as string) }}
-              onKeyDown={event => { if (event.key === 'Enter') commitWorkspaceRename(workspaceId as string) }}
-              onClick={event => event.stopPropagation()}
-            />
-            : <span className={css.workspaceLabel}>{label}</span>}
-          {workspaceId !== undefined && !renamingWorkspace && (
-            <span className={css.workspaceActions}>
-              <button type="button" className={css.iconButton} title={t('moreActions')}
-                aria-label={t('moreActions')}
-                onClick={event => { event.stopPropagation(); onWorkspaceMenu(event, workspaceId) }}>
-                <MoreHorizontal size={13} />
-              </button>
-            </span>
-          )}
+          <Archive size={13} className={css.workspaceIcon} />
+          <span className={css.workspaceLabel}>{label}</span>
         </div>
-        {!isCollapsed && rows}
+        {!isCollapsed && rows.map(id => sessionRow(id, archived))}
       </div>
     )
   }
@@ -155,24 +180,22 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     )
   }
 
+  const empty = groups.grouped.length === 0 && groups.ungrouped.length === 0 && groups.archived.length === 0
   return (
     <>
-      {groups.grouped.length === 0 && groups.ungrouped.length === 0 && groups.archived.length === 0 && (
+      {empty && (
         <div className={css.emptyWrap}>
           <Inbox size={22} />
           <span className={css.emptyTitle}>{t('sidebarEmptyTitle')}</span>
           <span>{t('sidebarEmptyHint')}</span>
         </div>
       )}
-      {groups.grouped.map(({ workspace, sessions }) => renderGroup(
-        `ws:${workspace.workspaceId}`, workspace.title, sessions.map(id => sessionRow(id)), 'workspace', workspace.workspaceId,
-      ))}
-      {groups.ungrouped.length > 0 && renderGroup(
-        'ungrouped', t('ungrouped'), groups.ungrouped.map(id => sessionRow(id)), 'ungrouped',
-      )}
-      {groups.archived.length > 0 && renderGroup(
-        'archived', t('archived'), groups.archived.map(id => sessionRow(id, true)), 'archived',
-      )}
+      {organize === 'flat'
+        ? groups.flat.map(id => sessionRow(id))
+        : groups.grouped.map(({ workspace, sessions }) => renderWorkspace(workspace, sessions))}
+      {organize === 'byProject' && groups.ungrouped.length > 0
+        && renderBucket('ungrouped', t('ungrouped'), groups.ungrouped)}
+      {groups.archived.length > 0 && renderBucket('archived', t('archived'), groups.archived, true)}
     </>
   )
 }

@@ -59,7 +59,7 @@ CLI resolution order: `DSH_DESKTOP_CLI` → walk upward from this exe → walk f
 <a id="dev-note"></a>
 ## Dev Note
 
-Decision record: [experimental web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.md).
+Decision record: [experimental web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.md).
 
 -----
 
@@ -82,4 +82,5 @@ None; the shell neither assembles nor sends a provider request.
 - **CI does not gate `tauri build`** — local or optional jobs own the native compile until a Rust/WebView2 runner is allocated.
 - **Committed exe can go stale** — changing shell sources without re-running `pnpm run desktop:web` and committing the new `DeepSeek Harness.exe` leaves peers on an old binary.
 - **No theme-switching .exe file icon** — Windows Explorer does not recolor PE icons from system light/dark mode; the shipped icon uses a dark tile and white mark so both themes stay readable.
+- **Custom title bar needs Tauri IPC** — with system decorations off, the splash and Web title bar call minimize / maximize / close through `withGlobalTauri` and the remote capability; the same Web UI in a normal browser does not show that chrome.
 - **Frontend freeze is dist-only** — Host still launches through checkout `dsh` (source); only the Web asset tree is rebuilt and snapshotted for the session.

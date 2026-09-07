@@ -11,7 +11,7 @@
  * - profile: writes $DSH_HOME/profiles/web (bundles + deps + registry) only
  *            when it does not exist, then runs `pnpm install` there once
  * - network: probes the NetEase registry and skips the two internal packages
- *            when it is unreachable
+ *            when it is unreachable (only when seeding a profile)
  *
  * Env overrides: DSH_SEED_SKIP_INSTALL=1 to never run pnpm in the profile.
  * Flags: --force (re-write the profile manifest), --internal / --public.
@@ -37,6 +37,7 @@ const skillsDst = join(dshHome, 'skills')
 /** Packages that exist only on the NetEase-internal npm registry. */
 const INTERNAL_PACKAGES = ['ntes-dsh-market', '@dap-dsh-plugins/netease-auth']
 
+/** @returns {Promise<boolean>} whether the NetEase registry is reachable. */
 async function detectInternalNetwork() {
   try {
     await fetch('https://npm.nie.netease.com/', { signal: AbortSignal.timeout(4000) })
@@ -45,12 +46,6 @@ async function detectInternalNetwork() {
     return false
   }
 }
-
-const internal = process.argv.includes('--internal')
-  ? true
-  : process.argv.includes('--public')
-    ? false
-    : await detectInternalNetwork()
 
 // Skills: fill in any that are missing; never overwrite an existing skill.
 await mkdir(skillsDst, { recursive: true })
@@ -72,35 +67,45 @@ if (existsSync(homeSrc)) {
 }
 
 // Profile: seed once; leave an existing profile alone unless --force.
+// Probe the registry only when writing a profile — otherwise a closing fetch
+// handle plus process.exit races UV_HANDLE_CLOSING on win32.
 const profileExists = existsSync(join(profileDst, 'package.json'))
-if (profileExists && !process.argv.includes('--force')) {
-  process.exit(0)
-}
+if (!profileExists || process.argv.includes('--force')) {
+  const internal = process.argv.includes('--internal')
+    ? true
+    : process.argv.includes('--public')
+      ? false
+      : await detectInternalNetwork()
 
-await mkdir(profileDst, { recursive: true })
-for (const file of ['cordis.yml', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
-  await cp(join(profileSrc, file), join(profileDst, file), { force: true })
-}
+  await mkdir(profileDst, { recursive: true })
+  for (const file of ['cordis.yml', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
+    await cp(join(profileSrc, file), join(profileDst, file), { force: true })
+  }
 
-const pkg = JSON.parse(await readFile(join(profileSrc, 'package.json'), 'utf8'))
-if (!internal) {
-  pkg.dsh.profile.bundles = pkg.dsh.profile.bundles.filter(name => !INTERNAL_PACKAGES.includes(name))
-  for (const name of INTERNAL_PACKAGES) delete pkg.dependencies[name]
-}
-const packageJson = JSON.stringify(pkg, null, 2).replaceAll('__COMMUNITY_TARBALLS__', tarballsUrl)
-await writeFile(join(profileDst, 'package.json'), packageJson, 'utf8')
+  const pkg = JSON.parse(await readFile(join(profileSrc, 'package.json'), 'utf8'))
+  if (!internal) {
+    pkg.dsh.profile.bundles = pkg.dsh.profile.bundles.filter(name => !INTERNAL_PACKAGES.includes(name))
+    for (const name of INTERNAL_PACKAGES) delete pkg.dependencies[name]
+  }
+  const packageJson = JSON.stringify(pkg, null, 2).replaceAll('__COMMUNITY_TARBALLS__', tarballsUrl)
+  await writeFile(join(profileDst, 'package.json'), packageJson, 'utf8')
 
-const npmrc = internal
-  ? 'registry=https://npm.nie.netease.com/\n'
-  : 'registry=https://registry.npmjs.org/\n'
-await writeFile(join(profileDst, '.npmrc'), npmrc, 'utf8')
+  const npmrc = internal
+    ? 'registry=https://npm.nie.netease.com/\n'
+    : 'registry=https://registry.npmjs.org/\n'
+  await writeFile(join(profileDst, '.npmrc'), npmrc, 'utf8')
 
-console.log(`[community] profile → ${profileDst} (${internal ? 'NetEase-internal' : 'public'})`)
-if (!internal) console.log(`[community] skipped → ${INTERNAL_PACKAGES.join(', ')}`)
+  console.log(`[community] profile → ${profileDst} (${internal ? 'NetEase-internal' : 'public'})`)
+  if (!internal) console.log(`[community] skipped → ${INTERNAL_PACKAGES.join(', ')}`)
 
-if (process.env.DSH_SEED_SKIP_INSTALL !== '1') {
-  const result = spawnSync('pnpm', ['install', '--no-frozen-lockfile'], { cwd: profileDst, stdio: 'inherit', shell: true })
-  if (result.status !== 0) {
-    console.warn('[community] profile pnpm install failed; run it manually in the profile dir')
+  if (process.env.DSH_SEED_SKIP_INSTALL !== '1') {
+    const result = spawnSync('pnpm', ['install', '--no-frozen-lockfile'], {
+      cwd: profileDst,
+      stdio: 'inherit',
+      shell: true,
+    })
+    if (result.status !== 0) {
+      console.warn('[community] profile pnpm install failed; run it manually in the profile dir')
+    }
   }
 }

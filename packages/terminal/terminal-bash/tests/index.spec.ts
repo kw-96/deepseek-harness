@@ -271,6 +271,36 @@ describe('BashTerminalBackend startup rollback', () => {
     expect(spawned?.env?.NO_COLOR).toBeUndefined()
   })
 
+  it('overrides the plugin dialect for one spawn when shellDialect is set', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EmptySandbox)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: '/workspace' })
+    let spawned: SubprocessTerminalSpawnSpec | undefined
+    const session = { motd: '' } as unknown as LocalPtySession
+    const backend = new BashTerminalBackend(
+      ctx,
+      { ...config(), shellDialect: 'bash', shellArgs: ['-i'] },
+      async (request) => {
+        spawned = request
+        return terminalHandle()
+      },
+      () => session,
+    )
+    expect(await backend.spawn({
+      ...spec(agent(ctx)),
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })).toBe(session)
+    expect(spawned?.argv[0]).not.toBe('/bin/bash')
+    expect(spawned?.argv.slice(1)).toEqual(['-NoLogo', '-NoProfile'])
+    expect(spawned?.env).toMatchObject({
+      TERM: 'xterm-256color',
+      DSH_SHELL: '1',
+    })
+    expect(spawned?.env?.PS1).toBeUndefined()
+  })
+
   it('resolves session mode and root together before wrapping the shell', async () => {
     const ctx = new Context()
     await ctx.plugin(RecordingSandbox)

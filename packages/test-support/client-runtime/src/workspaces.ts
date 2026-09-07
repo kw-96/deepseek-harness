@@ -127,6 +127,54 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Attach a session (recorded). Default prepends the id on the matching row.
+   * @param workspaceId - target workspace.
+   * @param sessionId - session to attach.
+   * @returns the updated view.
+   */
+  async attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    this.calls.push({ method: 'attachSession', args: [workspaceId, sessionId] })
+    const stub = this.stubs.get('attachSession')
+    if (stub !== undefined) return await (stub(workspaceId, sessionId) as Promise<WorkspaceView>)
+    let updated: WorkspaceView | undefined
+    await this.update((draft) => {
+      draft.items = draft.items.map((row) => {
+        if (row.workspaceId !== workspaceId) return row
+        if (row.sessionIds.includes(sessionId)) {
+          updated = { ...row, sessionIds: [...row.sessionIds] }
+          return row
+        }
+        const next = { ...row, sessionIds: [sessionId, ...row.sessionIds] }
+        updated = { ...next, sessionIds: [...next.sessionIds] }
+        return next
+      })
+    })
+    return updated ?? { workspaceId, title: '', path: '', sessionIds: [sessionId] } as unknown as WorkspaceView
+  }
+
+  /**
+   * Detach a session (recorded). Default removes the id from the matching row.
+   * @param workspaceId - owning workspace.
+   * @param sessionId - session to detach.
+   * @returns the updated view.
+   */
+  async detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    this.calls.push({ method: 'detachSession', args: [workspaceId, sessionId] })
+    const stub = this.stubs.get('detachSession')
+    if (stub !== undefined) return await (stub(workspaceId, sessionId) as Promise<WorkspaceView>)
+    let updated: WorkspaceView | undefined
+    await this.update((draft) => {
+      draft.items = draft.items.map((row) => {
+        if (row.workspaceId !== workspaceId) return row
+        const next = { ...row, sessionIds: row.sessionIds.filter(id => id !== sessionId) }
+        updated = { ...next, sessionIds: [...next.sessionIds] }
+        return next
+      })
+    })
+    return updated ?? { workspaceId, title: '', path: '', sessionIds: [] } as unknown as WorkspaceView
+  }
+
+  /**
    * Archive a session (recorded). The default mirrors the production face's
    * observable effect: the id joins the list state's archive set.
    * @param sessionId - session to archive.

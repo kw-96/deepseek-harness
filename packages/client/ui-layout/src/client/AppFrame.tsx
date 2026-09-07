@@ -12,13 +12,22 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
-  PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
+  InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import { isDesktopShell } from './desktop/detect.ts'
+import { DesktopTitleBar } from './desktop/DesktopTitleBar.tsx'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
+
+/** Injected desktop callbacks assembled in apply. */
+export type AppFrameInjected = {
+  /** Select a session as current (desktop title-bar history / neighbor nav). */
+  openSession: (id: SessionId) => void
+}
 
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
@@ -26,6 +35,7 @@ export type AppFrameProps =
   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'bottom' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
+  & InjectFace<AppFrameInjected>
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -130,6 +140,7 @@ export function AppFrame({
   actions,
   renderSlot,
   SessionProvider,
+  openSession,
   t,
 }: AppFrameProps) {
   const panels = useStore(s => s)
@@ -210,8 +221,17 @@ export function AppFrame({
   const onBottomStart = useCallback(() => { bottomBase.current = panels.bottom; setDragging(true) }, [panels.bottom])
   const onBottomDrag = useCallback((dy: number) => { actions.setBottom(bottomBase.current - dy) }, [actions])
   const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
+  const desktop = isDesktopShell()
+  const toggleDetails = useCallback(() => {
+    if (panels.details === 0) actions.openDetails()
+    else actions.closeDetails()
+  }, [actions, panels.details])
+  const toggleBottom = useCallback(() => {
+    if (panels.bottom === 0) actions.openBottom()
+    else actions.closeBottom()
+  }, [actions, panels.bottom])
 
-  return (
+  const frame = (
     <div
       ref={frameRef}
       className={css.frame}
@@ -220,6 +240,7 @@ export function AppFrame({
       data-details-collapsed={cols.details === 0 || undefined}
       data-bottom-collapsed={detailsSession === undefined || panels.bottom === 0 || undefined}
       data-dragging={dragging || undefined}
+      data-desktop-shell={desktop || undefined}
     >
       <DocumentTitle
         productTitle={productTitle}
@@ -257,6 +278,23 @@ export function AppFrame({
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
       {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+    </div>
+  )
+
+  if (!desktop) return frame
+  return (
+    <div className={css.shell} data-desktop-shell>
+      <DesktopTitleBar
+        t={t}
+        sidebarCollapsed={sidebarCollapsed}
+        toggleSidebar={() => { actions.toggleSidebar() }}
+        toggleDetails={toggleDetails}
+        toggleBottom={toggleBottom}
+        openBottom={() => { actions.openBottom() }}
+        openSession={openSession}
+        useSessions={useSessions}
+      />
+      {frame}
     </div>
   )
 }

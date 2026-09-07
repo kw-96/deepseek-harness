@@ -48,7 +48,27 @@ export interface CodexApi {
   gitPush: (cwd: string) => Promise<{ ok: true }>
   gitStageAll: (cwd: string) => Promise<{ ok: true }>
   gitUnstageAll: (cwd: string) => Promise<{ ok: true }>
-  terminalOpen: (sessionId: string, cwd?: string) => Promise<{ terminalId: string; output: string; status: { kind: string } }>
+  terminalOpen: (sessionId: string, options?: {
+    cwd?: string
+    name?: string
+    shellDialect?: 'bash' | 'pwsh'
+    cols?: number
+    rows?: number
+  }) => Promise<{
+    terminalId: string
+    output: string
+    status: { kind: string }
+    name?: string
+    origin: 'ui' | 'agent'
+  }>
+  terminalList: (sessionId: string) => Promise<{
+    terminals: readonly {
+      terminalId: string
+      name?: string
+      status: { kind: string }
+      origin: 'ui' | 'agent'
+    }[]
+  }>
   terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>
   terminalFollow: (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<{ seq: number; chunk: string }>
   terminalWrite: (sessionId: string, terminalId: string, data: string) => Promise<{ ok: true }>
