@@ -18,8 +18,8 @@ export interface CodexImportSettings {
 
 /** Loader schema resolving the namespace; the card edits `autoSync`. */
 export const CodexImportSettingsSchema: z<CodexImportSettings> = z.object({
-  autoSync: z.boolean().default(true),
+  autoSync: z.boolean().default(false),
 })
 
 /** Composition base value when no user document layer exists. */
-export const DEFAULT_CODEX_IMPORT_SETTINGS: CodexImportSettings = Object.freeze({ autoSync: true })
+export const DEFAULT_CODEX_IMPORT_SETTINGS: CodexImportSettings = Object.freeze({ autoSync: false })

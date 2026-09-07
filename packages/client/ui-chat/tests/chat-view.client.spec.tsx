@@ -1601,7 +1601,7 @@ describe('ChatView', () => {
     expect(contextRow?.getAttribute('hidden')).toBe('until-found')
   })
 
-  it('keeps a foldable closed Turn fully visible while history is partial', () => {
+  it('folds a closed Turn while Load earlier remains available', () => {
     const h = makeHarness({
       nodes: [
         user(1, 'question'),
@@ -1614,18 +1614,14 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     const contextRow = view.container.querySelector<HTMLElement>('[data-chat-flow-kind="context"]')
-
-    expect(turnProcessControl(view.container)).toBeNull()
-    expect(contextRow?.getAttribute('hidden')).toBeNull()
-    expect(contextRow?.hasAttribute('data-turn-process-member')).toBe(false)
-
-    act(() => { h.set({ hasMore: false }) })
     const toggle = turnProcessControl(view.container)!
+
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(contextRow?.getAttribute('hidden')).toBe('until-found')
+    expect(contextRow?.hasAttribute('data-turn-process-member')).toBe(true)
   })
 
-  it('withholds process controls for partial history and folds final-page groups', () => {
+  it('folds newly completed groups after Load earlier prepends history', () => {
     const h = makeHarness({
       nodes: [user(9, 'visible question'), assistant(10, 'visible answer', 2)],
       hasMore: true,
@@ -1643,7 +1639,7 @@ describe('ChatView', () => {
           assistant(10, 'visible answer', 2),
         ],
         turnEnds: new Map([[1, 5]]),
-        hasMore: false,
+        hasMore: true,
       })
     })
 
@@ -1691,20 +1687,20 @@ describe('ChatView', () => {
     const beforeKeys = partial.locations.getTurn(1)
     const completeSpec = { ...partialSpec, processStartSeq: 2 }
     turnData.set('turn-process', completeSpec)
-    const complete = builder.apply({
-      upserts: [{ ...partialProcess, data: completeSpec }],
-      timeline: source.timeline,
-    })
-    expect(complete.order).toBe(partial.order)
-    expect(complete.nodes).toBe(partial.nodes)
-    expect(complete.locations.getTurn(1)).not.toBe(beforeKeys)
-    expect(complete.order.map(key => complete.nodes.get(key)?.kind)).toEqual([
-      'user', 'turn-process', 'context', 'assistant-step', 'assistant-step', 'turn-tail',
-    ])
 
     act(() => {
+      const complete = builder.apply({
+        upserts: [{ ...partialProcess, data: completeSpec }],
+        timeline: source.timeline,
+      })
+      expect(complete.order).toBe(partial.order)
+      expect(complete.nodes).toBe(partial.nodes)
+      expect(complete.locations.getTurn(1)).not.toBe(beforeKeys)
+      expect(complete.order.map(key => complete.nodes.get(key)?.kind)).toEqual([
+        'user', 'turn-process', 'context', 'assistant-step', 'assistant-step', 'turn-tail',
+      ])
       turnData.publish()
-      h.set({ chat: complete, hasMore: false })
+      h.set({ chat: complete, hasMore: true })
     })
     expect(turnProcessControl(view.container)?.getAttribute('aria-expanded')).toBe('false')
   })

@@ -682,12 +682,13 @@
   width: 100%;
   height: 100%;
   min-width: 0;
+  flex-direction: column;
   overflow: hidden;
   background: var(--cx-bg-surface);
   color: var(--cx-text-hi);
 }
 
-/* ── 顶部居中标签条（Cursor 式：5 个主标签 + 溢出菜单） ── */
+/* ── 顶部横向图标栏（Cursor 式：5 个主图标 + 溢出菜单） ── */
 
 .tabBar {
   position: relative;
@@ -702,7 +703,7 @@
 .tabStrip {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 2px;
   min-width: 0;
   flex: 1;
@@ -737,14 +738,7 @@
 }
 
 .tabLabel {
-  min-width: 0;
-  max-width: 72px;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .tabClose {
@@ -1022,9 +1016,38 @@
 }
 
 .commitArea {
-  border-bottom: 0.5px solid var(--cx-line);
   padding: 8px 10px;
   flex: none;
+}
+
+.gitCommitSection {
+  border-bottom: 0.5px solid var(--cx-line);
+  flex: none;
+}
+
+.gitCommitHead,
+.gitChangeHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--cx-text-mid);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gitCommitHead:hover,
+.gitChangeHead:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
 }
 
 .commitBox {
@@ -1089,6 +1112,93 @@
   flex: 1;
   overflow: auto;
   padding: 0 4px 12px 0;
+}
+
+.gitChangesRoot {
+  padding: 4px 0 8px;
+}
+
+.gitChangesTitle {
+  min-height: 26px;
+  padding: 5px 8px 3px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.gitChangeGroup {
+  border-bottom: 0.5px solid var(--cx-line);
+}
+
+.gitChangeCount {
+  min-width: 18px;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: var(--cx-hover);
+  color: var(--cx-text-mid);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.gitFileRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 2px 8px 2px 20px;
+  color: var(--cx-text-mid);
+  cursor: pointer;
+}
+
+.gitFileRow:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.gitFileIcon {
+  flex: none;
+  color: var(--cx-text-low);
+}
+
+.gitFileMain {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.gitFileName,
+.gitFileDirectory {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitFileName {
+  flex: none;
+  color: inherit;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.gitFileDirectory {
+  min-width: 0;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.gitFileState {
+  margin-left: auto;
 }
 
 .gitFilePath {
@@ -1194,6 +1304,97 @@
 
 .historyHead:hover {
   color: var(--cx-text-mid);
+}
+
+.gitTimeline {
+  padding: 2px 8px 10px;
+}
+
+.gitTimelineItem {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 34px;
+  padding: 2px 0;
+}
+
+.gitTimelineRail {
+  position: relative;
+  display: flex;
+  width: 10px;
+  min-height: 30px;
+  flex: none;
+  justify-content: center;
+}
+
+.gitTimelineRail::before {
+  position: absolute;
+  top: 10px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--cx-line-strong);
+  content: '';
+}
+
+.gitTimelineItem:last-child .gitTimelineRail::before {
+  display: none;
+}
+
+.gitTimelineRail span {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border: 2px solid var(--cx-accent);
+  border-radius: 50%;
+  background: var(--cx-bg-surface);
+  box-sizing: border-box;
+}
+
+.gitTimelineIcon {
+  margin-top: 2px;
+  flex: none;
+  color: var(--cx-text-low);
+}
+
+.gitTimelineBody {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.gitTimelineSubject,
+.gitTimelineMeta,
+.gitTimelineRefs {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitTimelineSubject {
+  color: var(--cx-text-mid);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.gitTimelineMeta {
+  color: var(--cx-text-low);
+  font-size: 10.5px;
+  line-height: 15px;
+}
+
+.gitTimelineRefs {
+  max-width: 96px;
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent);
+  font-size: 10px;
+  line-height: 15px;
 }
 
 /* 下拉菜单小标题与自适应标签。 */
@@ -1943,4 +2144,81 @@
 
 .skillSwitch input:disabled + span {
   opacity: 0.5;
+}
+
+/* ── 底部持久终端 ───────────────────────────────────── */
+
+.bottomTerminal {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--cx-bg);
+  color: var(--cx-text-hi);
+}
+
+.bottomTerminalHead {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 8px;
+  flex: none;
+}
+
+.bottomTerminalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cx-text-mid);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bottomTerminalCwd {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomTerminalOutput {
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  color: var(--cx-text-hi);
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bottomTerminalInput {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border-top: 0.5px solid var(--cx-line);
+  padding: 0 10px;
+  color: var(--cx-accent-strong);
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  flex: none;
+}
+
+.bottomTerminalInput input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cx-text-hi);
+  font: inherit;
 }

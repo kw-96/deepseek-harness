@@ -1,10 +1,9 @@
 /**
- * Import local Codex threads as DSH sessions. On host start the plugin sweeps
- * Codex's thread-history store once, converts every thread into a DSH event
- * log, stores it durably, and publishes it as a live session so the Web GUI
- * session list shows it. The sweep is idempotent: a thread whose `codex-<id>`
- * session already exists — live or stored — is skipped, so later Codex
- * activity requires no import run unless the stored session is deleted.
+ * Import local Codex threads as DSH sessions. Manual import and an opt-in
+ * automatic sweep convert every thread into a DSH event log, store it
+ * durably, publish it live, and attach it to the workspace matching its cwd.
+ * Repeated sweeps keep one `codex-<id>` session per thread and repair missing
+ * workspace membership for existing imported sessions.
  * @module @deepseek-ai/dsh-session-import-codex
  */
 
@@ -25,6 +24,7 @@ import {
 } from './settings.ts'
 import { loadCodexThreads } from './sqlite.ts'
 import type { CodexImportSession, CodexImportSweepResult, ImportBounds } from './types.ts'
+import { attachCodexSessionWorkspace } from './workspace.ts'
 
 export { CodexImportController } from './remote.ts'
 export type { CodexImportControllerConfig, CodexImportRunner } from './remote.ts'
@@ -38,7 +38,7 @@ declare module '@deepseek-ai/cordis' {
 export type { CodexImportSummary } from './types.ts'
 
 export const name = 'session-import-codex'
-export const inject = ['sessions', 'sessionPersistence']
+export const inject = ['sessions', 'sessionPersistence', 'workspaceRegistry']
 
 /** Default cap for imported tool-result text. */
 export const DEFAULT_MAX_TOOL_RESULT_CHARS = 20_000
@@ -65,8 +65,9 @@ export interface Config {
   maxTitleChars?: number
   /**
    * Periodic re-scan interval in milliseconds while the card's sync toggle is
-   * on. `0` (the default) disables the timer; the boot sweep and the manual
-   * button still run regardless.
+   * on. `0` (the default) disables the timer; automatic import still runs
+   * once when its settings toggle becomes enabled, and the manual button is
+   * always available.
    */
   syncIntervalMs?: number
 }
@@ -161,6 +162,7 @@ async function importOneThread(
     seed: structuredClone(record.events),
     meta: { cwd, createdAt },
   })
+  await attachCodexSessionWorkspace(ctx, id, cwd)
   let title = ''
   for (const event of record.events) {
     if (event.type === 'session/title') {
@@ -201,13 +203,17 @@ export async function runImportSweep(
   for (const record of records) {
     if (signal.aborted) break
     const id = importedSessionId(record.threadId)
-    if (ctx.sessions.get(id) !== undefined) {
+    const live = ctx.sessions.get(id)
+    if (live !== undefined) {
       summary.skippedExisting += 1
+      await attachCodexSessionWorkspace(ctx, id, live.header.cwd)
       continue
     }
     try {
-      if (await ctx.sessionPersistence.stat(id) !== undefined) {
+      const stored = await ctx.sessionPersistence.stat(id)
+      if (stored !== undefined) {
         summary.skippedExisting += 1
+        await attachCodexSessionWorkspace(ctx, id, stored.header.cwd)
         continue
       }
     } catch {
@@ -236,9 +242,8 @@ export async function runImportSweep(
 }
 
 /**
- * Mount the import plugin: an always-on boot sweep, the settings section that
- * drives the card's sync toggle and periodic re-scan, and the Remote surface
- * for the card's manual button and history.
+ * Mount the import plugin: the settings section gates automatic scans, while
+ * the Remote provides manual import and history to the card.
  * @param ctx - context exposing the session and persistence services.
  * @param config - loader-supplied configuration.
  */
@@ -257,10 +262,8 @@ export function apply(ctx: Context, config: Config): void {
   // The card's manual button and history list.
   ctx.plugin(CodexImportController, { run: runner })
 
-  // The card's sync toggle: autoSync gates only the periodic re-scan. The boot
-  // sweep below stays unconditional (idempotent), so an install still imports
-  // the existing history before the user ever opens settings.
-  let autoSync = true
+  // The card's sync toggle gates both its initial automatic scan and the timer.
+  let autoSync = DEFAULT_CODEX_IMPORT_SETTINGS.autoSync
   let interval: ReturnType<typeof setInterval> | undefined
   const stopSync = (): void => {
     if (interval !== undefined) {
@@ -281,12 +284,12 @@ export function apply(ctx: Context, config: Config): void {
       setSource: () => {},
       onChange: () => {
         const value = settingsCtx.settings.get(CODEX_IMPORT_NS) as CodexImportSettings | undefined
-        autoSync = value?.autoSync ?? true
+        const nextAutoSync = value?.autoSync ?? DEFAULT_CODEX_IMPORT_SETTINGS.autoSync
+        const becameEnabled = nextAutoSync && !autoSync
+        autoSync = nextAutoSync
         startSync()
+        if (becameEnabled) void runner(controller.signal).then(logSummary)
       },
     })
   })
-
-  // Always-on, idempotent boot sweep (historical behavior).
-  void runner(controller.signal).then(logSummary)
 }

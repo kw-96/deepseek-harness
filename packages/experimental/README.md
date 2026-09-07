@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The experimental group contains prototype capabilities that are not part of any official release: they run on the real harness, but their contracts can change and they carry no support promise. The group holds Agent Teams, the cross-realm Inspector, the CPython subprocess backend for the code-execution seam, and the browser-worker runtime and image packer used by preview deployments. Use these packages to try an unreleased capability; they carry no stability promise, and released products must not depend on them.
+The experimental group contains prototype capabilities that are not part of any official release: they run on the real harness, but their contracts can change and they carry no support promise. The group holds Agent Teams, the cross-realm Inspector, the CPython subprocess backend for the code-execution seam, the browser-worker runtime and image packer used by preview deployments, and a Windows-first Tauri shell that opens `dsh web` in an independent native window. Use these packages to try an unreleased capability; they carry no stability promise, and released products must not depend on them.
 
 ## Table of Contents
 
@@ -33,6 +33,7 @@ The experimental group contains prototype capabilities that are not part of any 
 | [`tool-agent-team`](tool-agent-team/README.md) | Nine tools that let the model create, message, and coordinate teammates | registers scoped tools on `ctx.tools` |
 | [`webworker-packer`](webworker-packer/README.md) | Builds the gzip-compressed VFS image consumed by the browser worker preview | library and CLI — no ctx key |
 | [`webworker-runtime`](webworker-runtime/README.md) | Runs the harness plugin tree inside a dedicated browser worker | library and worker entry — no ctx key |
+| [`web-desktop`](web-desktop/README.md) | Tauri shell that opens DeepSeek Harness Web in an independent native window | native exe — no ctx key |
 
 -----
 

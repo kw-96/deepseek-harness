@@ -1,6 +1,6 @@
 {
   "name": "dsh-codex-shell",
-  "version": "0.4.0",
+  "version": "0.4.4",
   "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, right-edge files/git/projects/plugins/commands panel, pinned summary overlay, and session context actions - one bundle plugin",
   "keywords": [
     "deepseek-harness",
@@ -93,7 +93,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.host.json && tsdown --config tsdown.host.config.ts && tsc -p tsconfig.client.json && tsdown --config tsdown.client.config.ts",
     "test": "pnpm run contracts && vitest run",
     "test:watch": "vitest",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-codex-shell-0.4.0.tgz codex-shell",
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-codex-shell-0.4.4.tgz codex-shell",
     "prepare": "pnpm run build"
   },
   "dependencies": {
@@ -108,17 +108,25 @@
     "@deepseek-ai/dsh-client-connection": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-client-locale": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-workspace": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-fs": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-shell": "^0.1.2-rc.1",
+    "@deepseek-ai/dsh-terminal": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
     "react": ">=18.2.0 <20.0.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-layout": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-agent": "0.1.2-rc.1",
     "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     "@deepseek-ai/dsh-shell": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-terminal": "0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "0.1.2-rc.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.19.0",
@@ -133,5 +141,3 @@
     "vitest": "^4.1.0"
   }
 }
-
-

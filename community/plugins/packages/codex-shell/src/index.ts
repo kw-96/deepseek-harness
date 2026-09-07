@@ -3,6 +3,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-shell'
+import type {} from '@deepseek-ai/dsh-terminal'
+import type {} from '@deepseek-ai/dsh-agent'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { TerminalSessionId } from '@deepseek-ai/dsh-terminal'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   gitBranches, gitCheckout, gitCommit, gitDiff, gitDiscard, gitFetch, gitLog, gitPull, gitPush, gitStage,
@@ -14,14 +18,14 @@ import { projectAddDir, projectDirs, projectSetDirs } from './host/projects.js'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse,
+  ProjectAddDirResponse, ProjectDirsResponse, TerminalOpenResponse, TerminalReadResponse, TerminalSendResponse,
 } from './types.js'
 
 export type * from './types.js'
 
 /** codexShell Remote: filesystem, git, and per-workspace project directories for the Web shell. */
 export class CodexShell extends TypertRemoteService {
-  static inject = ['fs', 'shell']
+  static inject = ['fs', 'shell', 'terminals', 'agents']
 
   constructor(ctx: Context) {
     super(ctx, 'codexShell')
@@ -120,6 +124,43 @@ export class CodexShell extends TypertRemoteService {
   @Remote('gitUnstageAll')
   async gitUnstageAll(cwd: string): Promise<{ ok: true }> {
     return await gitUnstageAll(this.ctx.shell, cwd)
+  }
+
+  private terminalOwner(sessionId: string) {
+    const owner = this.ctx.agents.get(SessionId(sessionId))
+    if (owner === undefined) throw new Error(`终端需要当前会话的 live Agent：${sessionId}`)
+    return owner
+  }
+
+  @Remote('terminalOpen')
+  async terminalOpen(sessionId: string, cwd?: string): Promise<TerminalOpenResponse> {
+    const owner = this.terminalOwner(sessionId)
+    const existing = this.ctx.terminals.list(owner).find(item => item.name === 'codex-bottom' && item.status.kind === 'running')
+    if (existing !== undefined) {
+      const output = this.ctx.terminals.read(owner, existing.sessionId, { count: 500 })
+      return { terminalId: existing.sessionId, output: output.text, status: existing.status }
+    }
+    const created = await this.ctx.terminals.spawn(owner, { type: 'shell', name: 'codex-bottom', ...(cwd !== undefined ? { cwd } : {}) })
+    return { terminalId: created.sessionId, output: created.motd, status: created.status }
+  }
+
+  @Remote('terminalSend')
+  async terminalSend(sessionId: string, terminalId: string, text: string): Promise<TerminalSendResponse> {
+    const operation = this.ctx.terminals.startSend(this.terminalOwner(sessionId), TerminalSessionId(terminalId), { text, submit: true })
+    const result = await operation.done
+    return { output: result.viewport, status: result.sessionStatus, waitReason: result.waitReason, truncated: result.truncated }
+  }
+
+  @Remote('terminalRead')
+  async terminalRead(sessionId: string, terminalId: string): Promise<TerminalReadResponse> {
+    const result = this.ctx.terminals.read(this.terminalOwner(sessionId), TerminalSessionId(terminalId), { count: 500 })
+    return { output: result.text, truncated: result.truncated }
+  }
+
+  @Remote('terminalClose')
+  async terminalClose(sessionId: string, terminalId: string): Promise<{ ok: true }> {
+    await this.ctx.terminals.kill(this.terminalOwner(sessionId), TerminalSessionId(terminalId), 'bottom terminal closed')
+    return { ok: true }
   }
 
   @Remote('projectDirs')

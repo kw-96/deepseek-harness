@@ -1,7 +1,7 @@
 /**
- * 右侧面板顶部标签条（Cursor 式排布）：标签居中横向排列，最多展示
- * 5 个主标签，其余收进「更多」菜单；激活标签落在溢出集合时顶替第
- * 5 个可见位置。关闭按钮固定在最右端。
+ * 右侧面板顶部图标栏：标签横向排列，最多展示 5 个主标签，其余收进
+ * 「更多」菜单；激活标签落在溢出集合时顶替第 5 个可见位置。关闭按钮
+ * 固定在最右端。
  */
 import { useEffect, useRef, useState } from 'react'
 import { MoreHorizontal, X } from 'lucide-react'
@@ -24,12 +24,12 @@ interface TabBarProps {
   t: TFn
 }
 
-/** 顶部居中展示的主标签数量；其余进入溢出菜单。 */
+/** 顶部图标栏展示的主标签数量；其余进入溢出菜单。 */
 const MAX_TABS = 5
 
 /**
  * 标签条组件。
- * @param tabs 全部标签（按展示优先级排列，前 5 个为主标签）
+ * @param tabs 全部标签（按展示优先级排列，前 5 个为主图标）
  * @param activeId 当前激活标签
  * @param onSelect 选择标签回调
  * @param onClose 关闭整个面板回调
@@ -85,6 +85,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, t }: TabBarProps): R
             role="tab"
             className={tab.id === activeId ? css.tabActive : css.tab}
             aria-selected={tab.id === activeId}
+            aria-label={tab.label}
             title={tab.label}
             onClick={() => { onSelect(tab.id) }}
           >

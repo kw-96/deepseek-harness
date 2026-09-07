@@ -13,6 +13,7 @@ import {
   runImportSweep,
   type ResolvedConfig,
 } from '../src/index.ts'
+import { DEFAULT_CODEX_IMPORT_SETTINGS } from '../src/settings.ts'
 
 vi.mock('../src/sqlite.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/sqlite.ts')>()
@@ -39,7 +40,7 @@ function testContext(): Context {
 
 /** Minimal settings double: installSection drives apply's setSource/onChange. */
 function makeFakeSettings(): { service: unknown; setAutoSync(value: boolean): void } {
-  let autoSync = true
+  let autoSync = false
   let onChange: (() => void) | undefined
   const service = {
     installSection(
@@ -74,6 +75,10 @@ afterEach(async () => {
 })
 
 describe('resolveConfig', () => {
+  it('disables automatic import by default', () => {
+    expect(DEFAULT_CODEX_IMPORT_SETTINGS.autoSync).toBe(false)
+  })
+
   it('resolves codexHome from the config, then CODEX_HOME, then the home directory', () => {
     expect(resolveConfig({ codexHome: 'C:\\explicit' }, {}).codexHome).toBe('C:\\explicit')
     expect(resolveConfig({}, { CODEX_HOME: 'C:\\env-home' }).codexHome).toBe('C:\\env-home')
@@ -98,11 +103,14 @@ describe('resolveConfig', () => {
 })
 
 describe('apply', () => {
-  it('runs one sweep and logs the summary', async () => {
+  it('logs the automatic sweep after the setting is explicitly enabled', async () => {
     const ctx = testContext()
     contexts.push(ctx)
+    const settings = makeFakeSettings()
+    ctx.provide('settings', settings.service)
     const info = vi.spyOn(ctx.logger, 'info')
     apply(ctx, { codexHome: 'C:\\no-store-anywhere' })
+    settings.setAutoSync(true)
     await vi.waitFor(() => {
       expect(info).toHaveBeenCalledWith(
         expect.stringContaining('sweep finished (imported 0, skipped 0 existing, skipped 0 empty)'),
@@ -144,7 +152,7 @@ describe('apply', () => {
     expect(result.sessions).toEqual([])
   })
 
-  it('runs the periodic re-scan while autoSync is on and stops it when toggled off', async () => {
+  it('starts automatic scans only after autoSync is enabled and stops them when disabled', async () => {
     vi.useFakeTimers()
     try {
       const ctx = testContext()
@@ -154,12 +162,15 @@ describe('apply', () => {
       mockedLoad.mockResolvedValue(undefined)
       apply(ctx, { codexHome: 'C:\\anywhere', syncIntervalMs: 1000 })
       await vi.advanceTimersByTimeAsync(0)
+      expect(mockedLoad).not.toHaveBeenCalled()
 
-      const afterBoot = mockedLoad.mock.calls.length
-      expect(afterBoot).toBeGreaterThan(0)
+      settings.setAutoSync(true)
+      await vi.advanceTimersByTimeAsync(0)
+      const afterEnable = mockedLoad.mock.calls.length
+      expect(afterEnable).toBe(1)
 
       await vi.advanceTimersByTimeAsync(1000)
-      expect(mockedLoad.mock.calls.length).toBe(afterBoot + 1)
+      expect(mockedLoad.mock.calls.length).toBe(afterEnable + 1)
 
       settings.setAutoSync(false)
       const afterToggle = mockedLoad.mock.calls.length
@@ -167,7 +178,9 @@ describe('apply', () => {
       expect(mockedLoad.mock.calls.length).toBe(afterToggle)
 
       settings.setAutoSync(true)
+      await vi.advanceTimersByTimeAsync(0)
       const afterReEnable = mockedLoad.mock.calls.length
+      expect(afterReEnable).toBe(afterToggle + 1)
       await vi.advanceTimersByTimeAsync(1000)
       expect(mockedLoad.mock.calls.length).toBe(afterReEnable + 1)
 
@@ -178,7 +191,7 @@ describe('apply', () => {
     }
   })
 
-  it('defaults autoSync to on when the settings section value is unavailable', async () => {
+  it('keeps automatic import off when the settings section value is unavailable', async () => {
     vi.useFakeTimers()
     try {
       const ctx = testContext()
@@ -199,9 +212,8 @@ describe('apply', () => {
       mockedLoad.mockResolvedValue(undefined)
       apply(ctx, { codexHome: 'C:\\anywhere', syncIntervalMs: 1000 })
       await vi.advanceTimersByTimeAsync(0)
-      const afterBoot = mockedLoad.mock.calls.length
       await vi.advanceTimersByTimeAsync(1000)
-      expect(mockedLoad.mock.calls.length).toBe(afterBoot + 1)
+      expect(mockedLoad).not.toHaveBeenCalled()
       await ctx.fiber.dispose()
       contexts.splice(contexts.indexOf(ctx), 1)
     } finally {

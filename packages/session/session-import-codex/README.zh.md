@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import-codex` 把本地安装的 Codex 线程导入为 DeepSeek Harness 会话。主机启动时它扫描一次 Codex 的 thread-history 存储,把每个线程转换为标准 DSH 事件日志,经会话持久化后端落盘,并作为活跃会话发布——Web 会话列表随即展示你的 Codex 对话,包括标题、消息与工具调用。扫描是幂等的:每个线程对应固定的会话 id(`codex-<线程id>`),已存在的会话会被跳过,因此重启只会导入新线程。当你希望在 harness 里阅读 Codex 历史时选用它;它不是与 Codex 的双向实时同步。
+`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的 Codex 线程导入为 DeepSeek Harness 会话。它把每个线程转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按会话头的 `cwd` 创建或复用对应的 DSH 工作区。Web 会话列表因此会把导入的 Codex 对话归入其工作目录。自动导入默认关闭；开启设置卡片的开关后会先导入一次，再按配置间隔执行。它不是与 Codex 的双向实时同步。
 
 ## 目录
 
@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在组合里挂载本包(组合需先包含会话持久化后端;插件注入 `sessions` 与 `sessionPersistence`),导入会在主机启动时执行,无需其他配置。
+在组合里挂载本包（组合需先包含会话持久化和 `dsh-workspace`；插件注入 `sessions`、`sessionPersistence` 与 `workspaceRegistry`）。通过设置卡片的“立即导入”开始导入；自动导入需要显式开启。
 
 ### 最小配置
 
@@ -39,17 +39,22 @@ kind: "package-reference"
 | `cwd` | 进程 cwd | 线程没有命令 cwd 时,写入导入会话头的绝对工作目录 |
 | `maxToolResultChars` | `20,000` | 导入工具结果文本的最大 UTF-16 码元数 |
 | `maxTitleChars` | `300` | 导入会话标题的最大 UTF-16 码元数 |
+| `syncIntervalMs` | `0`（关闭） | 设置卡片同步开关开启时的定时重扫间隔 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-session-import-codex)是每个可接受字段的权威来源。
 
 ### 导入如何运行
 
-- 每次主机启动执行一轮扫描,导入所有尚不存在(未落盘且未活跃)的线程。
-- 每个导入会话使用固定 id:`codex-` 加 Codex 线程 id,重复运行不会产生副本。
+- 自动导入默认关闭。开启 `autoSync` 后会立即执行一轮扫描，再按 `syncIntervalMs` 重复；“立即导入”始终执行一轮扫描。
+- 每个导入会话使用固定 id：`codex-` 加 Codex 线程 id。重复扫描不会产生副本，并会在成员关系缺失时将已有导入会话挂入匹配的工作区。
 - 会话标题来自 Codex 的 `session_index.jsonl`(存在时);会话 `cwd` 取线程内出现最多的命令 cwd,否则用配置的 `cwd`。
-- 导入会话同时落盘并发布为活跃会话:立即出现在 Web 会话列表,重启后仍可见。
+- 导入会话同时落盘并发布为活跃会话，随后挂入具有相同规范化 `cwd` 的工作区：它会出现在 Web 会话列表的对应工作目录下，并在重启后保留。
 - 单个线程读取或转换失败只记录警告并跳过,不会中断整轮扫描。
 - 没有 Codex thread store 时,插件记录"无可导入"并正常加载。
+
+### 设置卡片与 Remote
+
+插件提供 `codex-import` 设置命名空间（一个字段 `autoSync`，默认 `false`）和带有 `run()`、`history()` 的 `codexImport` Remote 命名空间。配套客户端包 `@deepseek-ai/dsh-client-ui-codex-import` 在 Web **插件**配置标签中渲染同步开关、手动导入按钮以及带逐会话打开按钮的持久导入历史。该开关同时控制即时自动扫描和定时重扫（`syncIntervalMs`）；手动按钮始终可用。
 
 ### 条目映射
 

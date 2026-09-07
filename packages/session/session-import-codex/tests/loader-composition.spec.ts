@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -13,6 +13,7 @@ import { SessionAlreadyExistsError } from '@deepseek-ai/dsh-session-persistence'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
+import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import * as SessionImportCodex from '../src/index.ts'
 import { runImportSweep } from '../src/index.ts'
 
@@ -27,6 +28,7 @@ afterEach(async () => {
 
 /** Write a two-thread Codex thread-history store plus its title index. */
 async function writeCodexFixture(codexHome: string): Promise<void> {
+  await mkdir(join(codexHome, '..', 'workspace'))
   const db = new DatabaseSync(join(codexHome, 'thread_history_1.sqlite'))
   db.exec([
     'CREATE TABLE thread_turns (',
@@ -72,6 +74,7 @@ async function loadComposition(rows: string[]): Promise<Context> {
     ['@deepseek-ai/dsh-session-persistence-jsonl', JsonlSessionPersistence],
     ['@deepseek-ai/dsh-storage', Storage],
     ['@deepseek-ai/dsh-storage-json', StorageJson],
+    ['@deepseek-ai/dsh-workspace', WorkspaceRegistry],
     ['@deepseek-ai/dsh-storage-domain', StorageDomain],
     ['@deepseek-ai/dsh-session-import-codex', SessionImportCodex],
   ])
@@ -108,6 +111,7 @@ function compositionRows(): string[] {
     "- name: '@deepseek-ai/dsh-storage-domain'",
     '  config:',
     '    backend: json',
+    "- name: '@deepseek-ai/dsh-workspace'",
     "- name: '@deepseek-ai/dsh-session-import-codex'",
     '  config:',
     `    codexHome: ${JSON.stringify(join(root as string, 'codex'))}`,
@@ -120,23 +124,17 @@ function resolvedConfig(): SessionImportCodex.ResolvedConfig {
   return SessionImportCodex.resolveConfig({ codexHome: join(root as string, 'codex'), cwd: root as string }, process.env)
 }
 
-async function waitForLiveThread(ctx: Context, threadId: string): Promise<void> {
-  const id = SessionId(`codex-${threadId}`)
-  await vi.waitFor(() => {
-    expect(ctx.sessions.get(id)).toBeDefined()
-  })
-}
-
 describe('session-import-codex through a real Loader composition', () => {
-  it('imports codex threads durably and publishes them live', async () => {
+  it('imports only on demand, then groups new and existing sessions by cwd', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
     await mkdir(join(root, 'codex'))
     await writeCodexFixture(join(root, 'codex'))
     const first = await loadComposition(compositionRows())
 
     const id = SessionId('codex-thread-1')
-    await waitForLiveThread(first, 'thread-1')
-    await waitForLiveThread(first, 'thread-2')
+    expect(first.sessions.get(id)).toBeUndefined()
+    const run = await first.codexImport.run()
+    expect(run.imported).toBe(2)
     const session = first.sessions.get(id)
     if (session === undefined) throw new Error('imported session missing from live store')
     expect(session.header.cwd).toBe(join(root, 'workspace'))
@@ -159,6 +157,14 @@ describe('session-import-codex through a real Loader composition', () => {
     await handle.close()
     expect(stored).toEqual(session.snapshotEvents())
 
+    const workspace = await first.workspaceRegistry.resolveByPath(join(root, 'workspace'))
+    expect(workspace?.sessionIds).toEqual([id])
+    await workspace?.detachSession(id)
+    expect(workspace?.sessionIds).toEqual([])
+    const repeat = await first.codexImport.run()
+    expect(repeat.skippedExisting).toBe(2)
+    expect(workspace?.sessionIds).toEqual([id])
+
     // A thread whose commands carry no absolute cwd falls back to the configured one.
     const relative = await first.sessionPersistence.stat(SessionId('codex-thread-2'))
     expect(relative?.header.cwd).toBe(root)
@@ -169,8 +175,7 @@ describe('session-import-codex through a real Loader composition', () => {
     await mkdir(join(root, 'codex'))
     await writeCodexFixture(join(root, 'codex'))
     const first = await loadComposition(compositionRows())
-    await waitForLiveThread(first, 'thread-1')
-    await waitForLiveThread(first, 'thread-2')
+    await first.codexImport.run()
 
     // Live sessions exist: the sweep counts them as existing without touching storage.
     const liveResult = await runImportSweep(first, resolvedConfig(), new AbortController().signal)

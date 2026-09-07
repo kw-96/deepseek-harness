@@ -1,6 +1,6 @@
 /**
- * 右侧 Codex 面板（details 列 occupant）：顶部居中标签条（Cursor 式，
- * 5 个主标签 + 溢出菜单）+ 文件/Git/项目/插件/MCP/Skills/命令/摘要/
+ * 右侧 Codex 面板（details 列 occupant）：顶部横向图标栏（Cursor 式，
+ * 5 个主图标 + 溢出菜单）+ 文件/Git/项目/插件/MCP/Skills/命令/摘要/
  * 浏览器工作台，停靠进宿主第三列。关闭按钮同步收起 details 列；
  * 会话切换后自动重新展开，保持三栏工作区的持续存在感。
  */
@@ -48,6 +48,10 @@ export interface CodexApi {
   gitPush: (cwd: string) => Promise<{ ok: true }>
   gitStageAll: (cwd: string) => Promise<{ ok: true }>
   gitUnstageAll: (cwd: string) => Promise<{ ok: true }>
+  terminalOpen: (sessionId: string, cwd?: string) => Promise<{ terminalId: string; output: string; status: { kind: string } }>
+  terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>
+  terminalRead: (sessionId: string, terminalId: string) => Promise<{ output: string; truncated: boolean }>
+  terminalClose: (sessionId: string, terminalId: string) => Promise<{ ok: true }>
   projectDirs: (workspaceId: string) => Promise<ProjectDirsResponse>
   projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<ProjectDirsResponse>
   projectAddDir: (workspaceId: string, path: string) => Promise<ProjectAddDirResponse>

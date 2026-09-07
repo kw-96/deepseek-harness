@@ -1,0 +1,22 @@
+{
+  "name": "@deepseek-ai/dsh-experimental-web-desktop",
+  "description": "Experimental Tauri shell that opens DeepSeek Harness Web in an independent native window",
+  "version": "0.1.2-rc.1",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/experimental/web-desktop"
+  },
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build && node ./scripts/copy-exe-to-repo-root.mjs",
+    "copy-exe": "node ./scripts/copy-exe-to-repo-root.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

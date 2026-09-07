@@ -29,6 +29,7 @@ interface GitState {
   message: string
   filter: string
   busy: boolean
+  commitOpen: boolean
   historyOpen: boolean
 }
 
@@ -41,7 +42,7 @@ interface GitState {
 export function GitPanel({ api, t, cwd }: GitPanelProps): React.ReactNode {
   const [state, setState] = useState<GitState>({
     status: null, branches: null, log: null, diff: null, error: null,
-    message: '', filter: '', busy: false, historyOpen: false,
+    message: '', filter: '', busy: false, commitOpen: false, historyOpen: true,
   })
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -116,21 +117,31 @@ export function GitPanel({ api, t, cwd }: GitPanelProps): React.ReactNode {
         onRefresh={() => { void refresh() }}
         t={t}
       />
-      <div className={css.commitArea}>
-        <textarea className={css.commitBox} rows={2} placeholder={t('gitCommitMessage')}
-          value={state.message}
-          onChange={event => { setState(prev => ({ ...prev, message: event.target.value })) }}
-          onKeyDown={event => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void commit()
-          }} />
-        <div className={css.commitRow}>
-          <button type="button" className={css.commitButton}
-            disabled={state.busy || state.message.trim() === '' || staged.length === 0}
-            title={staged.length === 0 ? t('gitCommitHint') : undefined}
-            onClick={() => { void commit() }}>
-            {t('gitCommit')}
-          </button>
-        </div>
+      <div className={css.gitCommitSection}>
+        <button type="button" className={css.gitCommitHead} aria-expanded={state.commitOpen}
+          onClick={() => { setState(prev => ({ ...prev, commitOpen: !prev.commitOpen })) }}>
+          {state.commitOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <span>{t('gitCommit')}</span>
+          {staged.length > 0 && <span className={css.gitChangeCount}>{staged.length}</span>}
+        </button>
+        {state.commitOpen && (
+          <div className={css.commitArea}>
+            <textarea className={css.commitBox} rows={2} placeholder={t('gitCommitMessage')}
+              value={state.message}
+              onChange={event => { setState(prev => ({ ...prev, message: event.target.value })) }}
+              onKeyDown={event => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void commit()
+              }} />
+            <div className={css.commitRow}>
+              <button type="button" className={css.commitButton}
+                disabled={state.busy || state.message.trim() === '' || staged.length === 0}
+                title={staged.length === 0 ? t('gitCommitHint') : undefined}
+                onClick={() => { void commit() }}>
+                {t('gitCommit')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className={css.filterRow}>
         <Search size={12} style={{ flex: 'none', opacity: 0.7 }} />
@@ -172,13 +183,21 @@ export function GitPanel({ api, t, cwd }: GitPanelProps): React.ReactNode {
               <span>{t('gitHistory')}</span>
               <span className={css.count}>{state.log.entries.length}</span>
             </button>
-            {state.historyOpen && state.log.entries.map(entry => (
-              <div key={entry.hash} className={css.fileRow} title={entry.subject}>
-                <GitCommitHorizontal size={13} style={{ flex: 'none', opacity: 0.7 }} />
-                <span className={css.gitFilePath}>{entry.subject}</span>
-                <span className={css.gitLogMeta}>{timeAgo(t, entry.date)}</span>
+            {state.historyOpen && (
+              <div className={css.gitTimeline}>
+                {state.log.entries.map(entry => (
+                  <div key={entry.hash} className={css.gitTimelineItem} title={entry.subject}>
+                    <span className={css.gitTimelineRail} aria-hidden="true"><span /></span>
+                    <GitCommitHorizontal size={13} className={css.gitTimelineIcon} aria-hidden="true" />
+                    <span className={css.gitTimelineBody}>
+                      <span className={css.gitTimelineSubject}>{entry.subject}</span>
+                      <span className={css.gitTimelineMeta}>{entry.hash} · {entry.author} · {timeAgo(t, entry.date)}</span>
+                    </span>
+                    {entry.refs !== '' && <span className={css.gitTimelineRefs}>{entry.refs}</span>}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </>
         )}
       </div>

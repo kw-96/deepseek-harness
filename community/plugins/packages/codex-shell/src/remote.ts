@@ -4,10 +4,12 @@ import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsWriteResponse,
   GitBranchesResponse, GitCheckoutResponse, GitCommitResponse, GitDiffResponse, GitLogResponse,
   GitSimpleResponse, GitStatusResponse, ProjectAddDirResponse, ProjectDirsResponse, ProjectSetDirsResponse,
+  TerminalOpenResponse, TerminalReadResponse, TerminalSendResponse,
 } from './types.js'
 import {
   codexOk, fsContentSearchValue, fsListValue, fsNameSearchValue, fsReadValue,
   gitBranchValue, gitLogValue, gitStatusValue, projectAddValue, projectDirsValue,
+  terminalOpenValue, terminalReadValue, terminalSendValue,
 } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
@@ -43,6 +45,10 @@ const descriptors = [
   descriptor('gitPush', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('gitStageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('gitUnstageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
+  descriptor('terminalOpen', [parameter('sessionId', z.string()), parameter('cwd', optString)], terminalOpenValue, 'TerminalOpenResponse'),
+  descriptor('terminalSend', [parameter('sessionId', z.string()), parameter('terminalId', z.string()), parameter('text', z.string())], terminalSendValue, 'TerminalSendResponse'),
+  descriptor('terminalRead', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalReadValue, 'TerminalReadResponse'),
+  descriptor('terminalClose', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('projectDirs', [parameter('workspaceId', z.string())], projectDirsValue, 'ProjectDirsResponse'),
   descriptor('projectSetDirs', [parameter('workspaceId', z.string()), parameter('dirs', z.array(z.string()))], projectDirsValue, 'ProjectSetDirsResponse'),
   descriptor('projectAddDir', [parameter('workspaceId', z.string()), parameter('path', z.string())], projectAddValue, 'ProjectAddDirResponse'),
@@ -75,6 +81,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/gitPush': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/gitStageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/gitUnstageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+    'codexShell/terminalOpen': (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
+    'codexShell/terminalSend': (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
+    'codexShell/terminalRead': (sessionId: string, terminalId: string) => Promise<RemoteResult<TerminalReadResponse>>
+    'codexShell/terminalClose': (sessionId: string, terminalId: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/projectDirs': (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
     'codexShell/projectSetDirs': (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
     'codexShell/projectAddDir': (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>
@@ -100,6 +110,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       gitPush: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       gitStageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       gitUnstageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
+      terminalOpen: (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
+      terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
+      terminalRead: (sessionId: string, terminalId: string) => Promise<RemoteResult<TerminalReadResponse>>
+      terminalClose: (sessionId: string, terminalId: string) => Promise<RemoteResult<GitSimpleResponse>>
       projectDirs: (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
       projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
       projectAddDir: (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>

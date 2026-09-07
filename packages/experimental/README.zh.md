@@ -9,7 +9,7 @@ kind: "package-group"
 
 ## 概述
 
-实验组包含不属于任何正式发布的原型能力：它们运行在真实 harness 上，但约定可能变更，也不提供支持承诺。本组包含 Agent Teams、跨 realm Inspector、代码执行 seam 的 CPython 子进程后端，以及预览部署使用的浏览器 worker 运行时与镜像打包器。用这些包来尝试未发布的能力；它们没有稳定性承诺，已发布产品不得依赖它们。
+实验组包含不属于任何正式发布的原型能力：它们运行在真实 harness 上，但约定可能变更，也不提供支持承诺。本组包含 Agent Teams、跨 realm Inspector、代码执行 seam 的 CPython 子进程后端、预览部署使用的浏览器 worker 运行时与镜像打包器，以及以 Windows 为先、在独立原生窗口中打开 `dsh web` 的 Tauri 壳。用这些包来尝试未发布的能力；它们没有稳定性承诺，已发布产品不得依赖它们。
 
 ## 目录
 
@@ -33,6 +33,7 @@ kind: "package-group"
 | [`tool-agent-team`](tool-agent-team/README.zh.md) | 让模型创建、发消息与协调 teammate 的九个工具 | 按作用域注册工具到 `ctx.tools` |
 | [`webworker-packer`](webworker-packer/README.zh.md) | 构建浏览器 worker 预览所消费的 gzip 压缩 VFS 镜像 | 库与 CLI，不使用 ctx key |
 | [`webworker-runtime`](webworker-runtime/README.zh.md) | 在专用浏览器 worker 中运行 harness 插件树 | 库与 worker 入口，不使用 ctx key |
+| [`web-desktop`](web-desktop/README.zh.md) | 在独立原生窗口中打开 DeepSeek Harness Web 的 Tauri 壳 | 原生 exe，不使用 ctx key |
 
 -----
 

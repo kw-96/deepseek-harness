@@ -39,6 +39,9 @@
       "path": "../../storage/storage-domain"
     },
     {
+      "path": "../../workspace/workspace"
+    },
+    {
       "path": "../../typert/protocol"
     }
   ]

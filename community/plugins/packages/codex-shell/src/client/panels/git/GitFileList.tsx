@@ -1,6 +1,7 @@
-/** Git 面板的已暂存/更改分组列表：状态徽标 + 悬停显隐操作。 */
+/** Git 面板的变更分组列表：可折叠状态组、紧凑路径与悬停操作。 */
 
-import { Minus, Plus, Undo2 } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, ChevronRight, File, FileMinus2, FilePlus2, Minus, Plus, Undo2 } from 'lucide-react'
 import type { TFn } from '../../faces.js'
 import { displayPath, isUntracked, statusLetter, type GitEntryLike } from './support.js'
 import css from '../../styles.module.css'
@@ -27,14 +28,28 @@ interface GitFileListProps {
  * @param props 分组条目与各行操作回调
  */
 export function GitFileList(props: GitFileListProps): React.ReactNode {
-  /** 渲染一条文件行：状态徽标 + 路径 + 悬停显隐操作。 */
+  const [stagedOpen, setStagedOpen] = useState(true)
+  const [changesOpen, setChangesOpen] = useState(true)
+
+  /** 渲染一条文件行：文件名、目录、状态与悬停显隐操作。 */
   const renderFile = (entry: GitEntryLike, isStaged: boolean): React.ReactNode => {
     const letter = statusLetter(entry, isStaged)
+    const path = displayPath(entry)
+    const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    const name = separator < 0 ? path : path.slice(separator + 1)
+    const directory = separator < 0 ? '' : path.slice(0, separator + 1)
+    const FileIcon = letter === 'A' || letter === '?' ? FilePlus2 : letter === 'D' ? FileMinus2 : File
     return (
-      <div key={`${isStaged ? 's' : 'u'}:${entry.path}`} className={css.fileRow}
+      <div key={`${isStaged ? 's' : 'u'}:${entry.path}`} className={css.gitFileRow}
         onClick={() => { props.onShowDiff(entry.path, isStaged) }}>
-        <span className={STATUS_CLASS[letter] ?? css.statusBlank} aria-hidden="true">{letter === ' ' ? '' : letter}</span>
-        <span className={css.gitFilePath}>{displayPath(entry)}</span>
+        <FileIcon size={14} className={css.gitFileIcon} aria-hidden="true" />
+        <span className={css.gitFileMain}>
+          <span className={css.gitFileName}>{name}</span>
+          {directory !== '' && <span className={css.gitFileDirectory}>{directory}</span>}
+        </span>
+        <span className={`${STATUS_CLASS[letter] ?? css.statusBlank} ${css.gitFileState}`} aria-label={letter}>
+          {letter === ' ' ? '' : letter}
+        </span>
         <span className={css.rowMeta}>
           {isStaged ? (
             <button type="button" className={`${css.iconButton} ${css.reveal}`} title={props.t('gitUnstage')}
@@ -63,27 +78,31 @@ export function GitFileList(props: GitFileListProps): React.ReactNode {
     )
   }
 
+  /** 渲染一组可折叠的 Git 变更。 */
+  const renderGroup = (
+    label: string,
+    entries: readonly GitEntryLike[],
+    isStaged: boolean,
+    open: boolean,
+    setOpen: (open: boolean) => void,
+  ): React.ReactNode => entries.length === 0 ? null : (
+    <section className={css.gitChangeGroup}>
+      <button type="button" className={css.gitChangeHead} aria-expanded={open}
+        onClick={() => { setOpen(!open) }}>
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        <span>{label}</span>
+        <span className={css.gitChangeCount}>{entries.length}</span>
+      </button>
+      {open && entries.map(entry => renderFile(entry, isStaged))}
+    </section>
+  )
+
   return (
-    <>
-      {props.staged.length > 0 && (
-        <>
-          <div className={css.groupHead}>
-            <span>{props.t('gitStaged')}</span>
-            <span className={css.count}>{props.staged.length}</span>
-          </div>
-          {props.staged.map(entry => renderFile(entry, true))}
-        </>
-      )}
-      {props.changes.length > 0 && (
-        <>
-          <div className={css.groupHead}>
-            <span>{props.t('gitChanges')}</span>
-            <span className={css.count}>{props.changes.length}</span>
-          </div>
-          {props.changes.map(entry => renderFile(entry, false))}
-        </>
-      )}
+    <section className={css.gitChangesRoot}>
+      <div className={css.gitChangesTitle}>{props.t('gitChanges')}</div>
+      {renderGroup(props.t('gitStaged'), props.staged, true, stagedOpen, setStagedOpen)}
+      {renderGroup(props.t('gitChanges'), props.changes, false, changesOpen, setChangesOpen)}
       {props.clean && <div className={css.empty}>{props.t('gitClean')}</div>}
-    </>
+    </section>
   )
 }

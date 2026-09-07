@@ -83,6 +83,10 @@ export interface CodexShellRemoteFace {
   gitPush(cwd: string): Promise<RemoteResult<{ ok: true }>>
   gitStageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
   gitUnstageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
+  terminalOpen(sessionId: string, cwd?: string): Promise<RemoteResult<{ terminalId: string; output: string; status: { kind: string } }>>
+  terminalSend(sessionId: string, terminalId: string, text: string): Promise<RemoteResult<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>>
+  terminalRead(sessionId: string, terminalId: string): Promise<RemoteResult<{ output: string; truncated: boolean }>>
+  terminalClose(sessionId: string, terminalId: string): Promise<RemoteResult<{ ok: true }>>
   projectDirs(workspaceId: string): Promise<RemoteResult<ProjectDirsResponse>>
   projectSetDirs(workspaceId: string, dirs: readonly string[]): Promise<RemoteResult<ProjectDirsResponse>>
   projectAddDir(workspaceId: string, path: string): Promise<RemoteResult<ProjectAddDirResponse>>
@@ -153,6 +157,8 @@ export type RenderSlotFn = (
 export interface LayoutFace {
   openDetails(): void
   closeDetails(): void
+  openBottom(): void
+  closeBottom(): void
 }
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string

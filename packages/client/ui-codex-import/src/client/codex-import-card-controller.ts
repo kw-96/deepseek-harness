@@ -40,7 +40,7 @@ export interface CodexImportCardFace {
 }
 
 const INITIAL: CodexImportCardState = {
-  autoSync: true,
+  autoSync: false,
   running: false,
   runs: [],
 }
@@ -82,7 +82,7 @@ export class CodexImportCardController {
   }
 
   private derive(): void {
-    const autoSync = this.scope.getSnapshot().value?.autoSync ?? true
+    const autoSync = this.scope.getSnapshot().value?.autoSync ?? false
     this.store.update((draft) => { draft.autoSync = autoSync })
   }
 
@@ -103,11 +103,9 @@ export class CodexImportCardController {
     this.store.update((draft) => { draft.running = true })
     try {
       const carried = await this.ctx.remote.codexImport.run()
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- dispose() can run during the await and flip this flag
       if (this.disposed || !carried.ok) return
       this.store.update((draft) => { draft.runs = [carried.value, ...draft.runs] })
     } finally {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- dispose() can run during the await and flip this flag
       if (!this.disposed) this.store.update((draft) => { draft.running = false })
     }
   }

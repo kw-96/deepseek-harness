@@ -1,7 +1,7 @@
 /**
- * Three-column shell frame, registered into the built-in 'root' slot (the web
- * shell renders only 'root'). Owns the grid tracks (sidebar | center |
- * details), the drag handles (pointer capture + rAF throttle), the concession
+ * Three-column shell frame with an optional bottom row, registered into the
+ * built-in 'root' slot (the web shell renders only 'root'). Owns the grid
+ * tracks (sidebar | center | details plus bottom), the drag handles, the concession
  * chain (columns.ts), and the child-slot render decisions: the sidebar slot
  * renders HERE with live parameters from the concession solve, and the
  * session-aware occupants render in fixed column positions; strict entries
@@ -23,7 +23,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'bottom' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
@@ -35,6 +35,11 @@ function CenterColumn(props: { children?: ReactNode }) {
 /** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
 function DetailsColumn(props: { children?: ReactNode }) {
   return <div className={css.detailsCol}>{props.children}</div>
+}
+
+/** Bottom panel grid item; height 0 keeps its subtree mounted. */
+function BottomColumn(props: { children?: ReactNode }) {
+  return <div className={css.bottomCol}>{props.children}</div>
 }
 
 /**
@@ -85,6 +90,37 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
       onPointerUp={onPointerUp}
     />
   )
+}
+
+/** Bottom-panel drag handle: pointer capture with rAF-throttled vertical deltas. */
+function BottomDragHandle(props: { onStart: () => void; onDrag: (dy: number) => void; onEnd: () => void }) {
+  const origin = useRef(0)
+  const latest = useRef(0)
+  const frame = useRef<number | null>(null)
+  const callbacks = useRef(props)
+  callbacks.current = props
+  const finish = (target: HTMLDivElement, pointerId: number): void => {
+    if (!target.hasPointerCapture(pointerId)) return
+    target.releasePointerCapture(pointerId)
+    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
+    callbacks.current.onDrag(latest.current - origin.current)
+    callbacks.current.onEnd()
+  }
+  return <div className={css.bottomHandle}
+    onPointerDown={(event) => {
+      event.preventDefault()
+      origin.current = event.clientY
+      latest.current = event.clientY
+      event.currentTarget.setPointerCapture(event.pointerId)
+      callbacks.current.onStart()
+    }}
+    onPointerMove={(event) => {
+      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+      latest.current = event.clientY
+      frame.current ??= requestAnimationFrame(() => { frame.current = null; callbacks.current.onDrag(latest.current - origin.current) })
+    }}
+    onPointerUp={(event) => { finish(event.currentTarget, event.pointerId) }}
+  />
 }
 
 /** The three-column frame (see module doc). */
@@ -158,6 +194,7 @@ export function AppFrame({
   // it stays frozen for the whole gesture so dx deltas do not compound.
   const sidebarBase = useRef(0)
   const detailsBase = useRef(0)
+  const bottomBase = useRef(0)
   // Track-level transitions pause for the whole gesture: eased tracks would
   // detach the column edge from the pointer (AppFrame.module.css).
   const [dragging, setDragging] = useState(false)
@@ -170,15 +207,18 @@ export function AppFrame({
   const onDetailsDrag = useCallback((dx: number) => {
     actions.setDetails(detailsBase.current - dx)
   }, [actions])
+  const onBottomStart = useCallback(() => { bottomBase.current = panels.bottom; setDragging(true) }, [panels.bottom])
+  const onBottomDrag = useCallback((dy: number) => { actions.setBottom(bottomBase.current - dy) }, [actions])
   const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
 
   return (
     <div
       ref={frameRef}
       className={css.frame}
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px`, gridTemplateRows: `minmax(0, 1fr) ${detailsSession === undefined ? 0 : panels.bottom}px` }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
+      data-bottom-collapsed={detailsSession === undefined || panels.bottom === 0 || undefined}
       data-dragging={dragging || undefined}
     >
       <DocumentTitle
@@ -206,6 +246,10 @@ export function AppFrame({
         <DetailsColumn>
           <SessionProvider>{renderSlot('details', {})}</SessionProvider>
         </DetailsColumn>
+        <BottomColumn>
+          {panels.bottom > 0 && <BottomDragHandle onStart={onBottomStart} onDrag={onBottomDrag} onEnd={onDragEnd} />}
+          <SessionProvider>{renderSlot('bottom', {})}</SessionProvider>
+        </BottomColumn>
       </>
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}

@@ -75,10 +75,10 @@ describe('CodexImportCardController', () => {
     controller.dispose()
   })
 
-  it('defaults autoSync to true when the scope carries no value', () => {
+  it('defaults autoSync to false when the scope carries no value', () => {
     const { ctx } = makeContext()
     const controller = new CodexImportCardController(ctx, makeScope(undefined).scope)
-    expect(controller.inject().hooks.codexImportCard.getSnapshot().autoSync).toBe(true)
+    expect(controller.inject().hooks.codexImportCard.getSnapshot().autoSync).toBe(false)
     controller.dispose()
   })
 

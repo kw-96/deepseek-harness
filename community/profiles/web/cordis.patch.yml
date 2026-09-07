@@ -8,9 +8,20 @@
       name: "@deepseek-ai/dsh-client-ui-schedule",
       disabled: false
     },
-  # Import local Codex threads into DSH sessions on host start.
+  # Expose manual Codex-thread import; automatic scanning remains opt-in.
   {
       insert: [
+        {
+            id: terminal,
+            name: "@deepseek-ai/dsh-terminal"
+          },
+        {
+            id: terminal-bash,
+            name: "@deepseek-ai/dsh-terminal-bash",
+            config: {
+              shellDialect: "pwsh"
+            }
+          },
         {
             id: session-import-codex,
             name: "@deepseek-ai/dsh-session-import-codex"

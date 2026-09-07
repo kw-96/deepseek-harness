@@ -59,6 +59,15 @@ export const projectDirsValue = z.object({ dirs: z.array(z.string()).readonly() 
 
 export const projectAddValue = z.object({ dirs: z.array(z.string()).readonly(), rejected: z.string().nullable() }).readonly()
 
+export const terminalStatusValue = z.union([
+  z.object({ kind: z.literal('running') }).readonly(),
+  z.object({ kind: z.literal('exited'), exitCode: z.number().nullable(), signal: z.string().nullable() }).readonly(),
+]).readonly()
+
+export const terminalOpenValue = z.object({ terminalId: z.string(), output: z.string(), status: terminalStatusValue }).readonly()
+export const terminalSendValue = z.object({ output: z.string(), status: terminalStatusValue, waitReason: z.string(), truncated: z.boolean() }).readonly()
+export const terminalReadValue = z.object({ output: z.string(), truncated: z.boolean() }).readonly()
+
 /** Directory listing request/response. */
 export interface FsListRequest { path: string }
 export interface FsListResponse { entries: readonly FsListEntry[]; truncated: boolean }
@@ -101,3 +110,6 @@ export interface ProjectSetDirsRequest { workspaceId: string; dirs: readonly str
 export interface ProjectSetDirsResponse { dirs: readonly string[] }
 export interface ProjectAddDirRequest { workspaceId: string; path: string }
 export interface ProjectAddDirResponse { dirs: readonly string[]; rejected: string | null }
+export interface TerminalOpenResponse { terminalId: string; output: string; status: { kind: string; exitCode?: number | null; signal?: string | null } }
+export interface TerminalSendResponse { output: string; status: { kind: string; exitCode?: number | null; signal?: string | null }; waitReason: string; truncated: boolean }
+export interface TerminalReadResponse { output: string; truncated: boolean }

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import-codex` imports the threads from your local Codex install into DeepSeek Harness sessions. On host start it sweeps Codex's thread-history store once, converts every thread into a standard DSH event log, stores it durably through the session persistence backend, and publishes it as a live session, so the Web GUI session list shows your Codex conversations with their titles, messages, and tool traffic. The sweep is idempotent: each thread maps to one fixed session id (`codex-<threadId>`) and is skipped when that session already exists, so a restart imports only new threads. Choose it when you want your Codex history readable in the harness; it is not a live two-way sync with Codex.
+`dsh-session-import-codex` imports threads from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each thread into a standard DSH event log, stores it durably, publishes it live, and creates or reuses the DSH Workspace matching the session header's `cwd`. The Web session list therefore places imported Codex conversations under their working directories. Automatic import is off by default; enabling the settings-card toggle runs one import and then uses the configured interval. The importer is not a live two-way sync with Codex.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this package with the session persistence backend already composed (it injects `sessions` and `sessionPersistence`), and the import runs on host start. There is nothing else to set up.
+Mount this package with session persistence and `dsh-workspace` already composed (it injects `sessions`, `sessionPersistence`, and `workspaceRegistry`). Use the settings card's **Import now** button to start an import; automatic import is opt-in.
 
 ### Smallest working setup
 
@@ -45,16 +45,16 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### How the import behaves
 
-- One sweep runs per host start and imports every thread that does not already exist as a stored or live session.
-- Each imported session keeps a fixed id: `codex-` plus the Codex thread id, so re-runs never duplicate it.
+- Automatic import is disabled by default. Enabling `autoSync` runs one sweep immediately and then repeats it at `syncIntervalMs`; **Import now** always runs one sweep.
+- Each imported session keeps a fixed id: `codex-` plus the Codex thread id. Re-runs never duplicate it, and attach an existing imported session to its matching Workspace when membership is absent.
 - The session title comes from Codex's `session_index.jsonl` when present, and the session `cwd` comes from the most common command cwd in the thread (the configured `cwd` otherwise).
-- Imported sessions are stored durably and published live, so they appear in the Web session list immediately and remain listed after restart.
+- Imported sessions are stored durably and published live, then attached to a Workspace with the same canonical `cwd`, so they appear under the matching working directory in the Web session list and remain listed after restart.
 - A thread whose store or conversion fails is skipped with a warning; one broken thread never stops the sweep.
 - With no Codex thread store, the plugin logs that there is nothing to import and loads normally.
 
 ### Settings card and Remote
 
-The plugin serves a `codex-import` settings namespace (one field, `autoSync`) and a `codexImport` Remote namespace with `run()` and `history()`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and the durable import history with per-session open buttons. The `autoSync` toggle gates only the periodic re-scan (`syncIntervalMs`); the boot sweep and the manual button always run.
+The plugin serves a `codex-import` settings namespace (one field, `autoSync`, default `false`) and a `codexImport` Remote namespace with `run()` and `history()`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and durable import history with per-session open buttons. The toggle gates both the immediate automatic sweep and periodic re-scans (`syncIntervalMs`); the manual button always runs.
 
 ### Item mapping
 
@@ -147,4 +147,3 @@ This Dev Note is working context for maintainers: open questions and directions 
 The Known Limitations list above is the working queue: legacy rollout import, resync of already-imported threads, and deeper transcript fidelity. None has a design yet.
 
 </details>
-

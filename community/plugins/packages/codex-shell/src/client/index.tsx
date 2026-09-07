@@ -13,9 +13,11 @@ import { SessionMetaStore } from './session-meta.js'
 import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
 import { CodexRightPanel, type CodexPanelInjected, type CodexMcpManager, type CodexSkillsManager, type CommandPrompt } from './RightPanel.js'
 import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
+import { BottomTerminalPanel } from './BottomTerminalPanel.js'
 import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
 import { PanelController } from './panel-controller.js'
 import { en, zh } from './locales.js'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
   CodexShellRemoteFace, LayoutFace, LocaleFace, RemoteFace, SessionsFace, SlotsFace, TFn, WorkspacesFace,
 } from './faces.js'
@@ -106,6 +108,11 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     if (open) layout.openDetails()
     else layout.closeDetails()
   }
+  const setBottomOpen = (open: boolean): void => {
+    if (layout === undefined) return
+    if (open) layout.openBottom()
+    else layout.closeBottom()
+  }
 
   const browserInject = (): CodexBrowserInjected => ({
     startSession: (workspaceId?: string) => {
@@ -171,6 +178,10 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       gitPush: async cwd => unwrap(await codexRemote.gitPush(cwd)),
       gitStageAll: async cwd => unwrap(await codexRemote.gitStageAll(cwd)),
       gitUnstageAll: async cwd => unwrap(await codexRemote.gitUnstageAll(cwd)),
+      terminalOpen: async (sessionId, cwd) => unwrap(await codexRemote.terminalOpen(sessionId, cwd)),
+      terminalSend: async (sessionId, terminalId, text) => unwrap(await codexRemote.terminalSend(sessionId, terminalId, text)),
+      terminalRead: async (sessionId, terminalId) => unwrap(await codexRemote.terminalRead(sessionId, terminalId)),
+      terminalClose: async (sessionId, terminalId) => unwrap(await codexRemote.terminalClose(sessionId, terminalId)),
       projectDirs: async workspaceId => unwrap(await codexRemote.projectDirs(workspaceId)),
       projectSetDirs: async (workspaceId, dirs) => unwrap(await codexRemote.projectSetDirs(workspaceId, dirs)),
       projectAddDir: async (workspaceId, path) => unwrap(await codexRemote.projectAddDir(workspaceId, path)),
@@ -183,7 +194,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     setColumnOpen,
   })
 
-  const toggleInject = (): PanelToggleInjected => ({ panel, meta, setColumnOpen })
+  const toggleInject = (): PanelToggleInjected => ({ panel, meta, setColumnOpen, setBottomOpen })
 
   // 每处注册都通过 slots.inject 等待宿主声明（apply 顺序不受约束）。
   const disposeBrowser = slots.inject('sidebar.workspaces', () => slots.register({
@@ -205,6 +216,10 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     locale: 'codex-shell',
     inject: panelInject,
   }, CodexRightPanel))
+  const disposeBottom = slots.inject('bottom', () => slots.register({
+    name: 'bottom', priority: -1, locale: 'codex-shell',
+    inject: () => ({ api: panelInject().api, close: () => { setBottomOpen(false) } }),
+  }, BottomTerminalPanel))
   const disposeToggle = slots.inject('conversation.session.header.utilities', () => slots.register({
     name: 'conversation.session.header.utilities', id: 'codex-panel-toggle', order: 20,
     label: () => t('openRightPanel'), locale: 'codex-shell',
@@ -213,6 +228,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
 
   return async () => {
     disposeToggle()
+    disposeBottom()
     disposePanel()
     disposeAddWorkspace()
     disposeBrowser()
