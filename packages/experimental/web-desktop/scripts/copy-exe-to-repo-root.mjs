@@ -3,6 +3,7 @@
  * so day-to-day use is a double-click, not a buried `target/release` path.
  */
 import { copyFileSync, existsSync, unlinkSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -40,11 +41,23 @@ if (repoRoot === null) {
 }
 
 const dest = join(repoRoot, destName)
+// Delete the previous root exe first when possible so Explorer drops the
+// sticky per-path icon cache that otherwise keeps the prior glyph.
+if (process.platform === 'win32' && existsSync(dest)) {
+  try {
+    unlinkSync(dest)
+  } catch {
+    // File may be locked; overwrite in place below.
+  }
+}
 copyFileSync(releaseExe, dest)
 for (const legacy of legacyNames) {
   const oldPath = join(repoRoot, legacy)
   if (oldPath !== dest && existsSync(oldPath)) {
     unlinkSync(oldPath)
   }
+}
+if (process.platform === 'win32') {
+  spawnSync('ie4uinit.exe', ['-show'], { stdio: 'ignore', windowsHide: true })
 }
 console.log(`copy-exe-to-repo-root: wrote ${dest}`)

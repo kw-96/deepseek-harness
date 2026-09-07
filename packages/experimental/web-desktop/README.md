@@ -44,7 +44,7 @@ git add "DeepSeek Harness.exe"
 
 Equivalent filter form: `pnpm --filter @deepseek-ai/dsh-experimental-web-desktop build`.
 
-To refresh the brand icon assets from `apps/web/public/favicon.svg`, install `@resvg/resvg-js` temporarily, run `node scripts/rasterize-brand-icon.mjs`, then `pnpm exec tauri icon src-tauri/icons/icon.png`.
+To refresh the brand icon assets from `apps/web/public/favicon.svg`, install `@resvg/resvg-js` temporarily, run `node scripts/rasterize-brand-icon.mjs`, then `pnpm exec tauri icon src-tauri/icons/icon.png`, and finally `pnpm run desktop:web`. The script emits a **dark rounded tile with a white mark**: Windows `.exe` file icons cannot follow light/dark theme the way the web SVG `prefers-color-scheme` rule does, so a dual-theme-readable solid tile is the workable approach. If Explorer still shows a stale blue glyph for `DeepSeek Harness.exe`, close that folder window or restart Explorer to drop the per-path icon cache.
 
 Development loop (hot rebuild, no root copy):
 
@@ -81,4 +81,5 @@ None; the shell neither assembles nor sends a provider request.
 - **First launch needs network** — `pnpm install` / `build:web` are not offline; later launches skip install when the lockfile is not newer than `node_modules/.modules.yaml`.
 - **CI does not gate `tauri build`** — local or optional jobs own the native compile until a Rust/WebView2 runner is allocated.
 - **Committed exe can go stale** — changing shell sources without re-running `pnpm run desktop:web` and committing the new `DeepSeek Harness.exe` leaves peers on an old binary.
+- **No theme-switching .exe file icon** — Windows Explorer does not recolor PE icons from system light/dark mode; the shipped icon uses a dark tile and white mark so both themes stay readable.
 - **Frontend freeze is dist-only** — Host still launches through checkout `dsh` (source); only the Web asset tree is rebuilt and snapshotted for the session.

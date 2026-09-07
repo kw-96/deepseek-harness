@@ -91,6 +91,12 @@ class StubSession implements TerminalBackendSession {
     return { delivered: true as const, targetPgid: signal === 'SIGINT' ? 12 : 13 }
   }
 
+  async write(_data: string): Promise<void> {}
+
+  async resize(_cols: number, _rows: number): Promise<void> {}
+
+  async *followOutput(_signal: AbortSignal) {}
+
   status(): TerminalSessionStatus {
     return this.statusValue
   }
@@ -200,6 +206,14 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     b.sessions[0]!.rejectSend = true
     await expect(ctx.terminals.startSend(owner, created.sessionId, { text: 'bad', submit: true }).done).rejects.toThrow('send failed')
     await new Promise(resolve => setTimeout(resolve, 0))
+
+    const ui = await ctx.terminals.spawn(owner, { type: 'stub', name: 'ui' })
+    const active = ctx.terminals.startSend(owner, ui.sessionId, { text: 'busy', submit: true })
+    await expect(ctx.terminals.write(owner, ui.sessionId, 'x')).rejects.toMatchObject({ code: 'SEND_ACTIVE' })
+    active.cancel()
+    await active.done
+    await ctx.terminals.write(owner, ui.sessionId, 'ok')
+    await ctx.terminals.resize(owner, ui.sessionId, 100, 30)
   })
 
   it('reserves concurrent names and rolls back a spawn whose owner disappears', async () => {

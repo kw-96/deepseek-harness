@@ -44,7 +44,7 @@ git add "DeepSeek Harness.exe"
 
 等价 filter 写法：`pnpm --filter @deepseek-ai/dsh-experimental-web-desktop build`。
 
-若要从 `apps/web/public/favicon.svg` 刷新品牌图标：临时安装 `@resvg/resvg-js`，运行 `node scripts/rasterize-brand-icon.mjs`，再执行 `pnpm exec tauri icon src-tauri/icons/icon.png`。
+若要从 `apps/web/public/favicon.svg` 刷新品牌图标：临时安装 `@resvg/resvg-js`，运行 `node scripts/rasterize-brand-icon.mjs`，再执行 `pnpm exec tauri icon src-tauri/icons/icon.png`，最后 `pnpm run desktop:web`。脚本会生成**深色圆角底 + 白色小鱼**：Windows 的 `.exe` 文件图标无法像网页 SVG 那样随系统浅色/深色主题自动切换黑白，双主题可读的实体图标是可行方案。若资源管理器对 `DeepSeek Harness.exe` 仍显示旧蓝标，先关闭该文件夹窗口，或注销/重启资源管理器以清掉按路径缓存的图标。
 
 开发循环（热重建，不复制到根目录）：
 
@@ -81,4 +81,5 @@ CLI 解析顺序：`DSH_DESKTOP_CLI` → 自本 exe 向上查找 → 自进程 c
 - **首次启动需要网络** — `pnpm install` / `build:web` 不能离线；之后在 lockfile 未新于 `node_modules/.modules.yaml` 时会跳过 install。
 - **CI 不把 `tauri build` 当作门禁** — 在分配 Rust/WebView2 runner 之前，由本地或可选任务负责原生编译。
 - **已提交的 exe 可能过期** — 改了壳源码却未再跑 `pnpm run desktop:web` 并提交新的 `DeepSeek Harness.exe` 时，对端仍会用旧二进制。
+- **exe 文件图标不能随主题变色** — Windows 资源管理器不会按系统浅色/深色重绘 PE 图标；当前交付为深色底 + 白色小鱼，保证两主题都可读。
 - **前端冻结仅针对 dist** — Host 仍经 checkout 的 `dsh`（源码）启动；仅 Web 资源树会按会话重建并快照。

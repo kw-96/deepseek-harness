@@ -76,6 +76,12 @@ class StubSession implements TerminalBackendSession {
     return { delivered: true as const, targetPgid: signal === 'SIGINT' ? 10 : 11 }
   }
 
+  async write(_data: string): Promise<void> {}
+
+  async resize(_cols: number, _rows: number): Promise<void> {}
+
+  async *followOutput(_signal: AbortSignal) {}
+
   status() { return this.statusValue }
 
   async close() {

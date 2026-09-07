@@ -8,7 +8,7 @@
 
 import type { ReactNode } from 'react'
 import type {
-  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
+  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
   ProjectAddDirResponse, ProjectDirsResponse,
 } from 'dsh-codex-shell/types'
@@ -67,8 +67,8 @@ export interface CodexShellRemoteFace {
   fsList(path: string): Promise<RemoteResult<FsListResponse>>
   fsRead(path: string, maxBytes?: number): Promise<RemoteResult<FsReadResponse>>
   fsWrite(path: string, content: string): Promise<RemoteResult<{ ok: true }>>
-  fsSearchName(root: string, query: string): Promise<RemoteResult<FsNameSearchResponse>>
-  fsSearchContent(root: string, query: string): Promise<RemoteResult<FsContentSearchResponse>>
+  fsSearchName(root: string, query: string, options?: FsSearchOptions): Promise<RemoteResult<FsNameSearchResponse>>
+  fsSearchContent(root: string, query: string, options?: FsSearchOptions): Promise<RemoteResult<FsContentSearchResponse>>
   gitStatus(cwd: string): Promise<RemoteResult<GitStatusResponse>>
   gitLog(cwd: string, count?: number): Promise<RemoteResult<GitLogResponse>>
   gitDiff(cwd: string, path?: string, staged?: boolean): Promise<RemoteResult<GitDiffResponse>>
@@ -85,6 +85,9 @@ export interface CodexShellRemoteFace {
   gitUnstageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
   terminalOpen(sessionId: string, cwd?: string): Promise<RemoteResult<{ terminalId: string; output: string; status: { kind: string } }>>
   terminalSend(sessionId: string, terminalId: string, text: string): Promise<RemoteResult<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>>
+  terminalFollow(sessionId: string, terminalId: string, signal?: AbortSignal): AsyncIterable<{ seq: number; chunk: string }>
+  terminalWrite(sessionId: string, terminalId: string, data: string): Promise<RemoteResult<{ ok: true }>>
+  terminalResize(sessionId: string, terminalId: string, cols: number, rows: number): Promise<RemoteResult<{ ok: true }>>
   terminalRead(sessionId: string, terminalId: string): Promise<RemoteResult<{ output: string; truncated: boolean }>>
   terminalClose(sessionId: string, terminalId: string): Promise<RemoteResult<{ ok: true }>>
   projectDirs(workspaceId: string): Promise<RemoteResult<ProjectDirsResponse>>

@@ -16,7 +16,7 @@ import {
 import { listDirectory, readTextFile, searchNames, writeTextFile } from './host/fsops.js'
 import { projectAddDir, projectDirs, projectSetDirs } from './host/projects.js'
 import type {
-  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
+  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
   ProjectAddDirResponse, ProjectDirsResponse, TerminalOpenResponse, TerminalReadResponse, TerminalSendResponse,
 } from './types.js'
@@ -47,13 +47,13 @@ export class CodexShell extends TypertRemoteService {
   }
 
   @Remote('fsSearchName')
-  async fsSearchName(root: string, query: string): Promise<FsNameSearchResponse> {
-    return await searchNames(this.ctx.fs, root, query)
+  async fsSearchName(root: string, query: string, options?: FsSearchOptions): Promise<FsNameSearchResponse> {
+    return await searchNames(this.ctx.fs, root, query, options)
   }
 
   @Remote('fsSearchContent')
-  async fsSearchContent(root: string, query: string): Promise<FsContentSearchResponse> {
-    return await searchContent(this.ctx.shell, root, query)
+  async fsSearchContent(root: string, query: string, options?: FsSearchOptions): Promise<FsContentSearchResponse> {
+    return await searchContent(this.ctx.shell, root, query, options)
   }
 
   @Remote('gitStatus')
@@ -137,10 +137,14 @@ export class CodexShell extends TypertRemoteService {
     const owner = this.terminalOwner(sessionId)
     const existing = this.ctx.terminals.list(owner).find(item => item.name === 'codex-bottom' && item.status.kind === 'running')
     if (existing !== undefined) {
-      const output = this.ctx.terminals.read(owner, existing.sessionId, { count: 500 })
-      return { terminalId: existing.sessionId, output: output.text, status: existing.status }
+      return { terminalId: existing.sessionId, output: '', status: existing.status }
     }
-    const created = await this.ctx.terminals.spawn(owner, { type: 'shell', name: 'codex-bottom', ...(cwd !== undefined ? { cwd } : {}) })
+    const created = await this.ctx.terminals.spawn(owner, {
+      type: 'shell',
+      name: 'codex-bottom',
+      interaction: 'interactive',
+      ...(cwd !== undefined ? { cwd } : {}),
+    })
     return { terminalId: created.sessionId, output: created.motd, status: created.status }
   }
 
@@ -149,6 +153,43 @@ export class CodexShell extends TypertRemoteService {
     const operation = this.ctx.terminals.startSend(this.terminalOwner(sessionId), TerminalSessionId(terminalId), { text, submit: true })
     const result = await operation.done
     return { output: result.viewport, status: result.sessionStatus, waitReason: result.waitReason, truncated: result.truncated }
+  }
+
+  /**
+   * Stream interactive PTY output to the Web bottom panel (not session-logged).
+   * @param sessionId - live Agent session id.
+   * @param terminalId - owner-scoped PTY id.
+   * @param signal - Remote stream carrier cancellation.
+   * @returns decoded frames with CSI preserved.
+   */
+  @Remote({ mode: 'stream' })
+  terminalFollow(
+    sessionId: string,
+    terminalId: string,
+    signal: AbortSignal,
+  ): AsyncIterable<{ seq: number; chunk: string }> {
+    return this.ctx.terminals.followOutput(
+      this.terminalOwner(sessionId),
+      TerminalSessionId(terminalId),
+      signal,
+    )
+  }
+
+  @Remote('terminalWrite')
+  async terminalWrite(sessionId: string, terminalId: string, data: string): Promise<{ ok: true }> {
+    await this.ctx.terminals.write(this.terminalOwner(sessionId), TerminalSessionId(terminalId), data)
+    return { ok: true }
+  }
+
+  @Remote('terminalResize')
+  async terminalResize(
+    sessionId: string,
+    terminalId: string,
+    cols: number,
+    rows: number,
+  ): Promise<{ ok: true }> {
+    await this.ctx.terminals.resize(this.terminalOwner(sessionId), TerminalSessionId(terminalId), cols, rows)
+    return { ok: true }
   }
 
   @Remote('terminalRead')

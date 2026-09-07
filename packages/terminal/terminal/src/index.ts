@@ -10,6 +10,7 @@ import { TerminalBackendCleanupError } from './types.ts'
 import type {
   TerminalBackend,
   TerminalBackendSession,
+  TerminalFollowFrame,
   TerminalReadRequest,
   TerminalReadResult,
   TerminalSendOperation,
@@ -26,6 +27,7 @@ export type {
   TerminalBackend,
   TerminalBackendSession,
   TerminalBackendSpawnSpec,
+  TerminalFollowFrame,
   TerminalReadRequest,
   TerminalReadResult,
   TerminalSendOperation,
@@ -173,6 +175,9 @@ export class TerminalSessionService extends Service {
         type: request.type,
         ...request.name !== undefined ? { name: request.name } : {},
         ...request.cwd !== undefined ? { cwd: request.cwd } : {},
+        ...request.interaction !== undefined ? { interaction: request.interaction } : {},
+        ...request.cols !== undefined ? { cols: request.cols } : {},
+        ...request.rows !== undefined ? { rows: request.rows } : {},
         signal: backendSignal,
       })
       signal?.throwIfAborted()
@@ -273,6 +278,47 @@ export class TerminalSessionService extends Service {
    */
   signal(owner: Agent, id: TerminalSessionId, signal: TerminalSignal): Promise<TerminalSignalResult> {
     return this.expectOwned(owner, id).session.signal(signal)
+  }
+
+  /**
+   * Write raw text to an owned PTY without Enter or line-mode exclusivity.
+   * @param owner - exact session owner.
+   * @param id - target PTY identity.
+   * @param data - UTF-8 text delivered without implicit newline conversion.
+   */
+  async write(owner: Agent, id: TerminalSessionId, data: string): Promise<void> {
+    const record = this.expectOwned(owner, id)
+    if (record.closing !== undefined) throw new Error(`PTY session ${id} is closing`)
+    if (record.active !== undefined) {
+      throw new TerminalError(`PTY session ${id} already has an active send`, 'SEND_ACTIVE')
+    }
+    await record.session.write(data)
+  }
+
+  /**
+   * Resize an owned PTY window.
+   * @param owner - exact session owner.
+   * @param id - target PTY identity.
+   * @param cols - positive column count.
+   * @param rows - positive row count.
+   */
+  async resize(owner: Agent, id: TerminalSessionId, cols: number, rows: number): Promise<void> {
+    await this.expectOwned(owner, id).session.resize(cols, rows)
+  }
+
+  /**
+   * Follow decoded PTY output for UI rendering (CSI preserved).
+   * @param owner - exact session owner.
+   * @param id - target PTY identity.
+   * @param signal - cancels the subscription.
+   * @returns frames in delivery order.
+   */
+  followOutput(
+    owner: Agent,
+    id: TerminalSessionId,
+    signal: AbortSignal,
+  ): AsyncIterable<TerminalFollowFrame> {
+    return this.expectOwned(owner, id).session.followOutput(signal)
   }
 
   /**

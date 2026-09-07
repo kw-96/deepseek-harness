@@ -29,11 +29,13 @@ impl HarnessChild {
     let pid = self.child.id();
     #[cfg(windows)]
     {
-      let _ = Command::new("taskkill")
+      let mut taskkill = Command::new("taskkill");
+      taskkill
         .args(["/F", "/T", "/PID", &pid.to_string()])
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+        .stderr(Stdio::null());
+      apply_no_window(&mut taskkill);
+      let _ = taskkill.status();
     }
     #[cfg(not(windows))]
     {

@@ -8,7 +8,7 @@ import { useEffect } from 'react'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import { Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe, Server, Sparkles } from 'lucide-react'
 import type {
-  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse,
+  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
   ProjectAddDirResponse, ProjectDirsResponse,
 } from 'dsh-codex-shell/types'
@@ -16,7 +16,7 @@ import type { SessionMetaStore } from './session-meta.js'
 import { PanelController, usePanelState } from './panel-controller.js'
 import { TabBar, type TabBarTab } from './panel-tabs.js'
 import type { SelectorHook, SessionId, SessionListStateLike, TFn, WorkspaceSnapshotLike } from './faces.js'
-import { FilesPanel } from './panels/FilesPanel.js'
+import { FilesPanel } from './panels/files/FilesPanel.js'
 import { GitPanel } from './panels/git/GitPanel.js'
 import { ProjectsPanel } from './panels/ProjectsPanel.js'
 import { PluginsPanel } from './panels/plugins/PluginsPanel.js'
@@ -32,8 +32,8 @@ export interface CodexApi {
   fsList: (path: string) => Promise<FsListResponse>
   fsRead: (path: string, maxBytes?: number) => Promise<FsReadResponse>
   fsWrite: (path: string, content: string) => Promise<{ ok: true }>
-  fsSearchName: (root: string, query: string) => Promise<FsNameSearchResponse>
-  fsSearchContent: (root: string, query: string) => Promise<FsContentSearchResponse>
+  fsSearchName: (root: string, query: string, options?: FsSearchOptions) => Promise<FsNameSearchResponse>
+  fsSearchContent: (root: string, query: string, options?: FsSearchOptions) => Promise<FsContentSearchResponse>
   gitStatus: (cwd: string) => Promise<GitStatusResponse>
   gitLog: (cwd: string, count?: number) => Promise<GitLogResponse>
   gitDiff: (cwd: string, path?: string, staged?: boolean) => Promise<GitDiffResponse>
@@ -50,6 +50,9 @@ export interface CodexApi {
   gitUnstageAll: (cwd: string) => Promise<{ ok: true }>
   terminalOpen: (sessionId: string, cwd?: string) => Promise<{ terminalId: string; output: string; status: { kind: string } }>
   terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>
+  terminalFollow: (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<{ seq: number; chunk: string }>
+  terminalWrite: (sessionId: string, terminalId: string, data: string) => Promise<{ ok: true }>
+  terminalResize: (sessionId: string, terminalId: string, cols: number, rows: number) => Promise<{ ok: true }>
   terminalRead: (sessionId: string, terminalId: string) => Promise<{ output: string; truncated: boolean }>
   terminalClose: (sessionId: string, terminalId: string) => Promise<{ ok: true }>
   projectDirs: (workspaceId: string) => Promise<ProjectDirsResponse>

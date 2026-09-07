@@ -20,4 +20,4 @@ Web AppFrame 提供带可调高度且受会话约束的 `bottom` 槽位。Codex 
 
 ## 影响
 
-底部面板独立于右侧 details 列，可从会话头打开。没有 live Agent 的会话不能打开 PTY，会显示 Host 诊断而不是伪造终端。全屏终端程序仍不属于行导向终端 backend 的范围。
+底部面板独立于右侧 details 列，可从会话头打开。没有 live Agent 的会话不能打开 PTY，会显示 Host 诊断而不是伪造终端。Web UI 路径由[交互式底栏终端](2026-09-07-web-interactive-bottom-terminal.zh.md)（xterm + 实时 PTY write/follow/resize）取代。模型工具仍走行模式 backend；全屏 TUI 兼容仍不在该工具约定内。

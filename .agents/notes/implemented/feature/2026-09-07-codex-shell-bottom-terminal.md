@@ -20,4 +20,4 @@ The Web AppFrame owns a session-scoped `bottom` slot with a resizable height. Co
 
 ## Consequences
 
-The bottom panel is independent of the right details column and can be opened from the session header. A session without a live Agent cannot open a PTY and receives the Host diagnostic instead of a synthetic terminal. Full-screen terminal programs remain outside the line-oriented terminal backend.
+The bottom panel is independent of the right details column and can be opened from the session header. A session without a live Agent cannot open a PTY and receives the Host diagnostic instead of a synthetic terminal. The Web UI path is superseded by the [interactive bottom terminal](2026-09-07-web-interactive-bottom-terminal.md) (xterm + live PTY write/follow/resize). Model tools remain on the line-oriented backend; full-screen TUI compatibility is still outside that tool contract.

@@ -310,6 +310,16 @@ export class E2BTerminalHandle implements SubprocessTerminalHandle {
     })
   }
 
+  /**
+   * E2B's published PTY API has no resize primitive yet.
+   * @param _cols - unused.
+   * @param _rows - unused.
+   */
+  // oxlint-disable-next-line typescript/require-await -- Promise rejection is the supported contract.
+  async resize(_cols: number, _rows: number): Promise<void> {
+    throw new Error('subprocess-e2b: terminal resize is unsupported')
+  }
+
   /** @inheritdoc */
   inspectForeground(): Promise<SubprocessTerminalForeground | undefined> {
     return this.trackOperation(signal => this.inspectForegroundOnce(signal))

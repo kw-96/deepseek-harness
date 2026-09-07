@@ -1,10 +1,10 @@
 /** Filesystem operations behind the codexShell Remote, built on ctx.fs. */
 
-import { basename, join } from 'node:path'
-import type { Context } from '@deepseek-ai/cordis'
+import { basename, join, relative } from 'node:path'
 import type {} from '@deepseek-ai/dsh-fs'
 import type { FileSystem, FsDirEntry, FsTarget } from '@deepseek-ai/dsh-fs'
-import type { FsListResponse, FsReadResponse } from '../types.js'
+import type { FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions } from '../types.js'
+import { pathAllowed } from './globs.js'
 
 const MAX_LIST_ENTRIES = 1000
 const DEFAULT_READ_CAP = 512 * 1024
@@ -63,16 +63,24 @@ export async function writeTextFile(fs: FileSystem, path: string, content: strin
   return { ok: true }
 }
 
-/** Recursive filename search under one root; skips VCS/dependency directories. */
+/**
+ * 递归按文件名搜索；跳过依赖/VCS 目录，并应用可选大小写与路径过滤。
+ * @param fs 文件系统服务
+ * @param root 搜索根目录
+ * @param query 文件名子串
+ * @param options 大小写与 include/exclude
+ */
 export async function searchNames(
   fs: FileSystem,
   root: string,
   query: string,
-): Promise<{ matches: readonly { path: string; isDir: boolean }[]; truncated: boolean }> {
+  options?: FsSearchOptions,
+): Promise<FsNameSearchResponse> {
   const rootTarget = await fs.resolve(root)
   const rootInfo = await fs.stat(rootTarget)
   if (rootInfo === undefined) return { matches: [], truncated: false }
-  const needle = query.toLowerCase()
+  const matchCase = options?.matchCase === true
+  const needle = matchCase ? query : query.toLowerCase()
   const matches: { path: string; isDir: boolean }[] = []
   let visited = 0
   let truncated = false
@@ -89,7 +97,9 @@ export async function searchNames(
     for (const entry of entries) {
       if (truncated || matches.length >= 200) { truncated = matches.length >= 200; return }
       const childPath = join(prefix, entry.name)
-      if (entry.name.toLowerCase().includes(needle)) {
+      const rel = relative(root, childPath)
+      const hay = matchCase ? entry.name : entry.name.toLowerCase()
+      if (hay.includes(needle) && pathAllowed(rel, options?.include, options?.exclude)) {
         matches.push({ path: childPath, isDir: entry.type === 'directory' })
       }
       if (entry.type === 'directory' && !SKIP_NAMES.has(basename(entry.name))) {

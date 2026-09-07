@@ -1,3 +1,10 @@
+/**
+ * Rasterize apps/web/public/favicon.svg into Tauri icon PNGs.
+ *
+ * Windows .exe file icons cannot follow light/dark theme the way the SVG
+ * `prefers-color-scheme` rule does. Emit a dark rounded tile with a white mark
+ * so Explorer stays readable in both themes.
+ */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,15 +17,33 @@ const outDir = join(here, '../src-tauri/icons')
 mkdirSync(outDir, { recursive: true })
 
 const raw = readFileSync(svgPath, 'utf8')
-// Drop dark-mode CSS (resvg does not evaluate media queries) and keep the black mark.
-const normalized = raw
-  .replace(/<style>[\s\S]*?<\/style>\s*/u, '')
-  .replace(/fill="#000"/gu, 'fill="#111111"')
+const pathMatch = raw.match(/<path\b[^>]*\bd="([^"]+)"/u)
+if (pathMatch === null) {
+  throw new Error(`rasterize-brand-icon: missing path in ${svgPath}`)
+}
+const pathD = pathMatch[1]
+
+/**
+ * Build one square icon SVG: dark rounded tile + white brand mark with padding.
+ * @param size output pixel size
+ */
+function iconSvg(size) {
+  const pad = size * 0.14
+  const mark = size - pad * 2
+  const radius = Math.round(size * 0.22)
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" fill="none">
+  <rect width="${size}" height="${size}" rx="${radius}" fill="#0F1115"/>
+  <g transform="translate(${pad},${pad}) scale(${mark / 50})">
+    <path d="${pathD}" fill="#FFFFFF" fill-rule="nonzero"/>
+  </g>
+</svg>`
+}
 
 for (const size of [32, 128, 256, 512, 1024]) {
-  const resvg = new Resvg(normalized, {
+  const resvg = new Resvg(iconSvg(size), {
     fitTo: { mode: 'width', value: size },
-    background: 'rgba(255,255,255,0)',
+    background: 'rgba(0,0,0,0)',
   })
   const png = Buffer.from(resvg.render().asPng())
   if (size === 32) writeFileSync(join(outDir, '32x32.png'), png)

@@ -1,15 +1,16 @@
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type {
-  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsWriteResponse,
+  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions, FsWriteResponse,
   GitBranchesResponse, GitCheckoutResponse, GitCommitResponse, GitDiffResponse, GitLogResponse,
   GitSimpleResponse, GitStatusResponse, ProjectAddDirResponse, ProjectDirsResponse, ProjectSetDirsResponse,
-  TerminalOpenResponse, TerminalReadResponse, TerminalSendResponse,
+  TerminalFollowFrame, TerminalOpenResponse, TerminalReadResponse, TerminalResizeResponse, TerminalSendResponse,
+  TerminalWriteResponse,
 } from './types.js'
 import {
-  codexOk, fsContentSearchValue, fsListValue, fsNameSearchValue, fsReadValue,
+  codexOk, fsContentSearchValue, fsListValue, fsNameSearchValue, fsReadValue, fsSearchOptions,
   gitBranchValue, gitLogValue, gitStatusValue, projectAddValue, projectDirsValue,
-  terminalOpenValue, terminalReadValue, terminalSendValue,
+  terminalFollowValue, terminalOkValue, terminalOpenValue, terminalReadValue, terminalSendValue,
 } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
@@ -21,6 +22,16 @@ const descriptor = (method: string, parameters: readonly ReturnType<typeof param
   service: 'codexShell', namespace: 'codexShell', method, invocation: { kind: 'direct' as const }, parameters,
   result: strict(`dsh-codex-shell/types#${type}`, result),
 })
+const streamDescriptor = (
+  method: string,
+  parameters: readonly ReturnType<typeof parameter>[],
+  result: z.ZodType,
+  type: string,
+) => ({
+  ...descriptor(method, parameters, result, type),
+  mode: 'stream' as const,
+  cancellation: { parameter: 'signal' as const },
+})
 const optString = z.string().optional()
 const optNumber = z.number().optional()
 const optBoolean = z.boolean().optional()
@@ -29,8 +40,8 @@ const descriptors = [
   descriptor('fsList', [parameter('path', z.string())], fsListValue, 'FsListResponse'),
   descriptor('fsRead', [parameter('path', z.string()), parameter('maxBytes', optNumber)], fsReadValue, 'FsReadResponse'),
   descriptor('fsWrite', [parameter('path', z.string()), parameter('content', z.string())], codexOk, 'FsWriteResponse'),
-  descriptor('fsSearchName', [parameter('root', z.string()), parameter('query', z.string())], fsNameSearchValue, 'FsNameSearchResponse'),
-  descriptor('fsSearchContent', [parameter('root', z.string()), parameter('query', z.string())], fsContentSearchValue, 'FsContentSearchResponse'),
+  descriptor('fsSearchName', [parameter('root', z.string()), parameter('query', z.string()), parameter('options', fsSearchOptions.optional())], fsNameSearchValue, 'FsNameSearchResponse'),
+  descriptor('fsSearchContent', [parameter('root', z.string()), parameter('query', z.string()), parameter('options', fsSearchOptions.optional())], fsContentSearchValue, 'FsContentSearchResponse'),
   descriptor('gitStatus', [parameter('cwd', z.string())], gitStatusValue, 'GitStatusResponse'),
   descriptor('gitLog', [parameter('cwd', z.string()), parameter('count', optNumber)], gitLogValue, 'GitLogResponse'),
   descriptor('gitDiff', [parameter('cwd', z.string()), parameter('path', optString), parameter('staged', optBoolean)], z.object({ text: z.string() }).readonly(), 'GitDiffResponse'),
@@ -47,6 +58,14 @@ const descriptors = [
   descriptor('gitUnstageAll', [parameter('cwd', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('terminalOpen', [parameter('sessionId', z.string()), parameter('cwd', optString)], terminalOpenValue, 'TerminalOpenResponse'),
   descriptor('terminalSend', [parameter('sessionId', z.string()), parameter('terminalId', z.string()), parameter('text', z.string())], terminalSendValue, 'TerminalSendResponse'),
+  streamDescriptor('terminalFollow', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalFollowValue, 'TerminalFollowFrame'),
+  descriptor('terminalWrite', [parameter('sessionId', z.string()), parameter('terminalId', z.string()), parameter('data', z.string())], terminalOkValue, 'TerminalWriteResponse'),
+  descriptor('terminalResize', [
+    parameter('sessionId', z.string()),
+    parameter('terminalId', z.string()),
+    parameter('cols', z.number()),
+    parameter('rows', z.number()),
+  ], terminalOkValue, 'TerminalResizeResponse'),
   descriptor('terminalRead', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalReadValue, 'TerminalReadResponse'),
   descriptor('terminalClose', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], codexOk, 'GitSimpleResponse'),
   descriptor('projectDirs', [parameter('workspaceId', z.string())], projectDirsValue, 'ProjectDirsResponse'),
@@ -65,8 +84,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/fsList': (path: string) => Promise<RemoteResult<FsListResponse>>
     'codexShell/fsRead': (path: string, maxBytes?: number) => Promise<RemoteResult<FsReadResponse>>
     'codexShell/fsWrite': (path: string, content: string) => Promise<RemoteResult<FsWriteResponse>>
-    'codexShell/fsSearchName': (root: string, query: string) => Promise<RemoteResult<FsNameSearchResponse>>
-    'codexShell/fsSearchContent': (root: string, query: string) => Promise<RemoteResult<FsContentSearchResponse>>
+    'codexShell/fsSearchName': (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsNameSearchResponse>>
+    'codexShell/fsSearchContent': (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsContentSearchResponse>>
     'codexShell/gitStatus': (cwd: string) => Promise<RemoteResult<GitStatusResponse>>
     'codexShell/gitLog': (cwd: string, count?: number) => Promise<RemoteResult<GitLogResponse>>
     'codexShell/gitDiff': (cwd: string, path?: string, staged?: boolean) => Promise<RemoteResult<GitDiffResponse>>
@@ -83,6 +102,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/gitUnstageAll': (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/terminalOpen': (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
     'codexShell/terminalSend': (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
+    'codexShell/terminalFollow': (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<TerminalFollowFrame>
+    'codexShell/terminalWrite': (sessionId: string, terminalId: string, data: string) => Promise<RemoteResult<TerminalWriteResponse>>
+    'codexShell/terminalResize': (sessionId: string, terminalId: string, cols: number, rows: number) => Promise<RemoteResult<TerminalResizeResponse>>
     'codexShell/terminalRead': (sessionId: string, terminalId: string) => Promise<RemoteResult<TerminalReadResponse>>
     'codexShell/terminalClose': (sessionId: string, terminalId: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/projectDirs': (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
@@ -94,8 +116,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       fsList: (path: string) => Promise<RemoteResult<FsListResponse>>
       fsRead: (path: string, maxBytes?: number) => Promise<RemoteResult<FsReadResponse>>
       fsWrite: (path: string, content: string) => Promise<RemoteResult<FsWriteResponse>>
-      fsSearchName: (root: string, query: string) => Promise<RemoteResult<FsNameSearchResponse>>
-      fsSearchContent: (root: string, query: string) => Promise<RemoteResult<FsContentSearchResponse>>
+      fsSearchName: (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsNameSearchResponse>>
+      fsSearchContent: (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsContentSearchResponse>>
       gitStatus: (cwd: string) => Promise<RemoteResult<GitStatusResponse>>
       gitLog: (cwd: string, count?: number) => Promise<RemoteResult<GitLogResponse>>
       gitDiff: (cwd: string, path?: string, staged?: boolean) => Promise<RemoteResult<GitDiffResponse>>
@@ -112,6 +134,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       gitUnstageAll: (cwd: string) => Promise<RemoteResult<GitSimpleResponse>>
       terminalOpen: (sessionId: string, cwd?: string) => Promise<RemoteResult<TerminalOpenResponse>>
       terminalSend: (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
+      terminalFollow: (sessionId: string, terminalId: string, signal?: AbortSignal) => AsyncIterable<TerminalFollowFrame>
+      terminalWrite: (sessionId: string, terminalId: string, data: string) => Promise<RemoteResult<TerminalWriteResponse>>
+      terminalResize: (sessionId: string, terminalId: string, cols: number, rows: number) => Promise<RemoteResult<TerminalResizeResponse>>
       terminalRead: (sessionId: string, terminalId: string) => Promise<RemoteResult<TerminalReadResponse>>
       terminalClose: (sessionId: string, terminalId: string) => Promise<RemoteResult<GitSimpleResponse>>
       projectDirs: (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>

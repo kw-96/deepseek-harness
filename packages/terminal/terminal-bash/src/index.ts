@@ -61,9 +61,23 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
   }, { global: true })
 }
 
-function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect): Record<string, string> {
+function childEnvironment(
+  spec: TerminalBackendSpawnSpec,
+  dialect: ShellDialect,
+  interactive: boolean,
+): Record<string, string> {
   // The subprocess provider supplies its own scrubbed ambient base; these are
   // deliberate terminal-specific overrides layered after it.
+  if (interactive) {
+    return {
+      TERM: 'xterm-256color',
+      PAGER: 'cat',
+      GIT_PAGER: 'cat',
+      DSH_SHELL: '1',
+      DSH_SESSION_ID: spec.owner.id,
+      DSH_PTY_SESSION_ID: spec.sessionId,
+    }
+  }
   const common = {
     TERM: 'dumb',
     PAGER: 'cat',
@@ -194,17 +208,29 @@ export class BashTerminalBackend implements TerminalBackend {
     const policy = this.ctx.sandboxPolicy.resolve({ session: spec.owner.session })
     const argv = spawnArgv(this.ctx, this.config, policy)
     if (argv[0] === undefined) throw new Error('terminal-bash: sandbox returned empty argv')
+    const interactive = spec.interaction === 'interactive'
+    const cols = spec.cols ?? this.config.cols
+    const rows = spec.rows ?? this.config.rows
     const terminal = await this.spawnTerminal({
       argv,
       cwd: spec.cwd ?? policy.workspaceRoot,
-      env: childEnvironment(spec, this.config.shellDialect),
-      rows: this.config.rows,
-      cols: this.config.cols,
+      env: childEnvironment(spec, this.config.shellDialect, interactive),
+      ...interactive ? { name: 'xterm-256color' } : {},
+      rows,
+      cols,
       graceMs: this.config.disposeGraceMs,
       signal: spec.signal,
     })
-    const session = this.createSession(terminal, this.config)
+    const session = this.createSession(terminal, {
+      ...this.config,
+      cols,
+      rows,
+    })
     try {
+      if (interactive) {
+        session.motd = ''
+        return session
+      }
       await startupSession(session, this.config.shellDialect, this.config.timeoutMs, spec.signal)
       return session
     } catch (error) {

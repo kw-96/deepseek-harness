@@ -17,6 +17,7 @@ import { transform } from 'lightningcss'
 import { optionalStringArray } from './modules/src/client/manifest.ts'
 import { PLATFORM_MODULES, PRELOADED_CLIENT_EXTERNALS } from './web/src/platform.ts'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
+import { cssModuleClassName } from '../../scripts/css-module-class-name.ts'
 
 /**
  * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline
@@ -519,7 +520,7 @@ function clientConfig(id: string, entry: string): UserConfig {
         const classMap: Record<string, string> = {}
         const exportEntries = Object.entries(cssExports ?? {})
           .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        for (const [local, exp] of exportEntries) classMap[local] = exp.name
+        for (const [local, exp] of exportEntries) classMap[local] = cssModuleClassName(exp)
         return styleInjectionModule(id, fileId, code.toString(), classMap)
       },
     }, {

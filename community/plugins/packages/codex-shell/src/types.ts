@@ -24,6 +24,23 @@ export const fsReadValue = z.object({
   content: z.string(), size: z.number(), truncated: z.boolean(),
 }).readonly()
 
+/** 文件名 / 内容搜索的可选开关与路径过滤。 */
+export interface FsSearchOptions {
+  matchCase?: boolean
+  matchWholeWord?: boolean
+  useRegex?: boolean
+  include?: string
+  exclude?: string
+}
+
+export const fsSearchOptions = z.object({
+  matchCase: z.boolean().optional(),
+  matchWholeWord: z.boolean().optional(),
+  useRegex: z.boolean().optional(),
+  include: z.string().optional(),
+  exclude: z.string().optional(),
+}).partial().readonly()
+
 export const fsNameSearchValue = z.object({
   matches: z.array(z.object({ path: z.string(), isDir: z.boolean() }).readonly()).readonly(),
   truncated: z.boolean(),
@@ -67,6 +84,8 @@ export const terminalStatusValue = z.union([
 export const terminalOpenValue = z.object({ terminalId: z.string(), output: z.string(), status: terminalStatusValue }).readonly()
 export const terminalSendValue = z.object({ output: z.string(), status: terminalStatusValue, waitReason: z.string(), truncated: z.boolean() }).readonly()
 export const terminalReadValue = z.object({ output: z.string(), truncated: z.boolean() }).readonly()
+export const terminalFollowValue = z.object({ seq: z.number(), chunk: z.string() }).readonly()
+export const terminalOkValue = z.object({ ok: z.literal(true) }).readonly()
 
 /** Directory listing request/response. */
 export interface FsListRequest { path: string }
@@ -76,9 +95,9 @@ export interface FsReadRequest { path: string; maxBytes?: number }
 export interface FsReadResponse { kind: 'missing' | 'binary' | 'text'; content: string; size: number; truncated: boolean }
 export interface FsWriteRequest { path: string; content: string }
 export interface FsWriteResponse { ok: true }
-export interface FsNameSearchRequest { root: string; query: string }
+export interface FsNameSearchRequest { root: string; query: string; options?: FsSearchOptions }
 export interface FsNameSearchResponse { matches: readonly { path: string; isDir: boolean }[]; truncated: boolean }
-export interface FsContentSearchRequest { root: string; query: string }
+export interface FsContentSearchRequest { root: string; query: string; options?: FsSearchOptions }
 export interface FsContentSearchResponse {
   matches: readonly { path: string; line: number; content: string }[]
   truncated: boolean
@@ -113,3 +132,7 @@ export interface ProjectAddDirResponse { dirs: readonly string[]; rejected: stri
 export interface TerminalOpenResponse { terminalId: string; output: string; status: { kind: string; exitCode?: number | null; signal?: string | null } }
 export interface TerminalSendResponse { output: string; status: { kind: string; exitCode?: number | null; signal?: string | null }; waitReason: string; truncated: boolean }
 export interface TerminalReadResponse { output: string; truncated: boolean }
+/** One interactive bottom-terminal output frame. */
+export interface TerminalFollowFrame { seq: number; chunk: string }
+export interface TerminalWriteResponse { ok: true }
+export interface TerminalResizeResponse { ok: true }

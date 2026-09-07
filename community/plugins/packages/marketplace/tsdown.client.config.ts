@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { basename, dirname, resolve, sep } from 'node:path'
 import { transform } from 'lightningcss'
 import { defineConfig } from 'tsdown'
+import { cssModuleClassName } from '../../../../scripts/css-module-class-name.ts'
 
 const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { name?: unknown }
 if (typeof packageJson.name !== 'string' || packageJson.name.length === 0) {
@@ -48,7 +49,9 @@ export default defineConfig({
       const filename = virtualId.slice(cssPrefix.length, -cssSuffix.length)
       this.addWatchFile(filename)
       const result = transform({ filename, code: await readFile(filename), cssModules: true, minify: true })
-      const classes = Object.fromEntries(Object.entries(result.exports ?? {}).map(([key, value]) => [key, value.name]))
+      const classes = Object.fromEntries(
+        Object.entries(result.exports ?? {}).map(([key, value]) => [key, cssModuleClassName(value)]),
+      )
       const tagId = `${id}/${basename(filename)}`
       return [
         `const css = ${JSON.stringify(result.code.toString())};`,

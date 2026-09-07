@@ -8,14 +8,14 @@ A Codex-workflow-styled integrated workspace shell for DeepSeek Harness (DSH): t
 
 - **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布）：常驻圆角搜索框；会话先按工作区收纳、组内按最近使用向下排列；工作区标题行（名称前是文件夹图标，展开=打开/收起=闭合；折叠/重命名/删除/在此工作区新建会话）；单行会话固定行高（运行态亮点、置顶/未读小标记、悬停显露时间与 `…` 菜单：派生/重命名/归档/复制 cwd/id/深链接/新窗口打开）；工作区与会话名称超长省略；子代理嵌套树。
 - **添加工作区**（`sidebar.footer.action` 页脚入口）：居中目录选择弹窗（路径输入 + 目录浏览 + 创建，基于 `codexShell.fsList`），不复用原生 directoryFlow 槽。
-- **右侧与底部工作台**：右侧 `details` 列提供文件树、Git 变更分组/差异/提交/时间线历史/分支、附加目录管理、插件管家、摘要和浏览器；底部独立终端使用当前会话的持久 pwsh PTY，支持命令、滚动输出、清空和关闭。列宽/拖拽/动画由宿主布局接管。
+- **右侧与底部工作台**：右侧 `details` 列提供文件树、Git 变更分组/差异/提交/时间线历史/分支、附加目录管理、插件管家、摘要和浏览器；底部独立交互终端使用当前会话的持久 PTY（`@xterm/xterm` 渲染、按键直达、输出流式跟随、面板 resize），与模型侧行模式 `terminal_*` 工具并行。列宽/拖拽/动画由宿主布局接管。
 - **会话头工具按钮**（`conversation.session.header.utilities`）：一键开合右侧工作台面板，与宿主列双向同步。
 - **视觉**：完全映射宿主 `--dsw-*` 主题令牌，亮/暗主题自动跟随；侧栏为 Codex 式极简排布（安静分组、单行会话、悬停显露操作）。
 
 ## 安装 / Install
 
 ```sh
-dsh plugin --profile web add dsh-codex-shell@0.4.4
+dsh plugin --profile web add dsh-codex-shell@0.5.1
 ```
 
 或手动在 profile 的 `cordis.patch.yml` 里 insert：
@@ -34,6 +34,7 @@ dsh plugin --profile web add dsh-codex-shell@0.4.4
 
 - `fsList/fsRead/fsWrite/fsSearchName/fsSearchContent`
 - `gitStatus/gitLog/gitDiff/gitStage/gitUnstage/gitDiscard/gitCommit/gitBranches/gitCheckout`
+- `terminalOpen/terminalFollow/terminalWrite/terminalResize/terminalClose`（底栏交互终端；`terminalSend`/`terminalRead` 仍保留）
 - `projectDirs/projectSetDirs/projectAddDir`
 
 文件操作经 `ctx.fs`，git 经 `ctx.shell`（`git` 命令，30s 超时）。

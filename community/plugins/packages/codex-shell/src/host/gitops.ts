@@ -3,7 +3,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-shell'
 import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
-import type { FsContentSearchResponse, GitLogResponse, GitStatusResponse } from '../types.js'
+import type { FsContentSearchResponse, FsSearchOptions, GitLogResponse, GitStatusResponse } from '../types.js'
+import { grepPathspecs } from './globs.js'
 
 const GIT_TIMEOUT_MS = 30_000
 /** 网络类操作（fetch/pull/push）的超时上限。 */
@@ -200,12 +201,23 @@ export async function gitUnstageAll(shell: ShellExecutor, cwd: string): Promise<
   return { ok: true }
 }
 
-/** Content search through ripgrep when available; graceful empty result otherwise. */
+/**
+ * 通过 `git grep` 做内容搜索；失败时返回空结果。
+ * @param shell shell 执行器
+ * @param root 仓库工作目录
+ * @param query 搜索串
+ * @param options 大小写/整词/正则与路径过滤
+ */
 export async function searchContent(
-  shell: ShellExecutor, root: string, query: string,
+  shell: ShellExecutor, root: string, query: string, options?: FsSearchOptions,
 ): Promise<FsContentSearchResponse> {
+  if (query.trim() === '') return { matches: [], truncated: false }
+  const flags: string[] = ['--no-pager', 'grep', '-n', '--max-count', '200']
+  if (options?.matchCase !== true) flags.push('-i')
+  if (options?.matchWholeWord === true) flags.push('-w')
+  flags.push(options?.useRegex === true ? '-E' : '-F', '-e', query, '--', ...grepPathspecs(options?.include, options?.exclude))
   try {
-    const out = await git(shell, root, ['--no-pager', 'grep', '-n', '-i', '--max-count', '200', '-e', query, '--', '.'])
+    const out = await git(shell, root, flags)
     const matches = out.stdout.split('\n').filter(line => line !== '').map(line => {
       const colon = line.indexOf(':')
       if (colon < 0) return { path: line, line: 0, content: '' }

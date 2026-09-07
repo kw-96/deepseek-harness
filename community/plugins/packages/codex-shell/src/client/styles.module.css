@@ -681,7 +681,10 @@
   display: flex;
   width: 100%;
   height: 100%;
+  max-height: 100%;
   min-width: 0;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
   overflow: hidden;
   background: var(--cx-bg-surface);
@@ -767,6 +770,147 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* 文件面板：可伸缩列，目录列表为唯一滚动区 */
+.filesRoot {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filesScroll {
+  composes: scroll;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 12px 0;
+}
+
+.filesSearchBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 8px 10px 10px;
+}
+
+.filesSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 8px;
+  padding: 0 4px 0 8px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-low);
+}
+
+.filesSearchRow:focus-within {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+.filesSearchInput {
+  composes: search;
+  min-height: 28px;
+}
+
+.filesToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 4px;
+  background: transparent;
+  color: var(--cx-text-low);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+
+.filesToggle:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.filesToggleOn {
+  composes: filesToggle;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent-strong);
+}
+
+.filesFieldLabel {
+  margin: 2px 2px 0;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.filesResultGroup {
+  margin: 6px 0 2px;
+  padding: 4px 8px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filesResultRow {
+  composes: fileRow;
+  align-items: flex-start;
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.filesResultMeta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filesResultPath {
+  overflow: hidden;
+  color: var(--cx-text-hi);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesResultSnippet {
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesPreview {
+  display: flex;
+  min-height: 120px;
+  max-height: 260px;
+  flex-direction: column;
+  flex: none;
+  border-top: 1px solid var(--cx-line);
 }
 
 /* ── 面板通用：分组 / 路径屑 / 预览 / 输入行 ───────────── */
@@ -2187,38 +2331,16 @@
   white-space: nowrap;
 }
 
-.bottomTerminalOutput {
+.bottomTerminalXterm {
   min-height: 0;
   flex: 1;
-  margin: 0;
-  padding: 10px 12px;
-  overflow: auto;
-  color: var(--cx-text-hi);
-  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
+  padding: 0;
+  overflow: hidden;
+  background: #0d0d0d;
 }
 
-.bottomTerminalInput {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 8px;
-  border-top: 0.5px solid var(--cx-line);
-  padding: 0 10px;
-  color: var(--cx-accent-strong);
-  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
-  flex: none;
-}
-
-.bottomTerminalInput input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--cx-text-hi);
-  font: inherit;
+.bottomTerminalXterm :global(.xterm),
+.bottomTerminalXterm :global(.xterm-viewport),
+.bottomTerminalXterm :global(.xterm-screen) {
+  height: 100%;
 }
