@@ -162,12 +162,62 @@ describe('session-import-codex through a real Loader composition', () => {
     await workspace?.detachSession(id)
     expect(workspace?.sessionIds).toEqual([])
     const repeat = await first.codexImport.run()
-    expect(repeat.skippedExisting).toBe(2)
+    expect(repeat).toMatchObject({ imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 1, deferredActive: 0 })
     expect(workspace?.sessionIds).toEqual([id])
 
     // A thread whose commands carry no absolute cwd falls back to the configured one.
     const relative = await first.sessionPersistence.stat(SessionId('codex-thread-2'))
     expect(relative?.header.cwd).toBe(root)
+  })
+
+  it('replaces an imported snapshot and migrates workspace membership when Codex cwd changes', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    await mkdir(join(root, 'codex'))
+    await writeCodexFixture(join(root, 'codex'))
+    const first = await loadComposition(compositionRows())
+    await first.codexImport.run()
+
+    const nextWorkspace = join(root, 'workspace-next')
+    await mkdir(nextWorkspace)
+    const db = new DatabaseSync(join(root, 'codex', 'thread_history_1.sqlite'))
+    db.prepare('INSERT INTO thread_items (thread_id, turn_id, item_id, rollout_ordinal, created_at_ms, item_type, item_json) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('thread-1', 'turn-a', 'c-next', 5, 9000, 'commandExecution', JSON.stringify({
+        type: 'commandExecution', command: 'pwd', cwd: nextWorkspace, status: 'completed', aggregatedOutput: nextWorkspace,
+      }))
+    db.close()
+
+    const result = await first.codexImport.run()
+    const id = SessionId('codex-thread-1')
+    expect(result).toMatchObject({ imported: 0, updated: 1, skippedExisting: 1, skippedEmpty: 1, deferredActive: 0 })
+    expect(first.sessions.get(id)?.header.cwd).toBe(nextWorkspace)
+    expect((await first.sessionPersistence.stat(id))?.header.cwd).toBe(nextWorkspace)
+    const oldWorkspace = await first.workspaceRegistry.resolveByPath(join(root, 'workspace'))
+    const newWorkspace = await first.workspaceRegistry.resolveByPath(nextWorkspace)
+    expect(oldWorkspace?.sessionIds).not.toContain(id)
+    expect(newWorkspace?.sessionIds).toContain(id)
+  })
+
+  it('defers a changed imported session while a live Agent owns it', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    await mkdir(join(root, 'codex'))
+    await writeCodexFixture(join(root, 'codex'))
+    const first = await loadComposition(compositionRows())
+    await first.codexImport.run()
+
+    const nextWorkspace = join(root, 'workspace-deferred')
+    await mkdir(nextWorkspace)
+    const db = new DatabaseSync(join(root, 'codex', 'thread_history_1.sqlite'))
+    db.prepare('INSERT INTO thread_items (thread_id, turn_id, item_id, rollout_ordinal, created_at_ms, item_type, item_json) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run('thread-1', 'turn-a', 'c-deferred', 6, 10_000, 'commandExecution', JSON.stringify({
+        type: 'commandExecution', command: 'pwd', cwd: nextWorkspace, status: 'completed', aggregatedOutput: nextWorkspace,
+      }))
+    db.close()
+    first.provide('agents', { get: (id: SessionId) => id === SessionId('codex-thread-1') ? {} : undefined } as never)
+
+    const result = await first.codexImport.run()
+    const id = SessionId('codex-thread-1')
+    expect(result).toMatchObject({ imported: 0, updated: 0, skippedExisting: 1, skippedEmpty: 1, deferredActive: 1 })
+    expect((await first.sessionPersistence.stat(id))?.header.cwd).toBe(join(root, 'workspace'))
   })
 
   it('skips live threads and skips stored threads on a cold second load', async () => {
@@ -179,15 +229,15 @@ describe('session-import-codex through a real Loader composition', () => {
 
     // Live sessions exist: the sweep counts them as existing without touching storage.
     const liveResult = await runImportSweep(first, resolvedConfig(), new AbortController().signal)
-    expect(liveResult.summary).toEqual({ imported: 0, skippedExisting: 2, skippedEmpty: 1 })
+    expect(liveResult.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 1, deferredActive: 0 })
 
     // A pre-aborted sweep stops before the first thread.
     const aborted = await runImportSweep(first, resolvedConfig(), AbortSignal.abort())
-    expect(aborted.summary).toEqual({ imported: 0, skippedExisting: 0, skippedEmpty: 0 })
+    expect(aborted.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
 
     const second = await loadComposition(compositionRows())
     const coldResult = await runImportSweep(second, resolvedConfig(), new AbortController().signal)
-    expect(coldResult.summary).toEqual({ imported: 0, skippedExisting: 2, skippedEmpty: 1 })
+    expect(coldResult.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 1, deferredActive: 0 })
     expect(second.sessions.get(SessionId('codex-thread-1'))).toBeUndefined()
     expect((await second.sessionPersistence.list()).length).toBe(2)
   })
@@ -199,7 +249,7 @@ describe('session-import-codex through a real Loader composition', () => {
     await writeCodexFixture(join(root, 'codex'))
     first.sessionPersistence.stat = async () => { throw new Error('stat boom') }
     const result = await runImportSweep(first, resolvedConfig(), new AbortController().signal)
-    expect(result.summary).toEqual({ imported: 2, skippedExisting: 0, skippedEmpty: 1 })
+    expect(result.summary).toEqual({ imported: 2, updated: 0, skippedExisting: 0, skippedEmpty: 1, deferredActive: 0 })
 
     root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
     await mkdir(join(root, 'codex'))
@@ -211,7 +261,7 @@ describe('session-import-codex through a real Loader composition', () => {
       return secondCreate(header)
     }
     const raced = await runImportSweep(second, resolvedConfig(), new AbortController().signal)
-    expect(raced.summary).toEqual({ imported: 1, skippedExisting: 1, skippedEmpty: 1 })
+    expect(raced.summary).toEqual({ imported: 1, updated: 0, skippedExisting: 1, skippedEmpty: 1, deferredActive: 0 })
     expect(second.sessions.get(SessionId('codex-thread-1'))).toBeDefined()
     expect(second.sessions.get(SessionId('codex-thread-2'))).toBeUndefined()
   })
@@ -227,7 +277,7 @@ describe('session-import-codex through a real Loader composition', () => {
       return originalCreate(header)
     }
     const result = await runImportSweep(first, resolvedConfig(), new AbortController().signal)
-    expect(result.summary).toEqual({ imported: 1, skippedExisting: 0, skippedEmpty: 1 })
+    expect(result.summary).toEqual({ imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 1, deferredActive: 0 })
     expect(first.sessions.get(SessionId('codex-thread-1'))).toBeUndefined()
     expect(first.sessions.get(SessionId('codex-thread-2'))).toBeDefined()
   })
@@ -237,7 +287,7 @@ describe('session-import-codex through a real Loader composition', () => {
     await mkdir(join(root, 'codex'))
     const first = await loadComposition(compositionRows())
     const result = await runImportSweep(first, resolvedConfig(), new AbortController().signal)
-    expect(result.summary).toEqual({ imported: 0, skippedExisting: 0, skippedEmpty: 0 })
+    expect(result.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
     expect((await first.sessionPersistence.list())).toEqual([])
   })
 
@@ -254,7 +304,7 @@ describe('session-import-codex through a real Loader composition', () => {
       SessionId('codex-thread-2'),
     ])
     expect(run.sessions[0]?.title).toBe('整理校验表')
-    expect(run.sessions[1]?.title).toBe('')
+    expect(run.sessions[1]?.title).toBe('second thread')
 
     // A second run finds both already imported and records a new history entry.
     const secondRun = await first.codexImport.run()

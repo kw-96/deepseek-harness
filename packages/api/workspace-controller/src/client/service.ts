@@ -82,6 +82,13 @@ export interface IWorkspaces {
    */
   attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>
   /**
+   * Move a Session into a target Workspace, detaching its current owner.
+   * @param workspaceId - target Workspace.
+   * @param sessionId - Session to move.
+   * @returns the changed target Workspace.
+   */
+  moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>
+  /**
    * Remove a Session from a Workspace account (Ungrouped).
    * @param workspaceId - owning Workspace.
    * @param sessionId - Session to detach.
@@ -144,6 +151,18 @@ export class WorkspaceController extends Service implements IWorkspaces {
     const result = await this.model.attachSession(workspaceId, sessionId)
     if (!result.ok) throw commandError('attach', result.error)
     return result.value.workspace
+  }
+
+  async moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    const owner = this.model.getSnapshot().items.find(workspace =>
+      workspace.sessionIds.includes(sessionId))
+    if (owner !== undefined && owner.workspaceId !== workspaceId) {
+      const detached = await this.model.detachSession(owner.workspaceId, sessionId)
+      if (!detached.ok) throw commandError('move session detach', detached.error)
+    }
+    const attached = await this.model.attachSession(workspaceId, sessionId)
+    if (!attached.ok) throw commandError('move session attach', attached.error)
+    return attached.value.workspace
   }
 
   async detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {

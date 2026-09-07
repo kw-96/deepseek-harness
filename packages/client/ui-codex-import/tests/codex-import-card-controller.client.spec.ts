@@ -41,7 +41,7 @@ function makeScope(autoSync: boolean | undefined) {
 function makeContext() {
   const run = vi.fn(async (): Promise<RunResult> => ({
     ok: true,
-    value: { at: 200, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [{ id: SessionId('codex-t1'), title: '标题' }] },
+    value: { at: 200, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-t1'), title: '标题' }] },
   }))
   const history = vi.fn(async (): Promise<HistoryResult> => ({ ok: true, value: { runs: [] } }))
   const remote = { codexImport: { run, history } }
@@ -118,7 +118,7 @@ describe('CodexImportCardController', () => {
     face.runImport()
     face.runImport()
     expect(remote.codexImport.run).toHaveBeenCalledTimes(1)
-    resolve?.({ ok: true, value: { at: 1, imported: 0, skippedExisting: 0, skippedEmpty: 0, sessions: [] } })
+    resolve?.({ ok: true, value: { at: 1, imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [] } })
     await vi.waitFor(() => {
       expect(face.hooks.codexImportCard.getSnapshot().running).toBe(false)
     })
@@ -172,7 +172,7 @@ describe('CodexImportCardController', () => {
     face.toggleSync(false)
     notify()
     resolveHistory?.({ ok: true, value: { runs: [] } })
-    resolveRun?.({ ok: true, value: { at: 1, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [] } })
+    resolveRun?.({ ok: true, value: { at: 1, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [] } })
     await vi.waitFor(() => {
       expect(remote.codexImport.history).toHaveBeenCalled()
     })

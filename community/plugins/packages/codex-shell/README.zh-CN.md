@@ -4,7 +4,7 @@ Codex 工作流风格的一体化 DeepSeek Harness Web 插件，把工作区/会
 
 ## 功能
 
-- **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布）：常驻圆角搜索框；「项目」标题栏提供整理（按项目/扁平）与排序（置顶优先/最近更新/手动拖拽）；会话悬停置顶/归档/更多；嵌套菜单（项目迁移仅同 cwd、复制、分叉、打开方式）；项目行悬停信息卡与更多菜单；工作区标题行（文件夹图标、折叠/重命名）；子代理嵌套树。
+- **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布）：搜索请求防抖、取消且只展示最新结果；结果与会话/项目树行支持键盘打开和开合；选中、悬停和时间槽保留固定宽度，不挤压标题；菜单支持外点或 Esc 关闭并避免越出视口；「项目」标题栏提供整理（按项目/扁平）与排序（置顶优先/最近更新/手动拖拽），项目详情改为显式信息按钮；会话提供置顶/归档/更多与嵌套子代理树。
 - **添加工作区**（`sidebar.footer.action` 页脚入口 + 标题栏 `+`）：居中目录选择弹窗（路径输入 + 目录浏览 + 创建，基于 `codexShell.fsList`），不复用原生 directoryFlow 槽。
 - **右侧与底部工作台**：右侧 `details` 列提供文件树、Git 变更分组/差异/提交/时间线历史/分支、附加目录管理、插件管家、摘要和浏览器；底部独立多 tab 交互终端（`pwsh`/`bash` 新建、Agent `terminal_*` 会话可跟随；`@xterm/xterm` 渲染），与模型侧行模式工具并行。列宽/拖拽/动画由宿主布局接管。
 - **会话头工具按钮**（`conversation.session.header.utilities`）：一键开合右侧工作台面板，与宿主列双向同步。
@@ -13,7 +13,7 @@ Codex 工作流风格的一体化 DeepSeek Harness Web 插件，把工作区/会
 ## 安装
 
 ```sh
-dsh plugin --profile web add dsh-codex-shell@0.6.4
+dsh plugin --profile web add dsh-codex-shell@0.6.5
 ```
 
 或手动在 profile 的 `cordis.patch.yml` 里 insert：

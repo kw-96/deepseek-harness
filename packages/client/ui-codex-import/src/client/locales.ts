@@ -14,6 +14,8 @@ export type CodexImportKey =
   | 'empty'
   | 'noSessions'
   | 'importedCount'
+  | 'updatedCount'
+  | 'deferredActiveCount'
   | 'open'
 
 export const en: Record<CodexImportKey, string> = {
@@ -24,8 +26,10 @@ export const en: Record<CodexImportKey, string> = {
   running: 'Importing…',
   historyTitle: 'Import history',
   empty: 'No imports yet.',
-  noSessions: 'This run imported no new sessions.',
+  noSessions: 'This run made no session changes.',
   importedCount: 'Imported {count}',
+  updatedCount: 'Updated {count}',
+  deferredActiveCount: 'Deferred {count} active',
   open: 'Open',
 }
 
@@ -37,7 +41,9 @@ export const zh: Record<CodexImportKey, string> = {
   running: '导入中…',
   historyTitle: '导入历史',
   empty: '还没有导入记录。',
-  noSessions: '本轮没有导入新会话。',
+  noSessions: '本轮没有会话变更。',
   importedCount: '已导入 {count} 项',
+  updatedCount: '已更新 {count} 项',
+  deferredActiveCount: '活跃会话延后 {count} 项',
   open: '打开',
 }

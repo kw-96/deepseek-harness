@@ -260,24 +260,18 @@ function orderedTurnGroups(record: CodexThreadRecord): { turn: CodexThreadTurn |
     })
 }
 
-/** Most common absolute `cwd` across command items, else the fallback. */
+/** 最新绝对命令 cwd，缺失时回退到导入配置。 */
 function deriveCwd(record: CodexThreadRecord, fallbackCwd: string): string {
-  const counts = new Map<string, number>()
+  let latest: { cwd: string; time: number } | undefined
   for (const item of record.items) {
     if (item.itemType !== 'commandExecution' && item.itemType !== 'mcpToolCall') continue
     const cwd = asNonEmptyString(item.json['cwd'])
     if (cwd === undefined) continue
-    counts.set(cwd, (counts.get(cwd) ?? 0) + 1)
-  }
-  let best: string | undefined
-  let bestCount = 0
-  for (const [cwd, count] of counts) {
-    if (count > bestCount) {
-      best = cwd
-      bestCount = count
+    if (latest === undefined || item.createdAtMs >= latest.time) {
+      latest = { cwd, time: item.createdAtMs }
     }
   }
-  return best ?? fallbackCwd
+  return latest?.cwd ?? fallbackCwd
 }
 
 /**
@@ -316,7 +310,7 @@ export function convertCodexThread(
           }, 'append')
           if (firstUserSeq === undefined) {
             firstUserSeq = SessionSeq(events.length - 1)
-            const title = normalizeTitle(record.title, bounds.maxTitleChars)
+            const title = normalizeTitle(record.title ?? text, bounds.maxTitleChars)
             if (title !== undefined) {
               push(events, state, 'session/title', item.createdAtMs, {
                 title,

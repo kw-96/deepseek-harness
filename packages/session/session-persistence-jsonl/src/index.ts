@@ -22,6 +22,7 @@ import {
   type SessionAccess, type SessionHandle,
   type SessionLocation, type SessionPersistenceCreateOptions,
   type SessionPersistenceListOptions, type SessionPersistenceOpenOptions,
+  type SessionPersistenceReplaceOptions,
   type SessionPersistenceSnapshot, type SessionPersistenceStatOptions,
   type SessionPersistenceRevision as PersistenceRevision,
 } from '@deepseek-ai/dsh-session-persistence'
@@ -37,6 +38,7 @@ import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
 } from './zstd.ts'
 import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
+import { recoverJsonlReplacements, replaceJsonlArtifact } from './replace.ts'
 
 export type { JsonlCompression } from './format.ts'
 
@@ -203,6 +205,39 @@ class JsonlSessionPersistence extends SessionPersistence {
     options?.signal?.throwIfAborted()
     this.tracker.registerCreated(snapshot, inheritedEventCount)
     return this.tracker.adopt(new JsonlSessionHandle(this, snapshot.id, snapshot, 'write', { cursor: 0, materialized: false, inheritedEventCount }))
+  }
+
+  /**
+   * Replace one complete externally-authoritative session snapshot.
+   * @param header - replacement header carrying an existing session id.
+   * @param events - complete contiguous replacement log.
+   * @param options - optional cancellation.
+   * @returns resolution after the new artifact and header are durable.
+   */
+  override async replace(
+    header: SessionHeader,
+    events: readonly SessionEvent[],
+    options?: SessionPersistenceReplaceOptions,
+  ): Promise<void> {
+    options?.signal?.throwIfAborted()
+    await this.ensureRootEncoding()
+    const snapshot = materializeCreateHeader(header)
+    const inheritedEventCount = SessionLogOffset(0)
+    const location = this.locate(snapshot)
+    assertVersion(snapshot, location)
+    validateStoredEvents(snapshot, [...events], location)
+    this.tracker.claimWrite(snapshot.id)
+    try {
+      const oldPath = await this.findLog(snapshot.id, options?.signal)
+      if (oldPath === undefined) throw new SessionPersistenceNotFoundError(snapshot.id)
+      await this.readStoredLog(oldPath, snapshot.id, options?.signal)
+      const content = await this.encodeMaterialization(snapshot, inheritedEventCount, events)
+      const newPath = logPath(this.root, snapshot.cwd, snapshot.id, this.compression)
+      await replaceJsonlArtifact(this.root, oldPath, newPath, content)
+      this.coldLogMemo.delete(snapshot.id)
+    } finally {
+      this.tracker.releaseClaim(snapshot.id)
+    }
   }
 
   /**
@@ -1062,6 +1097,7 @@ class JsonlSessionPersistence extends SessionPersistence {
   /** Reject a root that already belongs to the other physical encoding. */
   private ensureRootEncoding(): Promise<void> {
     this.rootEncodingCheck ??= this.checkRootEncoding()
+      .then(async () => { await recoverJsonlReplacements(this.root) })
     return this.rootEncodingCheck
   }
 

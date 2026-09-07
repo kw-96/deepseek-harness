@@ -62,6 +62,8 @@ export function CodexImportCard(props: CodexImportCardProps) {
                   <div className={css.runHead}>
                     <span className={css.runTime}>{formatTime(run.at)}</span>
                     <span className={css.runCount}>{t('importedCount', { count: run.imported })}</span>
+                    {run.updated > 0 && <span className={css.runCount}>{t('updatedCount', { count: run.updated })}</span>}
+                    {run.deferredActive > 0 && <span className={css.runCount}>{t('deferredActiveCount', { count: run.deferredActive })}</span>}
                   </div>
                   {run.sessions.length === 0
                     ? <p className={css.none}>{t('noSessions')}</p>

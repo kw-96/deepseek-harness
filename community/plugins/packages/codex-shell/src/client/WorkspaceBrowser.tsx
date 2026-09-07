@@ -10,6 +10,7 @@ import { SectionHeader } from './sidebar/section-header.js'
 import { buildGroupsModel } from './sidebar/groups.js'
 import { useBrowserPrefs, type BrowserPrefsStore } from './sidebar/prefs.js'
 import { requestAddWorkspaceOpen } from './sidebar/add-workspace-bus.js'
+import { useSessionSearch } from './sidebar/search/use-session-search.js'
 import type { SessionMenuActions } from './sidebar/session-menu.js'
 import type { WorkspaceMenuActions } from './sidebar/workspace-menu.js'
 import type {
@@ -34,6 +35,7 @@ export interface CodexBrowserInjected {
   archiveSession: (sessionId: SessionId) => Promise<void>
   insertSessionBefore: (workspaceId: string, sessionId: SessionId, beforeSessionId?: SessionId) => Promise<void>
   attachSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
+  moveSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
   detachSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
   openWorkspacePath: (path: string) => Promise<void>
   openTerminalForSession: (sessionId: SessionId, cwd?: string) => Promise<void>
@@ -64,14 +66,14 @@ export function CodexBrowser(props: CodexBrowserProps) {
   const {
     wide, expandSidebar, useSessions, useWorkspaces, startSession, open, searchSessions,
     renameSession, forkSession, renameWorkspace, deleteWorkspace, archiveSession,
-    insertSessionBefore, attachSession, detachSession, openWorkspacePath, openTerminalForSession,
+    insertSessionBefore, moveSession, detachSession, openWorkspacePath, openTerminalForSession,
     exportSessionMarkdown, canExportMarkdown, meta, prefs, t,
   } = props
   const list = useSessions(state => state)
   const workspaces = useWorkspaces(state => state.items)
   const archivedIds = useWorkspaces(state => state.archivedSessionIds)
   const [menu, setMenu] = useState<BrowserMenuState | null>(null)
-  const [search, setSearch] = useState({ query: '', items: [] as readonly SearchResultLike[], loading: false })
+  const { search, setQuery, clear: clearSearch } = useSessionSearch(searchSessions)
   const [searchOnExpand, setSearchOnExpand] = useState(false)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
@@ -103,18 +105,6 @@ export function CodexBrowser(props: CodexBrowserProps) {
     if (next.has(key)) next.delete(key)
     else next.add(key)
     return next
-  }
-
-  const runSearch = async (value: string): Promise<void> => {
-    const query = value.trim()
-    if (query === '') { setSearch({ query: '', items: [], loading: false }); return }
-    setSearch(prev => ({ ...prev, loading: true }))
-    try {
-      const result = await searchSessions(query, new AbortController().signal)
-      setSearch({ query, items: result.items, loading: false })
-    } catch {
-      setSearch({ query, items: [], loading: false })
-    }
   }
 
   const beginRename = (sessionId: SessionId, title: string): void => {
@@ -152,7 +142,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
       archive: () => { setMenu(null); void archiveSession(sessionId) },
       moveToWorkspace: (workspaceId) => {
         setMenu(null)
-        void attachSession(workspaceId, sessionId)
+        void moveSession(workspaceId, sessionId)
       },
       moveToUngrouped: () => {
         const workspaceId = sessionWorkspaceId(sessionId)
@@ -223,13 +213,13 @@ export function CodexBrowser(props: CodexBrowserProps) {
           type="text"
           placeholder={t('searchPlaceholder')}
           value={search.query}
-          onChange={event => { setSearch(prev => ({ ...prev, query: event.target.value })); void runSearch(event.target.value) }}
-          onKeyDown={event => { if (event.key === 'Escape') setSearch({ query: '', items: [], loading: false }) }}
+          onChange={event => { setQuery(event.target.value) }}
+          onKeyDown={event => { if (event.key === 'Escape') clearSearch() }}
         />
         {search.query !== '' && (
           <button type="button" className={css.clearButton} title={t('clearSearch')}
             aria-label={t('clearSearch')}
-            onClick={() => { setSearch({ query: '', items: [], loading: false }) }}>
+            onClick={clearSearch}>
             <X size={12} />
           </button>
         )}
@@ -281,8 +271,12 @@ export function CodexBrowser(props: CodexBrowserProps) {
           setRenameDraft={setRenameDraft}
           commitRename={sessionId => { void commitRename(sessionId) }}
           commitWorkspaceRename={workspaceId => { void commitWorkspaceRename(workspaceId) }}
-          onSessionDrop={(sessionId, beforeSessionId, workspaceId) => {
-            void insertSessionBefore(workspaceId, sessionId, beforeSessionId)
+          onSessionDrop={(sessionId, beforeSessionId, workspaceId, fromWorkspaceId) => {
+            if (fromWorkspaceId !== undefined && fromWorkspaceId !== workspaceId) {
+              void moveSession(workspaceId, sessionId)
+            } else {
+              void insertSessionBefore(workspaceId, sessionId, beforeSessionId)
+            }
           }}
           sessionWorkspaceId={sessionWorkspaceId}
           meta={meta}

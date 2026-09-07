@@ -695,7 +695,7 @@ describe('Workspace session ordering', () => {
     expect(result.list).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects mismatched, missing, unresolved, non-directory, and unknown cwd facts', async () => {
+  it('attaches by session existence regardless of cwd, rejecting only unknown ids', async () => {
     const dir = await makeDir('strict')
     const elsewhere = await makeDir('elsewhere')
     const gone = await makeDir('gone')
@@ -710,12 +710,12 @@ describe('Workspace session ordering', () => {
     ])
     await rm(gone, { recursive: true })
     const workspace = await result.registry.create(dir)
-    await expect(workspace.attachSession(SessionId('mismatch'))).rejects.toThrow(/resolves to/)
-    await expect(workspace.attachSession(SessionId('no-cwd'))).rejects.toThrow(/no cwd/)
-    await expect(workspace.attachSession(SessionId('gone'))).rejects.toThrow(/does not resolve/)
-    await expect(workspace.attachSession(SessionId('file'))).rejects.toThrow(/not a directory/)
+    await expect(workspace.attachSession(SessionId('mismatch'))).resolves.toBeUndefined()
+    await expect(workspace.attachSession(SessionId('no-cwd'))).resolves.toBeUndefined()
+    await expect(workspace.attachSession(SessionId('gone'))).resolves.toBeUndefined()
+    await expect(workspace.attachSession(SessionId('file'))).resolves.toBeUndefined()
     await expect(workspace.attachSession(SessionId('unknown'))).rejects.toThrow(/no such session/)
-    expect(workspace.sessionIds).toEqual([])
+    expect(workspace.sessionIds).toEqual(['file', 'gone', 'no-cwd', 'mismatch'])
   })
 
   it('decides detach/attach membership at domain write-chain slots', async () => {
@@ -731,8 +731,8 @@ describe('Workspace session ordering', () => {
 
 })
 
-describe('header-validated membership projection', () => {
-  it('requires both candidate id and matching canonical cwd without re-reading on list()', async () => {
+describe('explicit membership projection', () => {
+  it('returns the explicit account without cwd filtering on list()', async () => {
     const owned = await makeDir('owned')
     const elsewhere = await makeDir('projection-elsewhere')
     const id = WorkspaceId('00000000-0000-4000-8000-000000000001')
@@ -749,13 +749,13 @@ describe('header-validated membership projection', () => {
       ],
     })
     const workspace = result.registry.list()[0]!
-    expect(workspace.sessionIds).toEqual(['good'])
-    expect(result.registry.list()[0]!.sessionIds).toEqual(['good'])
+    expect(workspace.sessionIds).toEqual(['good', 'mismatch', 'missing'])
+    expect(result.registry.list()[0]!.sessionIds).toEqual(['good', 'mismatch', 'missing'])
     expect(result.list).toHaveBeenCalledTimes(1)
     expect(storedRecord(pool, id).sessionIds).toEqual(['good', 'mismatch', 'missing'])
 
     await workspace.setTitle('pruned')
-    expect(storedRecord(pool, id).sessionIds).toEqual(['good'])
+    expect(storedRecord(pool, id).sessionIds).toEqual(['good', 'mismatch', 'missing'])
     expect(workspace.sessionIds).not.toContain('cwd-only')
   })
 

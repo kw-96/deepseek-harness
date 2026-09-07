@@ -25,7 +25,7 @@
     "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
     "@huiliyi37/dsh-office": "0.2.1",
     "@ruihuahe/dsh-plugin-marketplace": "file:__COMMUNITY_TARBALLS__/ruihuahe-dsh-plugin-marketplace-0.1.0.tgz",
-    "dsh-codex-shell": "file:__COMMUNITY_TARBALLS__/dsh-codex-shell-0.6.4.tgz",
+    "dsh-codex-shell": "file:__COMMUNITY_TARBALLS__/dsh-codex-shell-0.6.5.tgz",
     "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.2-rc.3.tgz",
     "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.2-rc.3.tgz",
     "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.1.tgz",

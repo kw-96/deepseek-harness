@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import-codex` imports threads from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each thread into a standard DSH event log, stores it durably, publishes it live, and creates or reuses the DSH Workspace matching the session header's `cwd`. The Web session list therefore places imported Codex conversations under their working directories. Automatic import is off by default; enabling the settings-card toggle runs one import and then uses the configured interval. The importer is not a live two-way sync with Codex.
+`dsh-session-import-codex` imports threads from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each thread into a standard DSH event log, stores it durably, publishes it live, and reconciles its Workspace membership against the thread's current working directory. The Web session list therefore places imported Codex conversations under their current working directories. Automatic import is off by default; enabling the settings-card toggle runs one reconciliation and then uses the configured interval. The importer reads Codex only and never writes back to it.
 
 ## Table of Contents
 
@@ -39,15 +39,15 @@ Mount this package with session persistence and `dsh-workspace` already composed
 | `cwd` | process cwd | Absolute working directory recorded on imported headers when a thread carries no command cwd |
 | `maxToolResultChars` | `20,000` | Maximum UTF-16 code units of imported tool-result text |
 | `maxTitleChars` | `300` | Maximum UTF-16 code units of an imported session title |
-| `syncIntervalMs` | `0` (off) | Periodic re-scan interval while the card's sync toggle is on |
+| `syncIntervalMs` | `60,000` | Periodic re-scan interval while the card's sync toggle is on; `0` disables it |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-import-codex) is the exhaustive source for every accepted field.
 
 ### How the import behaves
 
 - Automatic import is disabled by default. Enabling `autoSync` runs one sweep immediately and then repeats it at `syncIntervalMs`; **Import now** always runs one sweep.
-- Each imported session keeps a fixed id: `codex-` plus the Codex thread id. Re-runs never duplicate it, and attach an existing imported session to its matching Workspace when membership is absent.
-- The session title comes from Codex's `session_index.jsonl` when present, and the session `cwd` comes from the most common command cwd in the thread (the configured `cwd` otherwise).
+- Each imported session keeps a fixed id: `codex-` plus the Codex thread id. Re-runs compare its complete converted snapshot, replace changed imported logs, and reconcile exactly one matching Workspace membership. A session owned by a live Agent is deferred until a later sweep.
+- The session title comes from Codex's `session_index.jsonl` when present, otherwise from the first user message. The session `cwd` comes from the latest absolute command or MCP cwd in the thread (the configured `cwd` otherwise).
 - Imported sessions are stored durably and published live, then attached to a Workspace with the same canonical `cwd`, so they appear under the matching working directory in the Web session list and remain listed after restart.
 - A thread whose store or conversion fails is skipped with a warning; one broken thread never stops the sweep.
 - With no Codex thread store, the plugin logs that there is nothing to import and loads normally.
@@ -89,7 +89,7 @@ Completed Codex turns close as `completed`; every other turn closes as `aborted`
 
 ### Storage and publication
 
-The sweep in [`src/index.ts`](src/index.ts) writes each converted log through `ctx.sessionPersistence` (create, append, flush, close) before publishing the same events as a live session through `ctx.sessions.create`. Storage first means a failed live publication never loses data, and the stored log is the cold source of truth after restart.
+The sweep in [`src/index.ts`](src/index.ts) creates new logs through `ctx.sessionPersistence` and replaces changed imported snapshots through its guarded replacement method before publishing the same events through `ctx.sessions.replace`. The JSONL provider journals a cross-cwd replacement so startup can recover an interrupted move. Storage first means a failed live publication never loses data, and the stored log is the cold source of truth after restart.
 
 ### Failure containment
 
@@ -131,7 +131,7 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 ## Known Limitations and Deferred Work
 
 - **Current Codex store only** — the importer reads `thread_history_1.sqlite`; legacy rollouts under `archived_sessions/` (the older `*.jsonl` format) are not imported.
-- **One-time snapshot, not sync** — a thread already imported is skipped, so items Codex appends to an existing thread appear in DSH only after the stored DSH session is deleted.
+- **Active-session deferral** — an imported session currently owned by a live Agent is not replaced during a sweep; the settings card reports it as deferred and a later sweep reconciles it.
 - **Simplified fidelity** — Codex `reasoning`, `contextCompaction`, and raw file diffs are not transcribed; agent-message phase metadata is dropped, and each agent message becomes one DSH step rather than Codex's original grouping.
 - **Bounded tool results** — result text beyond `maxToolResultChars` is truncated to keep the durable log bounded.
 - **Continuation, not migration** — imported sessions resume with the deployment's default preset and model; the Codex model is recorded only as `codex` provenance on the assistant messages.
@@ -144,6 +144,6 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 
 This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
 
-The Known Limitations list above is the working queue: legacy rollout import, resync of already-imported threads, and deeper transcript fidelity. None has a design yet.
+The Known Limitations list above is the working queue: legacy rollout import and deeper transcript fidelity. [Codex import reconciliation](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.md) owns the current resync rules.
 
 </details>

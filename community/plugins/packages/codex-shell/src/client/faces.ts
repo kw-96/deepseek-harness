@@ -167,6 +167,7 @@ export interface WorkspacesFace {
   archiveSession(sessionId: SessionId): Promise<void>
   insertSessionBefore(workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>
   attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
+  moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
   detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
   create(input: { path: string }): Promise<WorkspaceViewLike>
 }

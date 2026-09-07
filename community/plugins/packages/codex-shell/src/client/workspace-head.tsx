@@ -2,8 +2,8 @@
  * 工作区（项目）标题行：折叠、重命名、悬停更多/重命名、信息侧弹窗。
  */
 
-import { Folder, FolderOpen, MoreHorizontal, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { Folder, FolderOpen, Info, MoreHorizontal, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { TFn } from './faces.js'
 import { ProjectInfoCard } from './sidebar/project-info.js'
 import css from './styles.module.css'
@@ -28,17 +28,43 @@ export interface WorkspaceHeadProps {
 /** 项目行头部。 */
 export function WorkspaceHead(props: WorkspaceHeadProps): React.ReactNode {
   const [info, setInfo] = useState(false)
+  const head = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!info) return
+    const closeOnOutside = (event: PointerEvent): void => {
+      if (head.current !== null && !head.current.contains(event.target as Node)) setInfo(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setInfo(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [info])
   const icon = props.collapsed
     ? <Folder size={13} className={css.workspaceIcon} />
     : <FolderOpen size={13} className={css.workspaceIcon} />
   return (
     <div
+      ref={head}
       className={css.workspaceHead}
       role="treeitem"
       aria-expanded={!props.collapsed}
-      onClick={props.onToggle}
-      onMouseEnter={() => { setInfo(true) }}
-      onMouseLeave={() => { setInfo(false) }}
+      onClick={() => {
+        setInfo(false)
+        props.onToggle()
+      }}
+      tabIndex={0}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          props.onToggle()
+        }
+      }}
     >
       {icon}
       {props.renaming
@@ -54,6 +80,19 @@ export function WorkspaceHead(props: WorkspaceHeadProps): React.ReactNode {
         : <span className={css.workspaceLabel}>{props.label}</span>}
       {!props.renaming && (
         <span className={css.workspaceActions}>
+          <button
+            type="button"
+            className={css.iconButton}
+            title={props.t('projectInfo')}
+            aria-label={props.t('projectInfo')}
+            aria-expanded={info}
+            onClick={event => {
+              event.stopPropagation()
+              setInfo(value => !value)
+            }}
+          >
+            <Info size={12} />
+          </button>
           <button
             type="button"
             className={css.iconButton}

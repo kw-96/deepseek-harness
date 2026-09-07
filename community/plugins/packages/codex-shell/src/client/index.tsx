@@ -186,6 +186,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     attachSession: async (workspaceId, sessionId) => {
       await workspaces.attachSession(workspaceId, sessionId)
     },
+    moveSession: async (workspaceId, sessionId) => {
+      await workspaces.moveSession(workspaceId, sessionId)
+    },
     detachSession: async (workspaceId, sessionId) => {
       await workspaces.detachSession(workspaceId, sessionId)
     },

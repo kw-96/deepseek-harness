@@ -8,6 +8,7 @@ import { loadCodexThreads } from '../src/sqlite.ts'
 import {
   DEFAULT_MAX_TITLE_CHARS,
   DEFAULT_MAX_TOOL_RESULT_CHARS,
+  DEFAULT_SYNC_INTERVAL_MS,
   apply,
   resolveConfig,
   runImportSweep,
@@ -92,6 +93,7 @@ describe('resolveConfig', () => {
       maxToolResultChars: DEFAULT_MAX_TOOL_RESULT_CHARS,
       maxTitleChars: DEFAULT_MAX_TITLE_CHARS,
     })
+    expect(resolved.syncIntervalMs).toBe(DEFAULT_SYNC_INTERVAL_MS)
   })
 
   it('keeps an explicit cwd and caps, and rejects a relative cwd', () => {
@@ -113,7 +115,7 @@ describe('apply', () => {
     settings.setAutoSync(true)
     await vi.waitFor(() => {
       expect(info).toHaveBeenCalledWith(
-        expect.stringContaining('sweep finished (imported 0, skipped 0 existing, skipped 0 empty)'),
+        expect.stringContaining('sweep finished (imported 0, updated 0, unchanged 0, deferred-active 0, skipped 0 empty)'),
       )
     })
     await ctx.fiber.dispose()
@@ -130,7 +132,7 @@ describe('apply', () => {
       resolveConfig({ codexHome: 'C:\\boom' }, {}),
       new AbortController().signal,
     )
-    expect(result.summary).toEqual({ imported: 0, skippedExisting: 0, skippedEmpty: 0 })
+    expect(result.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
     expect(result.sessions).toEqual([])
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not read the Codex thread store'))
   })
@@ -148,7 +150,7 @@ describe('apply', () => {
       { threadId: 't1', items: [], turns: [] },
     ])
     const result = await runImportSweep(ctx, config, AbortSignal.abort())
-    expect(result.summary).toEqual({ imported: 0, skippedExisting: 0, skippedEmpty: 0 })
+    expect(result.summary).toEqual({ imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
     expect(result.sessions).toEqual([])
   })
 
@@ -186,6 +188,25 @@ describe('apply', () => {
 
       await ctx.fiber.dispose()
       contexts.splice(contexts.indexOf(ctx), 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('repeats at the default interval after automatic sync is enabled', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = testContext()
+      contexts.push(ctx)
+      const settings = makeFakeSettings()
+      ctx.provide('settings', settings.service)
+      mockedLoad.mockResolvedValue(undefined)
+      apply(ctx, { codexHome: 'C:\\anywhere' })
+      settings.setAutoSync(true)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockedLoad).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(DEFAULT_SYNC_INTERVAL_MS)
+      expect(mockedLoad).toHaveBeenCalledTimes(2)
     } finally {
       vi.useRealTimers()
     }

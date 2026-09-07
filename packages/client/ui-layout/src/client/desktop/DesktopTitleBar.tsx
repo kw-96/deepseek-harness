@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelIcon } from './icons.tsx'
-import { buildMenus, tryRunMenuShortcut, type DesktopTitleBarT, type MenuId } from './menus.ts'
+import { buildMenus, navigateDropdownKey, tryRunMenuShortcut, type DesktopTitleBarT, type MenuId } from './menus.ts'
 import {
   canGoBack, canGoForward, createSessionHistory, goBack, goForward, pushSessionVisit,
 } from './session-history.ts'
@@ -91,6 +91,14 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
   const menusRef = useRef(menus)
   menusRef.current = menus
 
+  const focusMenuItem = (id: MenuId, edge: 'first' | 'last'): void => {
+    window.requestAnimationFrame(() => {
+      const items = rootRef.current?.querySelectorAll<HTMLButtonElement>(`[data-desktop-menu="${id}"] button:not(:disabled)`)
+      if (items === undefined || items.length === 0) return
+      items[edge === 'first' ? 0 : items.length - 1]?.focus()
+    })
+  }
+
   // Bind menu shortcuts globally; labels alone do not register key handlers.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -115,18 +123,36 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
           <ChevronRight />
         </button>
         {menus.map(entry => (
-          <div key={entry.id} className={css.menuWrap}>
+          <div
+            key={entry.id}
+            className={css.menuWrap}
+            onMouseEnter={() => { if (menu !== null) setMenu(entry.id) }}
+          >
             <button
               type="button"
               className={menu === entry.id ? `${css.menuBtn} ${css.menuBtnActive}` : css.menuBtn}
               aria-expanded={menu === entry.id}
               aria-haspopup="menu"
+              aria-controls={`desktop-menu-${entry.id}`}
               onClick={() => { setMenu(cur => cur === entry.id ? null : entry.id) }}
+              onKeyDown={event => {
+                if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                event.preventDefault()
+                setMenu(entry.id)
+                focusMenuItem(entry.id, event.key === 'ArrowDown' ? 'first' : 'last')
+              }}
             >
               {entry.label}
             </button>
             {menu === entry.id && (
-              <div className={css.dropdown} role="menu">
+              <div
+                id={`desktop-menu-${entry.id}`}
+                data-desktop-menu={entry.id}
+                className={css.dropdown}
+                role="menu"
+                aria-label={entry.label}
+                onKeyDown={event => { navigateDropdownKey(event, () => { setMenu(null) }) }}
+              >
                 {entry.items.map((item, index) => item.kind === 'sep'
                   ? <div key={`sep-${index}`} className={css.sep} role="separator" />
                   : (
@@ -147,7 +173,13 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
           </div>
         ))}
       </div>
-      <div className={css.drag} data-tauri-drag-region />
+      <div
+        className={css.drag}
+        onMouseDown={event => {
+          if (event.button === 0) void win?.startDragging()
+        }}
+        onDoubleClick={() => { void win?.toggleMaximize() }}
+      />
       <div className={css.controls}>
         <button type="button" className={css.winBtn} aria-label={t('desktop.window.minimize')} onClick={() => { void win?.minimize() }}>
           <MinIcon />

@@ -18,8 +18,10 @@ export const codexImportSessionSchema = z.object({
 export const codexImportRunSchema = z.object({
   at: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   imported: z.number().int().nonnegative(),
+  updated: z.number().int().nonnegative().default(0),
   skippedExisting: z.number().int().nonnegative(),
   skippedEmpty: z.number().int().nonnegative(),
+  deferredActive: z.number().int().nonnegative().default(0),
   sessions: z.array(codexImportSessionSchema),
 }) satisfies z.ZodType<CodexImportRun>
 

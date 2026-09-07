@@ -1,4 +1,5 @@
 /** Menu model builders for the desktop title bar. */
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { dispatchDesktopCommand } from './commands.ts'
 import type { DesktopAppWindow } from './window.ts'
 
@@ -37,9 +38,6 @@ export function setZoom(factor: number): void {
 export function editCommand(command: string): void {
   try { document.execCommand(command) } catch { /* unsupported command */ }
 }
-
-/** Edit-menu ids that must defer to the focused field's native key handling. */
-const NATIVE_EDIT_IDS = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'delete', 'selectAll'])
 
 /** True when the event target is a text field that owns clipboard / undo keys. */
 export function isEditableTarget(target: EventTarget | null): boolean {
@@ -85,17 +83,38 @@ export function tryRunMenuShortcut(
   event: KeyboardEvent,
   menus: readonly { items: readonly MenuItem[] }[],
 ): boolean {
-  const editable = isEditableTarget(event.target)
+  if (event.defaultPrevented || event.isComposing || isEditableTarget(event.target)) return false
   for (const group of menus) {
     for (const item of group.items) {
       if (item.kind !== 'item' || item.shortcut === undefined || item.disabled === true) continue
-      if (editable && NATIVE_EDIT_IDS.has(item.id)) continue
       if (!eventMatchesShortcut(event, item.shortcut)) continue
       item.run()
       return true
     }
   }
   return false
+}
+
+/**
+ * 在下拉菜单内处理方向键、Home、End 与 Escape。
+ * @param event 菜单中的键盘事件。
+ * @param close 关闭菜单并将焦点交回菜单按钮。
+ */
+export function navigateDropdownKey(event: ReactKeyboardEvent<HTMLElement>, close: () => void): void {
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+  const index = items.indexOf(event.target as HTMLButtonElement)
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    close()
+    ;(event.currentTarget.previousElementSibling as HTMLButtonElement | null)?.focus()
+    return
+  }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return
+  event.preventDefault()
+  const next = event.key === 'Home' ? 0
+    : event.key === 'End' ? items.length - 1
+      : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+  items[next]?.focus()
 }
 
 /** Inputs required to assemble the three menus. */

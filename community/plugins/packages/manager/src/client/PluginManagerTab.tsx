@@ -1,6 +1,7 @@
 import { ChevronDown, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ManagedPluginEntry, MutationReceipt, PluginManagerSnapshot, PluginCategory, PluginPhase } from '../types.js'
+import { packageDescriptionZh } from './descriptions/index.js'
 import { GROUP_LABELS, type LocaleKey } from './locales.js'
 import css from './PluginManagerTab.module.css'
 
@@ -44,6 +45,13 @@ function groupLabel(group: string, locale: string): string {
   return locale === 'zh-CN' ? labels.zh : labels.en
 }
 
+/** 取条目在当前语言下的说明：zh-CN 优先中文映射，缺失时回退英文原文。 */
+function describeEntry(entry: ManagedPluginEntry, locale: string): string | null {
+  if (entry.description === null) return null
+  if (locale === 'zh-CN') return packageDescriptionZh(entry.packageName) ?? entry.description
+  return entry.description
+}
+
 function orderGroups(groups: readonly string[]): readonly string[] {
   return [...groups].sort((left, right) => {
     const leftIndex = preferredGroupOrder.indexOf(left)
@@ -77,7 +85,7 @@ export function PluginManagerTab({ list, setEnabled, setCategoryEnabled, t, loca
     const normalized = query.trim().toLocaleLowerCase()
     const byCategory = new Map<PluginCategory, ManagedPluginEntry[]>(state.snapshot.categories.map(category => [category, []]))
     for (const entry of state.snapshot.entries) {
-      if (normalized && !matchesQuery(entry, normalized)) continue
+      if (normalized && !matchesQuery(entry, normalized, locale)) continue
       const entries = byCategory.get(entry.category) ?? []
       entries.push(entry)
       byCategory.set(entry.category, entries)
@@ -164,7 +172,7 @@ export function PluginManagerTab({ list, setEnabled, setCategoryEnabled, t, loca
             return <li key={entry.entryId}>
               <div className={css.entryBody}>
                 <div className={css.entryText} title={entry.protectionReason ?? undefined}><strong>{entry.configId}</strong><span data-phase={entry.phase ?? 'stopped'}>{phaseLabel(entry, t)}</span></div>
-                {entry.description !== null ? <p className={css.entryDescription} title={entry.description}>{entry.description}</p> : null}
+                {describeEntry(entry, locale) !== null ? <p className={css.entryDescription} title={describeEntry(entry, locale) ?? undefined}>{describeEntry(entry, locale)}</p> : null}
               </div>
               <Toggle checked={entry.enabled} disabled={entry.protected || busy.has(entryKey)} label={`${entry.configId}: ${entry.enabled ? t('disableEntry') : t('enableEntry')}`} onChange={() => { void run(entryKey, () => setEnabled(entry.entryId, !entry.enabled)) }} />
               {feedback.has(entryKey) ? <FeedbackView feedback={feedback.get(entryKey)!} /> : null}
@@ -176,10 +184,10 @@ export function PluginManagerTab({ list, setEnabled, setCategoryEnabled, t, loca
   </section>
 }
 
-function matchesQuery(entry: ManagedPluginEntry, normalized: string): boolean {
+function matchesQuery(entry: ManagedPluginEntry, normalized: string, locale: string): boolean {
   return entry.configId.toLocaleLowerCase().includes(normalized)
     || entry.packageName.toLocaleLowerCase().includes(normalized)
-    || (entry.description !== null && entry.description.toLocaleLowerCase().includes(normalized))
+    || (describeEntry(entry, locale) !== null && describeEntry(entry, locale)!.toLocaleLowerCase().includes(normalized))
 }
 
 function FeedbackView({ feedback }: { feedback: Feedback }): ReactNode {

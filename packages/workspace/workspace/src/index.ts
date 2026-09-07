@@ -103,12 +103,7 @@ export class WorkspaceRegistry extends Service {
 
   private readonly host: WorkspaceEntityHost = {
     table: () => this.requireTable(),
-    sessionPath: id => this.sessionPaths.get(id),
     readSessionHeader: id => this.readSessionHeader(id),
-    rememberSessionPath: (id, path) => {
-      this.sessionPaths.set(id, path)
-      this.invalidSessionPaths.delete(id)
-    },
   }
 
   constructor(ctx: Context) {
@@ -136,7 +131,6 @@ export class WorkspaceRegistry extends Service {
     await this.indexLiveSessions()
     this.validateStoredState(this.requireState())
     this.rebuildEntities()
-    this.reportFilteredCandidates()
   }
 
   /**
@@ -599,23 +593,6 @@ export class WorkspaceRegistry extends Service {
     const sessions = this.ctx.get('sessions')
     if (sessions === undefined) return
     await this.indexHeaders(sessions.list().map(session => session.header))
-  }
-
-  private reportFilteredCandidates(): void {
-    for (const entity of this.entities.values()) {
-      const record = this.requireTable().get(entity.id) as WorkspaceRecord
-      for (const sessionId of record.sessionIds) {
-        const path = this.sessionPaths.get(sessionId)
-        if (path === record.path) continue
-        const reason = this.invalidSessionPaths.get(sessionId)
-          ?? (this.headers.has(sessionId)
-            ? `canonical cwd '${path}' differs from workspace path '${record.path}'`
-            : 'session header is missing')
-        this.ctx.logger.warn(
-          `workspace '${entity.id}' filtered session '${sessionId}' from membership: ${reason}`,
-        )
-      }
-    }
   }
 
   private async readSessionHeader(id: SessionId): Promise<SessionHeader> {

@@ -104,7 +104,7 @@ export interface WorkspaceInsertSessionBeforeRequest {
   readonly beforeSessionId?: SessionId
 }
 
-/** Attach one Session whose stored cwd matches the Workspace path. */
+/** Attach one known Session to a Workspace account. */
 export interface WorkspaceAttachSessionRequest {
   readonly workspaceId: WorkspaceId
   readonly sessionId: SessionId

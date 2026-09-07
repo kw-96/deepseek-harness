@@ -15,6 +15,8 @@ function renderCard(state: CodexImportCardState) {
   const props = {
     t: ((key: string, params?: { count?: number }) => {
       if (key === 'importedCount') return `Imported ${params?.count ?? 0}`
+      if (key === 'updatedCount') return `Updated ${params?.count ?? 0}`
+      if (key === 'deferredActiveCount') return `Deferred ${params?.count ?? 0}`
       if (key === 'title') return 'Codex import'
       if (key === 'run') return 'Import now'
       if (key === 'open') return 'Open'
@@ -56,7 +58,7 @@ describe('CodexImportCard', () => {
     const { openSession } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [{ id: sessionId, title: '整理校验表' }] }],
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: sessionId, title: '整理校验表' }] }],
     })
     expect(screen.getByText('Imported 1')).toBeDefined()
     expect(screen.getByText('整理校验表')).toBeDefined()
@@ -68,13 +70,23 @@ describe('CodexImportCard', () => {
     renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 1, skippedExisting: 0, skippedEmpty: 0, sessions: [{ id: SessionId('codex-t2'), title: '' }] }],
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-t2'), title: '' }] }],
     })
     expect(screen.getByText('codex-t2')).toBeDefined()
   })
 
+  it('shows updated and active-deferred counts separately from new imports', () => {
+    renderCard({
+      autoSync: true,
+      running: false,
+      runs: [{ at: 100, imported: 0, updated: 2, skippedExisting: 0, skippedEmpty: 0, deferredActive: 1, sessions: [] }],
+    })
+    expect(screen.getByText('Updated 2')).toBeDefined()
+    expect(screen.getByText('Deferred 1')).toBeDefined()
+  })
+
   it('shows the no-sessions hint for a run that imported nothing', () => {
-    renderCard({ autoSync: true, running: false, runs: [{ at: 100, imported: 0, skippedExisting: 2, skippedEmpty: 0, sessions: [] }] })
+    renderCard({ autoSync: true, running: false, runs: [{ at: 100, imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 0, deferredActive: 0, sessions: [] }] })
     expect(screen.getByText('noSessions')).toBeDefined()
   })
 })

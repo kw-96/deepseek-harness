@@ -906,6 +906,26 @@ export class SessionStore extends Service {
   }
 
   /**
+   * Replace one non-appending live session with a new seeded snapshot under
+   * the same id. External importers call this only after their durable source
+   * replacement succeeds and after excluding Agent-owned sessions.
+   * @param id - existing or new session id.
+   * @param options - replacement seed and immutable header metadata.
+   * @returns the newly announced live session.
+   * @throws when the existing session is publishing an event.
+   */
+  replace(id: SessionId, options: CreateSessionOptions): Session {
+    const entry = this.store.get(id)
+    if (entry !== undefined) {
+      if (entry.announcing || entry.appending) {
+        throw new Error(`session "${id}" cannot be replaced while it is publishing`)
+      }
+      entry.detach()
+    }
+    return this.create(id, options)
+  }
+
+  /**
    * Build a session WITHOUT entering it into the store — validate the id/cwd and
    * construct the {@link Session} (with its immutable {@link SessionHeader}).
    * Pairs with {@link enter} + {@link announce}: a caller that owns a composite

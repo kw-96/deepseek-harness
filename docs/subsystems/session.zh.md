@@ -865,6 +865,17 @@ Persistence is intentionally not implemented here — the agent lifecycle attach
 create(id?: SessionId, options?: CreateSessionOptions): Session
 
 /**
+ * Replace one non-appending live session with a new seeded snapshot under
+ * the same id. External importers call this only after their durable source
+ * replacement succeeds and after excluding Agent-owned sessions.
+ * @param id - existing or new session id.
+ * @param options - replacement seed and immutable header metadata.
+ * @returns the newly announced live session.
+ * @throws when the existing session is publishing an event.
+ */
+replace(id: SessionId, options: CreateSessionOptions): Session
+
+/**
  * Build a session WITHOUT entering it into the store — validate the id/cwd and
  * construct the {@link Session} (with its immutable {@link SessionHeader}).
  * Pairs with {@link enter} + {@link announce}: a caller that owns a composite

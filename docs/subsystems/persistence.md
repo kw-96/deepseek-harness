@@ -4,11 +4,11 @@ English | [中文](persistence.zh.md)
 
 The **durability seam** for the event log. [session.md](session.md) describes the in-memory `Session` — the append-only `SessionEvent` log that is the source of truth. This page describes how that log is made durable: the abstract `SessionPersistence` service, its provider model and shipped JSONL backend, the flush checkpoint, crash recovery, and the metadata header that travels alongside the log. The event vocabulary the log carries is enumerated, member by member, in the generated [persistence log event catalog](../persistence-catalog.md).
 
-The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) exposing `create`/`open`/`stat`/`list` over the existing `SessionEvent` — **no parallel persisted event type** — where `create` and `open` return a per-session `SessionHandle` (`read`/`append`/`flush`/`close`) that carries all log access and single-writer ownership. The repository ships [dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl) as its provider; out-of-tree providers may implement the same service contract. See the [handle-based persistence Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md) and the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
+The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) exposing `create`/`open`/`replace`/`stat`/`list` over the existing `SessionEvent` — **no parallel persisted event type** — where `create` and `open` return a per-session `SessionHandle` (`read`/`append`/`flush`/`close`) that carries ordinary log access and single-writer ownership. `replace` is the explicit narrow path for an externally-authoritative complete snapshot; providers that do not implement it refuse loudly. The repository ships [dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl) as its provider; out-of-tree providers may implement the same service contract. See the [handle-based persistence Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md) and the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
 
 ## `SessionHandle` — one open channel onto a stored session
 
-Every log read and write flows through a handle, never through id-addressed service methods: the handle is the single door a future cross-process write lease will guard. One handle type serves both accesses — a mutation on a `read` handle is a runtime `SessionReadOnlyError` rather than a typed split — and in-process single-writer ownership makes a second `open(id, 'write')` reject with `SessionAlreadyOwnedError` while an owner is active.
+Ordinary log reads and appends flow through a handle, never through id-addressed service methods: the handle is the single door a future cross-process write lease will guard. `replace` is the externally-authoritative snapshot exception and requires a provider that supports it. One handle type serves both accesses — a mutation on a `read` handle is a runtime `SessionReadOnlyError` rather than a typed split — and in-process single-writer ownership makes a second `open(id, 'write')` reject with `SessionAlreadyOwnedError` while an owner is active.
 
 ```ts type-equiv
 /**
@@ -338,6 +338,17 @@ Freshness: once an `append` or `flush` resolves, reads started afterwards on thi
 abstract create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandle>
 
 /**
+ * Replace one complete stored session snapshot while preserving its id.
+ * Backends that do not implement replacement reject loudly; importers use it
+ * only for externally-owned snapshots whose source remains authoritative.
+ * @param header - replacement header with the existing stored id.
+ * @param events - complete contiguous replacement event log.
+ * @param options - optional cancellation.
+ * @returns resolution after the replacement is durable.
+ */
+async replace( header: SessionHeader, events: readonly SessionEvent[], options?: SessionPersistenceReplaceOptions, ): Promise<void>
+
+/**
  * Open an existing stored session.
  *
  * `read` never takes ownership and works while another handle (or process)
@@ -389,7 +400,7 @@ abstract stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<S
 abstract list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>
 ```
 
-Types: [SessionId](core.md)
+Types: [SessionEvent](session.md) · [SessionId](core.md)
 
 Source: [`packages/session/session-persistence/src/index.ts`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

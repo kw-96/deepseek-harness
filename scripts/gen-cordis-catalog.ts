@@ -418,6 +418,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   SessionHandle: 'persistence.md',
   SessionPersistenceCreateOptions: 'persistence.md',
   SessionPersistenceOpenOptions: 'persistence.md',
+  SessionPersistenceReplaceOptions: 'persistence.md',
   SessionPersistenceStatOptions: 'persistence.md',
   SessionPersistenceListOptions: 'persistence.md',
   SessionPersistenceSnapshot: 'persistence.md',

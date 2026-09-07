@@ -34,6 +34,7 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
+  user-select: none;
   color: var(--cx-text-hi);
   font-family: var(--dsw-font-family, -apple-system, 'Segoe UI', system-ui, sans-serif);
   font-size: 13px;
@@ -53,6 +54,11 @@
 .modal input,
 .modal textarea {
   caret-color: var(--cx-accent-strong);
+  user-select: text;
+}
+
+.code {
+  user-select: text;
 }
 
 .scroll,
@@ -267,13 +273,18 @@
 .workspaceHead {
   position: relative;
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 6px;
   height: 26px;
+  border: 0;
   border-radius: 6px;
   padding: 0 8px;
+  background: transparent;
   color: var(--cx-text-low);
   cursor: pointer;
+  font: inherit;
+  text-align: left;
   user-select: none;
 }
 
@@ -379,18 +390,21 @@
 }
 
 .rowTime {
-  display: none;
+  display: block;
+  width: 42px;
   flex: none;
   color: var(--cx-text-low);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 16px;
+  text-align: right;
+  visibility: hidden;
 }
 
 .row:hover .rowTime,
 .row:focus-within .rowTime,
 .rowCurrent .rowTime {
-  display: block;
+  visibility: visible;
 }
 
 .reveal {
@@ -482,11 +496,16 @@
 /* 搜索结果：标题 + 摘要两行，独立于普通行。 */
 .searchResult {
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: 1px;
   min-height: 44px;
+  border: 0;
   border-radius: 8px;
   padding: 5px 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
@@ -852,6 +871,7 @@
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+  user-select: none;
   background: var(--cx-bg-surface);
   color: var(--cx-text-hi);
 }
@@ -1831,6 +1851,7 @@
 .primaryButton:focus-visible,
 .menuItem:focus-visible,
 .crumb:focus-visible,
+.workspaceHead:focus-visible,
 .row:focus-visible,
 .fileRow:focus-visible,
 .tab:focus-visible,

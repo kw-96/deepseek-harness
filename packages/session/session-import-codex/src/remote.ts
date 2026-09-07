@@ -78,8 +78,10 @@ export class CodexImportController extends TypertRemoteService {
     return {
       at,
       imported: result.summary.imported,
+      updated: result.summary.updated,
       skippedExisting: result.summary.skippedExisting,
       skippedEmpty: result.summary.skippedEmpty,
+      deferredActive: result.summary.deferredActive,
       sessions: result.sessions.map(session => ({ id: session.id, title: session.title })),
     }
   }

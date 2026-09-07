@@ -117,6 +117,33 @@ describe('convertCodexThread', () => {
     expect(cwd).toBe('C:\\fallback')
   })
 
+  it('derives a missing Codex index title from the first user message', () => {
+    const { events } = convertCodexThread({
+      threadId: 'thread-fallback-title',
+      items: [{
+        turnId: 'turn-a', itemId: 'u1', itemType: 'userMessage', createdAtMs: 1,
+        json: { content: [{ type: 'text', text: '  根据最新项目更新会话归属  ' }] },
+      }],
+      turns: [{ turnId: 'turn-a', status: 'completed' }],
+    }, 'C:\\fallback', BOUNDS)
+    const title = events.find(event => event.type === 'session/title')
+    expect(title).toMatchObject({ data: { title: '根据最新项目更新会话归属' } })
+  })
+
+  it('uses the most recent absolute command cwd instead of the most frequent cwd', () => {
+    const { cwd } = convertCodexThread({
+      threadId: 'thread-latest-cwd',
+      items: [
+        { turnId: 'turn-a', itemId: 'u1', itemType: 'userMessage', createdAtMs: 1, json: { content: [{ type: 'text', text: 'one' }] } },
+        { turnId: 'turn-a', itemId: 'c1', itemType: 'commandExecution', createdAtMs: 2, json: { cwd: 'C:\\old', command: 'a', status: 'completed' } },
+        { turnId: 'turn-a', itemId: 'c2', itemType: 'commandExecution', createdAtMs: 3, json: { cwd: 'C:\\old', command: 'b', status: 'completed' } },
+        { turnId: 'turn-b', itemId: 'c3', itemType: 'commandExecution', createdAtMs: 4, json: { cwd: 'C:\\new', command: 'c', status: 'completed' } },
+      ],
+      turns: [{ turnId: 'turn-a', status: 'completed' }, { turnId: 'turn-b', status: 'completed' }],
+    }, 'C:\\fallback', BOUNDS)
+    expect(cwd).toBe('C:\\new')
+  })
+
   it('returns no events for a thread with only non-transcript items', () => {
     const { events } = convertCodexThread({
       threadId: 'thread-3',
@@ -151,11 +178,11 @@ describe('convertCodexThread', () => {
       ],
       turns: [{ turnId: 'turn-a', status: 'completed', completedAtMs: 6 }],
     }, 'C:\\fallback', BOUNDS)
-    expect(typesOf(events)).toEqual(['turn/start', 'assistant/message', 'user/message', 'user/message', 'turn/end', 'session/end-seed'])
+    expect(typesOf(events)).toEqual(['turn/start', 'assistant/message', 'user/message', 'session/title', 'user/message', 'turn/end', 'session/end-seed'])
     if (events[2] === undefined || events[2].type !== 'user/message') throw new Error('missing joined user message')
     expect(events[2].data.content[0]).toEqual({ type: 'text', text: 'one\ntwo' })
-    // No title: the thread carries none.
-    expect(events.find(event => event.type === 'session/title')).toBeUndefined()
+    const title = events.find(event => event.type === 'session/title')
+    expect(title).toMatchObject({ data: { title: 'one two' } })
   })
 
   it('handles sparse tool items without crashing', () => {

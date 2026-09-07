@@ -10,22 +10,6 @@ import type { TFn, WorkspaceViewLike } from '../faces.js'
 import { MenuItem, MenuSep, Submenu } from './menu-flyout.js'
 import css from '../styles.module.css'
 
-/** 规范化路径：统一分隔符、去尾斜杠、Windows 盘符小写。 */
-export function normalizePath(path: string): string {
-  const trimmed = path.trim().replace(/\\/g, '/')
-  if (trimmed === '') return ''
-  const noTrail = trimmed.length > 1 && trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
-  return /^[A-Za-z]:/.test(noTrail) ? `${noTrail[0]!.toLowerCase()}${noTrail.slice(1)}` : noTrail
-}
-
-/** 两路径在规范化后是否指向同一目录。 */
-export function sameDirectory(left: string | undefined, right: string | undefined): boolean {
-  if (left === undefined || right === undefined) return false
-  const a = normalizePath(left)
-  const b = normalizePath(right)
-  return a !== '' && a === b
-}
-
 /** 会话菜单可执行动作（由浏览器闭包提供）。 */
 export interface SessionMenuActions {
   rename(): void
@@ -58,14 +42,9 @@ export interface SessionMenuProps {
 /** 渲染会话嵌套菜单内容（不含定位外壳）。 */
 export function SessionMenuBody(props: SessionMenuProps): React.ReactNode {
   const { actions, workspaces, currentWorkspaceId, t } = props
-  // 仅 cwd 与工作区 path 一致、且尚未归属该工作区时可 attach。
-  const movable = workspaces.filter(ws =>
-    ws.workspaceId !== currentWorkspaceId && sameDirectory(actions.cwd, ws.path),
-  )
-  const blocked = workspaces.filter(ws =>
-    ws.workspaceId !== currentWorkspaceId && !sameDirectory(actions.cwd, ws.path),
-  )
-  const empty = movable.length === 0 && blocked.length === 0 && !actions.canMoveToUngrouped
+  // 所有其他项目都可作为迁移目标；项目归属不再受会话 cwd 约束。
+  const targets = workspaces.filter(ws => ws.workspaceId !== currentWorkspaceId)
+  const empty = targets.length === 0 && !actions.canMoveToUngrouped
 
   return (
     <>
@@ -88,19 +67,11 @@ export function SessionMenuBody(props: SessionMenuProps): React.ReactNode {
         {actions.canMoveToUngrouped && (
           <MenuItem label={t('menuMoveToUngrouped')} onClick={actions.moveToUngrouped} />
         )}
-        {movable.map(ws => (
+        {targets.map(ws => (
           <MenuItem
             key={ws.workspaceId}
             label={ws.title}
             onClick={() => { actions.moveToWorkspace(ws.workspaceId) }}
-          />
-        ))}
-        {blocked.map(ws => (
-          <MenuItem
-            key={ws.workspaceId}
-            label={ws.title}
-            disabled
-            disabledReason={t('menuMovePathMismatch')}
           />
         ))}
       </Submenu>

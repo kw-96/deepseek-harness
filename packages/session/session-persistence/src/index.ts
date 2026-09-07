@@ -105,6 +105,12 @@ export interface SessionPersistenceListOptions {
   readonly signal?: AbortSignal
 }
 
+/** Options for {@link SessionPersistence.replace}. */
+export interface SessionPersistenceReplaceOptions {
+  /** Optional cancellation observed before replacement starts. */
+  readonly signal?: AbortSignal
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     sessionPersistence: SessionPersistence
@@ -144,6 +150,26 @@ export abstract class SessionPersistence extends Service {
    * @throws {SessionAlreadyExistsError} when the id already exists.
    */
   abstract create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandle>
+
+  /**
+   * Replace one complete stored session snapshot while preserving its id.
+   * Backends that do not implement replacement reject loudly; importers use it
+   * only for externally-owned snapshots whose source remains authoritative.
+   * @param header - replacement header with the existing stored id.
+   * @param events - complete contiguous replacement event log.
+   * @param options - optional cancellation.
+   * @returns resolution after the replacement is durable.
+   */
+  async replace(
+    header: SessionHeader,
+    events: readonly SessionEvent[],
+    options?: SessionPersistenceReplaceOptions,
+  ): Promise<void> {
+    options?.signal?.throwIfAborted()
+    void header
+    void events
+    throw new Error(`${this.name}: complete session replacement is unsupported`)
+  }
 
   /**
    * Open an existing stored session.

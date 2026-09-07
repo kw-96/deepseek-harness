@@ -224,7 +224,7 @@ describe('WorkspaceController commands', () => {
     await expect(controller.attachSession({
       workspaceId: second.workspace.workspaceId,
       sessionId: ungrouped.id,
-    })).rejects.toMatchObject({ code: 'workspace/attach-invalid' })
+    })).resolves.toMatchObject({ workspace: { sessionIds: [ungrouped.id] } })
     await expect(controller.detachSession({
       workspaceId: first.workspace.workspaceId,
       sessionId: ungrouped.id,

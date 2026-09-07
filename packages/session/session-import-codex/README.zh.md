@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的 Codex 线程导入为 DeepSeek Harness 会话。它把每个线程转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按会话头的 `cwd` 创建或复用对应的 DSH 工作区。Web 会话列表因此会把导入的 Codex 对话归入其工作目录。自动导入默认关闭；开启设置卡片的开关后会先导入一次，再按配置间隔执行。它不是与 Codex 的双向实时同步。
+`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的 Codex 线程导入为 DeepSeek Harness 会话。它把每个线程转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按线程当前工作目录对账 DSH 工作区归属。Web 会话列表因此会把导入的 Codex 对话归入其当前工作目录。自动导入默认关闭；开启设置卡片的开关后会先执行一轮对账，再按配置间隔执行。导入器只读取 Codex，不会向 Codex 回写。
 
 ## 目录
 
@@ -39,15 +39,15 @@ kind: "package-reference"
 | `cwd` | 进程 cwd | 线程没有命令 cwd 时,写入导入会话头的绝对工作目录 |
 | `maxToolResultChars` | `20,000` | 导入工具结果文本的最大 UTF-16 码元数 |
 | `maxTitleChars` | `300` | 导入会话标题的最大 UTF-16 码元数 |
-| `syncIntervalMs` | `0`（关闭） | 设置卡片同步开关开启时的定时重扫间隔 |
+| `syncIntervalMs` | `60,000` | 设置卡片同步开关开启时的定时重扫间隔；`0` 关闭定时扫描 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-session-import-codex)是每个可接受字段的权威来源。
 
 ### 导入如何运行
 
 - 自动导入默认关闭。开启 `autoSync` 后会立即执行一轮扫描，再按 `syncIntervalMs` 重复；“立即导入”始终执行一轮扫描。
-- 每个导入会话使用固定 id：`codex-` 加 Codex 线程 id。重复扫描不会产生副本，并会在成员关系缺失时将已有导入会话挂入匹配的工作区。
-- 会话标题来自 Codex 的 `session_index.jsonl`(存在时);会话 `cwd` 取线程内出现最多的命令 cwd,否则用配置的 `cwd`。
+- 每个导入会话使用固定 id：`codex-` 加 Codex 线程 id。重复扫描会比较完整转换快照，替换已经变化的导入日志，并对账唯一匹配的工作区成员关系。会话被 live Agent 持有时会延后到下一轮扫描。
+- 会话标题优先来自 Codex 的 `session_index.jsonl`，缺失时回退到第一条用户消息；会话 `cwd` 取线程内最新的绝对 command 或 MCP cwd,否则用配置的 `cwd`。
 - 导入会话同时落盘并发布为活跃会话，随后挂入具有相同规范化 `cwd` 的工作区：它会出现在 Web 会话列表的对应工作目录下，并在重启后保留。
 - 单个线程读取或转换失败只记录警告并跳过,不会中断整轮扫描。
 - 没有 Codex thread store 时,插件记录"无可导入"并正常加载。
@@ -89,7 +89,7 @@ kind: "package-reference"
 
 ### 存储与发布
 
-[`src/index.ts`](src/index.ts) 的扫描先通过 `ctx.sessionPersistence`(create、append、flush、close)写入每份转换日志,再经 `ctx.sessions.create` 以同一组事件发布活跃会话。先落盘意味着活跃发布失败也不会丢数据,落盘日志是重启后的冷数据权威来源。
+[`src/index.ts`](src/index.ts) 的扫描对新日志使用 `ctx.sessionPersistence` 创建，对变更的导入快照使用其受控替换方法，再经 `ctx.sessions.replace` 以同一组事件发布活跃会话。JSONL provider 会记录跨 cwd 替换，以便启动时恢复中断的移动。先落盘意味着活跃发布失败也不会丢数据,落盘日志是重启后的冷数据权威来源。
 
 ### 失败隔离
 
@@ -132,7 +132,7 @@ Indirectly, through the imported session logs the agent loop later continues.
 ## 已知限制与延期工作
 
 - **仅当前 Codex 存储** — 导入器读取 `thread_history_1.sqlite`;`archived_sessions/` 下的旧版 `*.jsonl` rollout 不导入。
-- **一次性快照,非同步** — 已导入的线程被跳过,Codex 之后追加到该线程的条目只有在删除对应 DSH 会话后才会出现。
+- **活跃会话延后** — 被 live Agent 持有的导入会话不会在扫描中替换；设置卡会报告延后数量，后续扫描会继续对账。
 - **保真度简化** — Codex 的 `reasoning`、`contextCompaction` 与原始文件 diff 不转录;代理消息的 phase 元数据被丢弃,每条代理消息对应一个 DSH step 而非 Codex 原始分组。
 - **工具结果有界** — 超出 `maxToolResultChars` 的结果文本被截断,以保持持久日志有界。
 - **续接而非迁移** — 导入会话以部署的默认预设与模型续接;Codex 模型只作为助手消息上的 `codex` 来源记录。
@@ -145,6 +145,6 @@ Indirectly, through the imported session logs the agent loop later continues.
 
 本开发备注是维护者的工作上下文:开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-上面的已知限制列表就是工作队列:旧版 rollout 导入、已导入线程的重同步,以及更深的转录保真度。目前均无设计方案。
+上面的已知限制列表就是工作队列:旧版 rollout 导入和更深的转录保真度。[Codex 导入对账](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.zh.md)持有当前重同步规则。
 
 </details>

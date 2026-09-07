@@ -14,6 +14,7 @@ import {
 import { runPersistenceContract, meta, oneTurnLog } from '../../session-persistence/tests/contract.ts'
 import { runLiveWritePathContract } from '../../session-persistence/tests/live-write-contract.ts'
 import { LIVE_WRITE_BATCH_MAX_DELAY_MS, type JsonlSessionHandle } from '../src/storage.ts'
+import { recoverJsonlReplacements } from '../src/replace.ts'
 import SessionStore from '@deepseek-ai/dsh-session'
 
 const statRace = vi.hoisted(() => ({
@@ -1470,6 +1471,39 @@ describe('JsonlSessionPersistence: edge cases', () => {
     // The log materialized under the ORIGINAL cwd, not the mutated one.
     expect((await stat(rawLogPath(root, '/orig', SessionId('create-snap')))).isFile()).toBe(true)
     await expect(stat(rawLogPath(root, '/mutated', SessionId('create-snap')))).rejects.toThrow()
+  })
+
+  it('replaces a stored snapshot and rehomes it when the header cwd changes', async () => {
+    const original = meta('replace-codex', '/old-project')
+    await writeLog(ctx.sessionPersistence, original, oneTurnLog())
+    const replacement = { ...original, cwd: '/new-project' }
+    const events = oneTurnLog()
+    await ctx.sessionPersistence.replace(replacement, events)
+
+    await expect(stat(rawLogPath(root, '/old-project', original.id))).rejects.toThrow()
+    expect((await stat(rawLogPath(root, '/new-project', original.id))).isFile()).toBe(true)
+    const loaded = await readAll(ctx.sessionPersistence, original.id)
+    expect(loaded.meta.cwd).toBe('/new-project')
+    expect(loaded.events).toEqual(events)
+    expect((await ctx.sessionPersistence.list()).map(snapshot => snapshot.header.id)).toEqual([original.id])
+  })
+
+  it('restores the old artifact when a cross-cwd replacement stops before publish', async () => {
+    const oldPath = join(root, 'old-session.jsonl')
+    const backupPath = join(root, 'old-session.jsonl.replacing.bak')
+    const tempPath = join(root, 'new-session.jsonl.replacing.tmp')
+    const newPath = join(root, 'new-session.jsonl')
+    const journalPath = join(root, '.dsh-session-replace-test.json')
+    await writeFile(backupPath, 'old')
+    await writeFile(tempPath, 'new')
+    await writeFile(journalPath, JSON.stringify({ oldPath, newPath, tempPath, backupPath }))
+
+    await recoverJsonlReplacements(root)
+
+    expect(await readFile(oldPath, 'utf8')).toBe('old')
+    await expect(stat(backupPath)).rejects.toThrow()
+    await expect(stat(tempPath)).rejects.toThrow()
+    await expect(stat(journalPath)).rejects.toThrow()
   })
 
   it('create rejects non-JSON metadata and a fractional creation timestamp without reserving the id', async () => {

@@ -65,10 +65,14 @@ export interface ConvertedCodexThread {
 export interface CodexImportSummary {
   /** Threads written into DSH storage this sweep. */
   readonly imported: number
+  /** Existing imported threads whose snapshot or cwd changed and was replaced. */
+  readonly updated: number
   /** Threads skipped because a DSH session with that id already exists. */
   readonly skippedExisting: number
   /** Threads skipped because they convert to no DSH events. */
   readonly skippedEmpty: number
+  /** Changed threads deferred because a live Agent owns the DSH session. */
+  readonly deferredActive: number
 }
 
 /** One imported session as reported to the card (id and display title). */
@@ -91,10 +95,14 @@ export interface CodexImportRun {
   readonly at: number
   /** Threads newly imported by this run. */
   readonly imported: number
+  /** Existing sessions reconciled from their current Codex snapshot. */
+  readonly updated: number
   /** Threads skipped because their session already existed. */
   readonly skippedExisting: number
   /** Threads skipped because they converted to no events. */
   readonly skippedEmpty: number
+  /** Changed sessions left untouched because a live Agent owns them. */
+  readonly deferredActive: number
   /** The sessions this run imported. */
   readonly sessions: readonly CodexImportSession[]
 }

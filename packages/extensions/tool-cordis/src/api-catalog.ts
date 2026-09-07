@@ -1490,6 +1490,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{SessionAlreadyExistsError} when the id already exists.'],
       },
       {
+        signature: 'async replace( header: SessionHeader, events: readonly SessionEvent[], options?: SessionPersistenceReplaceOptions, ): Promise<void>',
+        description: 'Replace one complete stored session snapshot while preserving its id. Backends that do not implement replacement reject loudly; importers use it only for externally-owned snapshots whose source remains authoritative.',
+        parameters: [{ name: 'header', description: 'replacement header with the existing stored id.' }, { name: 'events', description: 'complete contiguous replacement event log.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: 'resolution after the replacement is durable.',
+      },
+      {
         signature: 'abstract open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle>',
         description: 'Open an existing stored session.\n\n`read` never takes ownership and works while another handle (or process) holds write ownership. `write` atomically claims single-writer ownership; an existing active owner rejects.',
         parameters: [{ name: 'id', description: 'the stored session to open.' }, { name: 'access', description: '`read` or `write`.' }, { name: 'options', description: 'optional cancellation.' }],
@@ -1758,6 +1764,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'the session id; omitted, the store mints `session-<n>`.' }, { name: 'options', description: 'seed events and/or creation metadata for the header.' }],
         returns: 'the live session, already entered and announced.',
         throws: ['if a session with `id` already exists, metadata is not a plain lossless-JSON record with valid scalar fields, or `meta.cwd` is a non-absolute path (storage backends key directories off it).'],
+      },
+      {
+        signature: 'replace(id: SessionId, options: CreateSessionOptions): Session',
+        description: 'Replace one non-appending live session with a new seeded snapshot under the same id. External importers call this only after their durable source replacement succeeds and after excluding Agent-owned sessions.',
+        parameters: [{ name: 'id', description: 'existing or new session id.' }, { name: 'options', description: 'replacement seed and immutable header metadata.' }],
+        returns: 'the newly announced live session.',
+        throws: ['when the existing session is publishing an event.'],
       },
       {
         signature: 'prepare(id?: SessionId, options?: PrepareSessionOptions): Session',
@@ -3665,7 +3678,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CodexImportRun',
-    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly sessions: readonly CodexImportSession[];\n}',
+    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n    readonly sessions: readonly CodexImportSession[];\n}',
   },
   {
     name: 'CodexImportSession',
@@ -5042,6 +5055,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionPersistenceOpenOptions',
     declaration: 'export interface SessionPersistenceOpenOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SessionPersistenceReplaceOptions',
+    declaration: 'export interface SessionPersistenceReplaceOptions {\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'SessionPersistenceRevision',

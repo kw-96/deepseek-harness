@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionMenuBody } from '../src/client/sidebar/session-menu.js'
 import { WorkspaceMenuBody } from '../src/client/sidebar/workspace-menu.js'
 import { SectionHeader } from '../src/client/sidebar/section-header.js'
-import { sameDirectory, normalizePath } from '../src/client/sidebar/session-menu.js'
+import { WorkspaceHead } from '../src/client/workspace-head.js'
 import { SessionRow } from '../src/client/session-rows.js'
 import { SessionMetaStore } from '../src/client/session-meta.js'
 import { zh } from '../src/client/locales.js'
@@ -16,14 +16,6 @@ const t = (key: string, params?: Record<string, unknown>): string => {
 }
 
 afterEach(cleanup)
-
-describe('path-util', () => {
-  it('normalizes Windows paths for equality', () => {
-    expect(normalizePath('D:\\a\\b\\')).toBe('d:/a/b')
-    expect(sameDirectory('D:/a/b', 'd:\\a\\b\\')).toBe(true)
-    expect(sameDirectory('D:/a/b', 'D:/a/c')).toBe(false)
-  })
-})
 
 describe('session hover actions', () => {
   it('shows pin archive more on hover actions', () => {
@@ -59,10 +51,45 @@ describe('session hover actions', () => {
     fireEvent.click(screen.getByLabelText('更多操作'))
     expect(onMenu).toHaveBeenCalledTimes(1)
   })
+
+  it('opens and expands a session row from the keyboard', () => {
+    const meta = new SessionMetaStore()
+    const onOpen = vi.fn()
+    const onToggleSubagents = vi.fn()
+    render(
+      <SessionRow
+        sessionId="s1"
+        title="Demo"
+        timeLabel="刚刚"
+        current={false}
+        running={false}
+        archived={false}
+        subagents={[{ id: 'child', title: 'Child', current: false, running: false }]}
+        expanded={false}
+        onToggleSubagents={onToggleSubagents}
+        renaming={false}
+        renameDraft=""
+        setRenameDraft={() => {}}
+        commitRename={() => {}}
+        onOpen={onOpen}
+        onMenu={event => { event.stopPropagation() }}
+        onArchive={() => {}}
+        draggable={false}
+        meta={meta}
+        open={() => {}}
+        t={t}
+      />,
+    )
+    const row = screen.getAllByRole('treeitem')[0]!
+    fireEvent.keyDown(row, { key: 'ArrowRight' })
+    expect(onToggleSubagents).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('nested menus', () => {
-  it('disables cross-directory move and worktree / cursor items', () => {
+  it('moves sessions across directories and disables worktree / cursor items', () => {
     const actions = {
       rename: vi.fn(),
       togglePin: vi.fn(),
@@ -96,7 +123,8 @@ describe('nested menus', () => {
     )
     fireEvent.mouseEnter(screen.getByText('项目').closest('div')!)
     expect(screen.getByText('移到未分组')).toBeTruthy()
-    expect(screen.getByTitle('目录不一致，无法迁移（需会话 cwd 与工作区 path 相同）')).toBeTruthy()
+    fireEvent.click(screen.getByText('B'))
+    expect(actions.moveToWorkspace).toHaveBeenCalledWith('w2')
     fireEvent.click(screen.getByText('移到未分组'))
     expect(actions.moveToUngrouped).toHaveBeenCalledTimes(1)
     fireEvent.mouseEnter(screen.getByText('分叉').closest('div')!)
@@ -144,5 +172,54 @@ describe('section header', () => {
     fireEvent.click(screen.getByLabelText('整理侧边栏'))
     fireEvent.click(screen.getByText('在一个列表中'))
     expect(onOrganize).toHaveBeenCalledWith('flat')
+  })
+
+  it('toggles a workspace from the keyboard without opening its actions', () => {
+    const onToggle = vi.fn()
+    render(
+      <WorkspaceHead
+        label="项目 A"
+        path="D:/project-a"
+        sessionCount={1}
+        pinned={false}
+        collapsed={false}
+        renaming={false}
+        renameDraft=""
+        setRenameDraft={() => {}}
+        commitRename={() => {}}
+        onToggle={onToggle}
+        onMenu={() => {}}
+        onBeginRename={() => {}}
+        onTogglePin={() => {}}
+        t={t}
+      />,
+    )
+    fireEvent.keyDown(screen.getByRole('treeitem'), { key: ' ' })
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens project details explicitly and dismisses them with Escape', () => {
+    render(
+      <WorkspaceHead
+        label="项目 A"
+        path="D:/project-a"
+        sessionCount={1}
+        pinned={false}
+        collapsed={false}
+        renaming={false}
+        renameDraft=""
+        setRenameDraft={() => {}}
+        commitRename={() => {}}
+        onToggle={() => {}}
+        onMenu={() => {}}
+        onBeginRename={() => {}}
+        onTogglePin={() => {}}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText('项目信息'))
+    expect(screen.getByRole('dialog', { name: '项目信息' })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '项目信息' })).toBeNull()
   })
 })

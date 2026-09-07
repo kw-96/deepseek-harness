@@ -64,7 +64,7 @@ Each session gets a session-owned directory under a readable project directory; 
       session.jsonl              # only with compression: 'none'
 ```
 
-Session ids are injectively escaped to one safe path segment before use (no traversal, no collision). The normalized cwd keeps the project directory readable for navigation; cwd strings that normalize alike share a project directory while session ids still select distinct session directories. Format-refusal diagnostics name the absolute path of the fixed transcript inside the resolved directories, so an operator can find the raw log a build refused to interpret.
+Session ids are injectively escaped to one safe path segment before use (no traversal, no collision). The normalized cwd keeps the project directory readable for navigation; cwd strings that normalize alike share a project directory while session ids still select distinct session directories. An explicit supported `replace` writes a replacement journal before rehoming a session across cwd directories; startup recovers an interrupted move before it discovers logs. Format-refusal diagnostics name the absolute path of the fixed transcript inside the resolved directories, so an operator can find the raw log a build refused to interpret.
 
 ### Durability and crash semantics
 

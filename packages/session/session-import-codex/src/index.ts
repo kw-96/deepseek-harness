@@ -1,9 +1,8 @@
 /**
  * Import local Codex threads as DSH sessions. Manual import and an opt-in
  * automatic sweep convert every thread into a DSH event log, store it
- * durably, publish it live, and attach it to the workspace matching its cwd.
- * Repeated sweeps keep one `codex-<id>` session per thread and repair missing
- * workspace membership for existing imported sessions.
+ * durably, publish it live, and reconcile it with the workspace matching the
+ * current Codex cwd on every later sweep.
  * @module @deepseek-ai/dsh-session-import-codex
  */
 
@@ -24,7 +23,7 @@ import {
 } from './settings.ts'
 import { loadCodexThreads } from './sqlite.ts'
 import type { CodexImportSession, CodexImportSweepResult, ImportBounds } from './types.ts'
-import { attachCodexSessionWorkspace } from './workspace.ts'
+import { CodexImportReconciler, type CodexImportSnapshot } from './workspace.ts'
 
 export { CodexImportController } from './remote.ts'
 export type { CodexImportControllerConfig, CodexImportRunner } from './remote.ts'
@@ -46,6 +45,9 @@ export const DEFAULT_MAX_TOOL_RESULT_CHARS = 20_000
 /** Default cap for an imported Codex thread title. */
 export const DEFAULT_MAX_TITLE_CHARS = 300
 
+/** Default repeat interval after a user enables automatic Codex reconciliation. */
+export const DEFAULT_SYNC_INTERVAL_MS = 60_000
+
 /** Plugin configuration: Codex source location and import caps. */
 export interface Config {
   /**
@@ -65,9 +67,9 @@ export interface Config {
   maxTitleChars?: number
   /**
    * Periodic re-scan interval in milliseconds while the card's sync toggle is
-   * on. `0` (the default) disables the timer; automatic import still runs
-   * once when its settings toggle becomes enabled, and the manual button is
-   * always available.
+   * on. `0` disables the timer; the default repeats every 60 seconds after
+   * the settings toggle becomes enabled, and the manual button is always
+   * available.
    */
   syncIntervalMs?: number
 }
@@ -77,7 +79,7 @@ export const Config: z<Config> = z.object({
   cwd: z.string().min(1),
   maxToolResultChars: z.number().step(1).min(1).default(DEFAULT_MAX_TOOL_RESULT_CHARS),
   maxTitleChars: z.number().step(1).min(1).default(DEFAULT_MAX_TITLE_CHARS),
-  syncIntervalMs: z.number().step(1).min(0).default(0),
+  syncIntervalMs: z.number().step(1).min(0).default(DEFAULT_SYNC_INTERVAL_MS),
 })
 
 /** Configuration with every fallback resolved and validated. */
@@ -113,7 +115,7 @@ export function resolveConfig(config: Config, env: NodeJS.ProcessEnv): ResolvedC
       maxToolResultChars: config.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS,
       maxTitleChars: config.maxTitleChars ?? DEFAULT_MAX_TITLE_CHARS,
     },
-    syncIntervalMs: config.syncIntervalMs ?? 0,
+    syncIntervalMs: config.syncIntervalMs ?? DEFAULT_SYNC_INTERVAL_MS,
   }
 }
 
@@ -125,20 +127,12 @@ function importedSessionId(threadId: string): SessionId {
   return SessionId(`${IMPORTED_ID_PREFIX}${threadId}`)
 }
 
-/**
- * Store one converted thread durably and publish it as a live session.
- * @param ctx - context exposing the session and persistence services.
- * @param record - converted events and header cwd.
- * @param threadId - source Codex thread id, used for ids and diagnostics.
- * @param fallbackCwd - absolute cwd substituted when the converted cwd is not absolute.
- * @returns the imported session's id and display title.
- */
-async function importOneThread(
-  ctx: Context,
+/** Build a complete stable DSH snapshot from one non-empty Codex conversion. */
+function importSnapshot(
   record: ReturnType<typeof convertCodexThread>,
   threadId: string,
   fallbackCwd: string,
-): Promise<CodexImportSession> {
+): CodexImportSnapshot {
   const id = importedSessionId(threadId)
   // The sweep skips empty conversions, so the first event always exists.
   // oxlint-disable-next-line typescript/no-non-null-assertion
@@ -150,27 +144,15 @@ async function importOneThread(
     createdAt,
     cwd,
     isSeeded: false,
+    delegationDepth: 0,
   }
-  const handle = await ctx.sessionPersistence.create(header)
-  try {
-    await handle.append(record.events)
-    await handle.flush()
-  } finally {
-    await handle.close()
+  const title = record.events.find(event => event.type === 'session/title')
+  return {
+    id,
+    header,
+    events: record.events,
+    title: title?.type === 'session/title' ? title.data.title : '',
   }
-  ctx.sessions.create(id, {
-    seed: structuredClone(record.events),
-    meta: { cwd, createdAt },
-  })
-  await attachCodexSessionWorkspace(ctx, id, cwd)
-  let title = ''
-  for (const event of record.events) {
-    if (event.type === 'session/title') {
-      title = event.data.title
-      break
-    }
-  }
-  return { id, title }
 }
 
 /**
@@ -180,15 +162,16 @@ async function importOneThread(
  * @param ctx - context exposing the session and persistence services.
  * @param config - resolved Codex location and caps.
  * @param signal - aborts the sweep between threads.
- * @returns the per-thread outcome counts plus the sessions this sweep imported.
+ * @returns the per-thread outcome counts plus newly imported or updated sessions.
  */
 export async function runImportSweep(
   ctx: Context,
   config: ResolvedConfig,
   signal: AbortSignal,
 ): Promise<CodexImportSweepResult> {
-  const summary = { imported: 0, skippedExisting: 0, skippedEmpty: 0 }
+  const summary = { imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 }
   const sessions: CodexImportSession[] = []
+  const reconciler = new CodexImportReconciler(ctx)
   let records
   try {
     records = await loadCodexThreads(config.codexHome)
@@ -202,34 +185,26 @@ export async function runImportSweep(
   }
   for (const record of records) {
     if (signal.aborted) break
-    const id = importedSessionId(record.threadId)
-    const live = ctx.sessions.get(id)
-    if (live !== undefined) {
-      summary.skippedExisting += 1
-      await attachCodexSessionWorkspace(ctx, id, live.header.cwd)
-      continue
-    }
-    try {
-      const stored = await ctx.sessionPersistence.stat(id)
-      if (stored !== undefined) {
-        summary.skippedExisting += 1
-        await attachCodexSessionWorkspace(ctx, id, stored.header.cwd)
-        continue
-      }
-    } catch {
-      // A failed stat is not proof of absence; try the write and let the
-      // already-exists rejection decide.
-    }
     const converted = convertCodexThread(record, config.cwd, config.bounds)
     if (converted.events.length === 0) {
       summary.skippedEmpty += 1
       continue
     }
     try {
-      const created = await importOneThread(ctx, converted, record.threadId, config.cwd)
-      summary.imported += 1
-      sessions.push(created)
-      ctx.logger.info(`session-import-codex: imported codex thread "${record.threadId}" as "${created.id}" (${converted.events.length} events)`)
+      const snapshot = importSnapshot(converted, record.threadId, config.cwd)
+      const outcome = await reconciler.reconcile(snapshot)
+      if (outcome === 'imported') {
+        summary.imported += 1
+        sessions.push({ id: snapshot.id, title: snapshot.title })
+      } else if (outcome === 'updated') {
+        summary.updated += 1
+        sessions.push({ id: snapshot.id, title: snapshot.title })
+      } else if (outcome === 'deferred-active') {
+        summary.deferredActive += 1
+      } else {
+        summary.skippedExisting += 1
+      }
+      ctx.logger.info(`session-import-codex: ${outcome} Codex thread "${record.threadId}" as "${snapshot.id}" (${converted.events.length} events)`)
     } catch (error: unknown) {
       if (error instanceof SessionAlreadyExistsError) {
         summary.skippedExisting += 1
@@ -256,7 +231,7 @@ export function apply(ctx: Context, config: Config): void {
 
   const runner = (signal: AbortSignal): Promise<CodexImportSweepResult> => runImportSweep(ctx, resolved, signal)
   const logSummary = (result: CodexImportSweepResult): void => {
-    ctx.logger.info(`session-import-codex: sweep finished (imported ${result.summary.imported}, skipped ${result.summary.skippedExisting} existing, skipped ${result.summary.skippedEmpty} empty)`)
+    ctx.logger.info(`session-import-codex: sweep finished (imported ${result.summary.imported}, updated ${result.summary.updated}, unchanged ${result.summary.skippedExisting}, deferred-active ${result.summary.deferredActive}, skipped ${result.summary.skippedEmpty} empty)`)
   }
 
   // The card's manual button and history list.

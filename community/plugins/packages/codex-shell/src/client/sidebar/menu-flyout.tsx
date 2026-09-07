@@ -49,7 +49,7 @@ export interface SubmenuProps {
   t: TFn
 }
 
-/** 悬停向右展开的子菜单。 */
+/** 点击或悬停均可展开的右侧子菜单。 */
 export function Submenu(props: SubmenuProps): React.ReactNode {
   const [open, setOpen] = useState(false)
   return (
@@ -58,7 +58,13 @@ export function Submenu(props: SubmenuProps): React.ReactNode {
       onMouseEnter={() => { setOpen(true) }}
       onMouseLeave={() => { setOpen(false) }}
     >
-      <button type="button" className={css.menuItem} aria-haspopup="menu" aria-expanded={open}>
+      <button
+        type="button"
+        className={css.menuItem}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => { setOpen(value => !value) }}
+      >
         {props.icon !== undefined && <span className={css.menuIcon}>{props.icon}</span>}
         <span className={css.menuItemLabel}>{props.label}</span>
         <ChevronRight size={13} className={css.menuChevron} />

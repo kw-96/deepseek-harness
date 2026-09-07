@@ -1,6 +1,7 @@
 # workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host 与 GCP MCP。
-# 配置以前端为主：Host 配置在 Harness 设置页的 workorder-agent 命名空间填写，
-# GCP MCP 连接参数在插件管理界面编辑。环境变量仅在存在时作为首次默认值回退。
+# 配置以前端为主：Host 配置在 Harness 设置页的 workorder-agent 命名空间填写。
+# 设置卡首次保存易协作 Key 时，会创建并维护名为 gcp 的 MCP 服务。
+# 环境变量仅在存在时作为首次默认值回退。
 - insert:
     - id: workorder-agent-host
       name: 'workorder-agent'
@@ -19,20 +20,3 @@
         projectIdChannelArt: !!js Number(process.env.PROJECT_ID_CHANNEL_ART) || 7
         projectIdReturnBusiness: !!js Number(process.env.PROJECT_ID_RETURN_BUSINESS) || 2001
         projectIdAiOperations: !!js Number(process.env.PROJECT_ID_AI_OPERATIONS) || 2004
-
-    - id: workorder-agent-gcp-mcp
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        transport: streamable-http
-        serverName: gcp
-        url: !!js process.env.GCP_MCP_URL?.trim() || 'https://mcp.netease.com/servers/gcp/mcp'
-        headers:
-          gcp-host: !!js process.env.GCP_HOST?.trim() || 'promoteart.pm.netease.com'
-          gcp-user-key: !!js process.env.GCP_USER_KEY?.trim() || ''
-        toolCallTimeoutMs: 60000
-        failOnStartupError: false
-        reconnect:
-          enabled: true
-          initialDelayMs: 500
-          maxDelayMs: 30000
-          maxAttempts: 10

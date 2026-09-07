@@ -43,7 +43,12 @@ export interface BrowserTreeProps {
   setRenameDraft: (value: string) => void
   commitRename: (sessionId: SessionId) => void
   commitWorkspaceRename: (workspaceId: string) => void
-  onSessionDrop: (sessionId: SessionId, beforeSessionId: SessionId | undefined, workspaceId: string) => void
+  onSessionDrop: (
+    sessionId: SessionId,
+    beforeSessionId: SessionId | undefined,
+    workspaceId: string,
+    fromWorkspaceId?: string,
+  ) => void
   sessionWorkspaceId: (sessionId: SessionId) => string | undefined
   meta: SessionMetaStore
   t: TFn
@@ -115,7 +120,8 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
         event.preventDefault()
         const dragged = event.dataTransfer.getData('text/session-id') as SessionId
         if (dragged === '' || dragged === sessionId) return
-        onSessionDrop(dragged, sessionId, wsId)
+        const fromWorkspaceId = event.dataTransfer.getData('text/workspace-id')
+        onSessionDrop(dragged, sessionId, wsId, fromWorkspaceId === '' ? undefined : fromWorkspaceId)
       }}
       meta={meta}
       open={onOpen}
@@ -153,11 +159,11 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     const isCollapsed = collapsed.has(key)
     return (
       <div key={key} className={css.workspaceGroup}>
-        <div className={css.workspaceHead} role="treeitem" aria-expanded={!isCollapsed}
+        <button type="button" className={css.workspaceHead} role="treeitem" aria-expanded={!isCollapsed}
           onClick={() => { onToggleGroup(key) }}>
           <Archive size={13} className={css.workspaceIcon} />
           <span className={css.workspaceLabel}>{label}</span>
-        </div>
+        </button>
         {!isCollapsed && rows.map(id => sessionRow(id, archived))}
       </div>
     )
@@ -171,10 +177,10 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
           : searchItems.length === 0
             ? <div className={css.empty}>{t('filesEmpty')}</div>
             : searchItems.map(item => (
-              <div key={item.sessionId} className={css.searchResult} onClick={() => { onOpen(item.sessionId) }}>
+              <button type="button" key={item.sessionId} className={css.searchResult} onClick={() => { onOpen(item.sessionId) }}>
                 <span className={css.searchResultTitle}>{list.byId[item.sessionId]?.displayTitle ?? item.sessionId}</span>
                 <span className={css.searchResultSnippet}>{item.snippet}</span>
-              </div>
+              </button>
             ))}
       </>
     )

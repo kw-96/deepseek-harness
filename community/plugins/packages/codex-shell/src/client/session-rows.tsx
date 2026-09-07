@@ -53,12 +53,32 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
       <div
         className={className}
         role="treeitem"
+        tabIndex={0}
         aria-selected={props.current}
+        aria-current={props.current ? 'page' : undefined}
+        aria-expanded={props.subagents.length > 0 ? props.expanded : undefined}
         draggable={props.draggable}
         onDragStart={props.onDragStart}
         onDragOver={props.onDragOver}
         onDrop={props.onDrop}
         onClick={props.onOpen}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget) return
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            props.onOpen()
+            return
+          }
+          if (event.key === 'ArrowRight' && props.subagents.length > 0 && !props.expanded) {
+            event.preventDefault()
+            props.onToggleSubagents()
+            return
+          }
+          if (event.key === 'ArrowLeft' && props.subagents.length > 0 && props.expanded) {
+            event.preventDefault()
+            props.onToggleSubagents()
+          }
+        }}
         title={props.cwd ?? props.sessionId}
       >
         <span aria-hidden="true" className={props.running ? css.dotRunning : css.dotSlot} />
@@ -129,8 +149,15 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
       {props.expanded && props.subagents.map(sub => (
         <div key={sub.id} className={css.subRow}
           role="treeitem"
+          tabIndex={0}
           aria-selected={sub.current}
           onClick={() => { props.open(sub.id) }}
+          onKeyDown={event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              props.open(sub.id)
+            }
+          }}
           title={sub.id}>
           <GitFork size={11} style={{ flex: 'none', opacity: 0.55 }} />
           <span className={css.rowLabel}>{sub.title}</span>
