@@ -9,6 +9,19 @@
     "directory": "packages/experimental/web-desktop"
   },
   "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
   "license": "MIT",
   "scripts": {
     "tauri": "tauri",
@@ -16,7 +29,11 @@
     "build": "tauri build && node ./scripts/copy-exe-to-repo-root.mjs",
     "copy-exe": "node ./scripts/copy-exe-to-repo-root.mjs"
   },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^"
+  },
   "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
     "@tauri-apps/cli": "^2.9.0"
   }
 }

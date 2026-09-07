@@ -4893,6 +4893,9 @@ importers:
 
   packages/experimental/web-desktop:
     devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
       '@tauri-apps/cli':
         specifier: ^2.9.0
         version: 2.11.4
