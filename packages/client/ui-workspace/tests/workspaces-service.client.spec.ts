@@ -138,6 +138,7 @@ class FakeWorkspaces implements IWorkspaces {
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']
   declare readonly attachSession: IWorkspaces['attachSession']
+  declare readonly moveSession: IWorkspaces['moveSession']
   declare readonly detachSession: IWorkspaces['detachSession']
 
   constructor(initial: WorkspaceSnapshot) {

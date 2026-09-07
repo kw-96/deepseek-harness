@@ -153,6 +153,39 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Move a session into a target Workspace (recorded). The default removes the
+   * id from its current owner (when different), then prepends it on the target row.
+   * @param workspaceId - target workspace.
+   * @param sessionId - session to move.
+   * @returns the updated target view.
+   */
+  async moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    this.calls.push({ method: 'moveSession', args: [workspaceId, sessionId] })
+    const stub = this.stubs.get('moveSession')
+    if (stub !== undefined) return await (stub(workspaceId, sessionId) as Promise<WorkspaceView>)
+    let updated: WorkspaceView | undefined
+    await this.update((draft) => {
+      draft.items = draft.items.map((row) => {
+        if (row.workspaceId !== workspaceId) {
+          // Detach from any previous owner before re-attaching to the target.
+          if (row.sessionIds.includes(sessionId)) {
+            return { ...row, sessionIds: row.sessionIds.filter(id => id !== sessionId) }
+          }
+          return row
+        }
+        if (row.sessionIds.includes(sessionId)) {
+          updated = { ...row, sessionIds: [...row.sessionIds] }
+          return row
+        }
+        const next = { ...row, sessionIds: [sessionId, ...row.sessionIds] }
+        updated = { ...next, sessionIds: [...next.sessionIds] }
+        return next
+      })
+    })
+    return updated ?? { workspaceId, title: '', path: '', sessionIds: [sessionId] } as unknown as WorkspaceView
+  }
+
+  /**
    * Detach a session (recorded). Default removes the id from the matching row.
    * @param workspaceId - owning workspace.
    * @param sessionId - session to detach.

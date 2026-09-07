@@ -1,6 +1,9 @@
 CLAUDE.local.md
 .env
 node_modules/
+# Bundled peer-host Node under `.runtime` must keep its own node_modules
+# (corepack/npm); the desktop shell invokes those shims on every launch.
+!.runtime/**/node_modules/
 lib/
 *.tsbuildinfo
 pnpm-debug.log
