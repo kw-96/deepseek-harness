@@ -1,9 +1,0 @@
-apps/web/tests/expected/github-ready-review/conversation-expanded.expected.md
-apps/web/tests/expected/github-ready-review/conversation.expected.md
-apps/web/tests/expected/reference-composer/menu.expected.md
-apps/web/tests/expected/stats-paged-history/ui.expected.md
-apps/web/tests/expected/workspace-new-session-folding/sidebar.expected.md
-snapshots/web/navigation-panes/search-results.expected.md
-snapshots/web/navigation-panes/terminal-card.expected.md
-snapshots/web/navigation-panes/trajectory.expected.md
-snapshots/web/skill-tool-row/ui.expected.md

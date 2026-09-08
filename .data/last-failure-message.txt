@@ -1,4 +1,0 @@
-AssertionError: expected '- button "New session"\n- button "Col…' to be '- button "New session"\n- button "Col…' // Object.is equality
-    at compareOrRefreshGolden (E:/KW/qtGit/deepseek-harness/apps/web/tests/scaffold.ts:1244:19)
-    at E:/KW/qtGit/deepseek-harness/apps/web/tests/lifecycle-chrome.e2e.ts:128:7
-    at file:///E:/KW/qtGit/deepseek-harness/node_modules/.pnpm/@vitest+runner@4.1.8/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
