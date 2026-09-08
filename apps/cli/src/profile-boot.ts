@@ -11,8 +11,9 @@
  * @module @deepseek-ai/dsh/profile-boot
  */
 
-import { writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { spawn } from 'node:child_process'
+import { existsSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -220,7 +221,10 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   const composed = await composeProfile(options.profile, options.patchFiles)
   const app: { current?: Context } = {}
   const appReady = createAppReady()
+  const communityDevScript = resolve(dirname(INSTALL_ANCHOR), '..', '..', 'community', 'plugins', 'dev.mjs')
+  let communityDev: ReturnType<typeof spawn> | undefined
   const shutdown = createProcessShutdown(async () => {
+    communityDev?.kill()
     await app.current?.fiber.dispose()
     await disposeProxy()
   })
@@ -329,6 +333,16 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     appReady.commit()
+  }
+  // 源码 checkout 且 web profile：自动把社区自研插件 link 进 profile、
+  // 启用 Cordis HMR 并启动 watch 构建，使 `dsh web` / 桌面壳启动即热替换。
+  if (options.profile === 'web'
+    && existsSync(communityDevScript)
+    && !signalShutdown.signal.aborted) {
+    communityDev = spawn(process.execPath, [communityDevScript], {
+      cwd: dirname(dirname(communityDevScript)),
+      stdio: 'inherit',
+    })
   }
   return { ctx, shutdown }
 }

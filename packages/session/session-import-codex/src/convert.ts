@@ -260,8 +260,9 @@ function orderedTurnGroups(record: CodexThreadRecord): { turn: CodexThreadTurn |
     })
 }
 
-/** 最新绝对命令 cwd，缺失时回退到导入配置。 */
+/** 线程级 cwd 优先；缺失时用最新绝对命令 cwd，再回退到导入配置。 */
 function deriveCwd(record: CodexThreadRecord, fallbackCwd: string): string {
+  if (record.cwd !== undefined) return record.cwd
   let latest: { cwd: string; time: number } | undefined
   for (const item of record.items) {
     if (item.itemType !== 'commandExecution' && item.itemType !== 'mcpToolCall') continue
@@ -271,7 +272,7 @@ function deriveCwd(record: CodexThreadRecord, fallbackCwd: string): string {
       latest = { cwd, time: item.createdAtMs }
     }
   }
-  return latest?.cwd ?? record.cwd ?? fallbackCwd
+  return latest?.cwd ?? fallbackCwd
 }
 
 /**

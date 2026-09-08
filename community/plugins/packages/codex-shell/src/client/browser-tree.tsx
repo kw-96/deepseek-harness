@@ -3,10 +3,10 @@
  * 状态与动作来自 WorkspaceBrowser。
  */
 
-import { Archive, Inbox } from 'lucide-react'
+import { Archive, Folder, Inbox } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import type { BrowserPrefsStore, OrganizeMode, SortMode } from './sidebar/prefs.js'
-import type { SearchResultLike, SessionId, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
+import type { ProjectView, SearchResultLike, SessionId, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
 import { SessionRow } from './session-rows.js'
 import { WorkspaceHead } from './workspace-head.js'
 import css from './styles.module.css'
@@ -32,6 +32,7 @@ export interface BrowserTreeProps {
   organize: OrganizeMode
   sort: SortMode
   prefs: BrowserPrefsStore
+  projects: readonly ProjectView[]
   onToggleGroup: (key: string) => void
   onOpen: (sessionId: SessionId) => void
   onWorkspaceMenu: (event: React.MouseEvent, workspaceId: string) => void
@@ -54,11 +55,33 @@ export interface BrowserTreeProps {
   t: TFn
 }
 
+/** Normalize a directory path for longest-prefix matching, case-folding on Windows. */
+function projectKey(value: string): string {
+  return value.replace(/\//g, '\\').replace(/\\+$/u, '').toLowerCase()
+}
+
+/** Resolve the project owning one workspace path by longest root prefix. */
+function projectForPath(path: string, projects: readonly ProjectView[]): ProjectView | undefined {
+  const key = projectKey(path)
+  let best: ProjectView | undefined
+  let bestLength = 0
+  for (const project of projects) {
+    for (const root of project.roots) {
+      const rootKey = projectKey(root)
+      if (rootKey === '' || (key !== rootKey && !key.startsWith(rootKey + '\\'))) continue
+      if (rootKey.length < bestLength) continue
+      best = project
+      bestLength = rootKey.length
+    }
+  }
+  return best
+}
+
 /** 渲染树体。 */
 export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const {
     groups, list, collapsed, collapsedSubagents, searching, searchItems, searchLoading,
-    renaming, renameDraft, organize, sort, prefs, onToggleGroup, onOpen, onWorkspaceMenu,
+    renaming, renameDraft, organize, sort, prefs, projects, onToggleGroup, onOpen, onWorkspaceMenu,
     onSessionMenu, onArchiveSession, onToggleWorkspacePin, onBeginWorkspaceRename,
     onToggleSubagents, setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
     sessionWorkspaceId, meta, t,
@@ -169,6 +192,43 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     )
   }
 
+  const renderProject = (project: ProjectView, workspaces: React.ReactNode[]): React.ReactNode => {
+    const key = `project:${project.projectId}`
+    const isCollapsed = collapsed.has(key)
+    return (
+      <div key={key} className={css.workspaceGroup}>
+        <button type="button" className={css.workspaceHead} role="treeitem" aria-expanded={!isCollapsed}
+          onClick={() => { onToggleGroup(key) }}>
+          <Folder size={13} className={css.workspaceIcon} />
+          <span className={css.workspaceLabel}>{project.name}</span>
+        </button>
+        {!isCollapsed && workspaces}
+      </div>
+    )
+  }
+
+  const renderByProject = (): React.ReactNode => {
+    const byProject = new Map<string, React.ReactNode[]>()
+    const ungrouped: React.ReactNode[] = []
+    for (const { workspace, sessions } of groups.grouped) {
+      const project = projectForPath(workspace.path, projects)
+      const node = renderWorkspace(workspace, sessions)
+      if (project === undefined) {
+        ungrouped.push(node)
+      } else {
+        const list = byProject.get(project.projectId) ?? []
+        list.push(node)
+        byProject.set(project.projectId, list)
+      }
+    }
+    return (
+      <>
+        {projects.map(project => renderProject(project, byProject.get(project.projectId) ?? []))}
+        {ungrouped}
+      </>
+    )
+  }
+
   if (searching) {
     return (
       <>
@@ -198,7 +258,9 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
       )}
       {organize === 'flat'
         ? groups.flat.map(id => sessionRow(id))
-        : groups.grouped.map(({ workspace, sessions }) => renderWorkspace(workspace, sessions))}
+        : projects.length > 0
+          ? renderByProject()
+          : groups.grouped.map(({ workspace, sessions }) => renderWorkspace(workspace, sessions))}
       {organize === 'byProject' && groups.ungrouped.length > 0
         && renderBucket('ungrouped', t('ungrouped'), groups.ungrouped)}
       {groups.archived.length > 0 && renderBucket('archived', t('archived'), groups.archived, true)}

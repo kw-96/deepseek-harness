@@ -19,18 +19,44 @@ import { mintUiTerminalName, terminalOrigin } from './host/terminal-identity.js'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse,
+  ProjectAddDirResponse, ProjectCreateRequest, ProjectDeleteRequest, ProjectDeleteResponse, ProjectDirsResponse,
+  ProjectListResponse, ProjectRenameRequest, ProjectSetRootsRequest, ProjectValue, ProjectView,
+  TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse,
   TerminalReadResponse, TerminalSendResponse,
 } from './types.js'
 
 export type * from './types.js'
 
+/** Structural face of `ctx.workspaceRegistry` project tier (avoids full import). */
+interface ProjectEntityLike {
+  readonly id: unknown
+  readonly name: string
+  readonly roots: readonly string[]
+  readonly createdAt: string
+  readonly updatedAt: string
+  setName(name: string): Promise<void>
+  setRoots(roots: readonly string[]): Promise<void>
+}
+
+interface ProjectRegistryFace {
+  listProjects(): Array<ProjectEntityLike>
+  getProject(id: string): ProjectEntityLike | undefined
+  createProject(name: string, roots: readonly string[]): Promise<ProjectEntityLike>
+  deleteProject(id: string): Promise<boolean>
+}
+
 /** codexShell Remote: filesystem, git, and per-workspace project directories for the Web shell. */
 export class CodexShell extends TypertRemoteService {
-  static inject = ['fs', 'shell', 'terminals', 'agents']
+  static inject = ['fs', 'shell', 'terminals', 'agents', 'workspaceRegistry']
 
   constructor(ctx: Context) {
     super(ctx, 'codexShell')
+  }
+
+  private projectRegistry(): ProjectRegistryFace {
+    const registry = this.ctx.get('workspaceRegistry') as ProjectRegistryFace | undefined
+    if (registry === undefined) throw new Error('工作区注册表未挂载')
+    return registry
   }
 
   @Remote('fsList')
@@ -252,6 +278,43 @@ export class CodexShell extends TypertRemoteService {
     return { ok: true }
   }
 
+  @Remote('projectList')
+  projectList(): Promise<ProjectListResponse> {
+    return Promise.resolve({
+      projects: this.projectRegistry().listProjects().map(projectView),
+    })
+  }
+
+  @Remote('projectCreate')
+  async projectCreate(request: ProjectCreateRequest): Promise<ProjectValue> {
+    const name = request.name.trim()
+    if (name === '') throw new Error('项目名称不能为空')
+    return { project: projectView(await this.projectRegistry().createProject(name, request.roots ?? [])) }
+  }
+
+  @Remote('projectRename')
+  async projectRename(request: ProjectRenameRequest): Promise<ProjectValue> {
+    const project = this.projectRegistry().getProject(request.projectId)
+    if (project === undefined) throw new Error(`未知项目 ${request.projectId}`)
+    const name = request.name.trim()
+    if (name === '') throw new Error('项目名称不能为空')
+    await project.setName(name)
+    return { project: projectView(project) }
+  }
+
+  @Remote('projectSetRoots')
+  async projectSetRoots(request: ProjectSetRootsRequest): Promise<ProjectValue> {
+    const project = this.projectRegistry().getProject(request.projectId)
+    if (project === undefined) throw new Error(`未知项目 ${request.projectId}`)
+    await project.setRoots(request.roots)
+    return { project: projectView(project) }
+  }
+
+  @Remote('projectDelete')
+  async projectDelete(request: ProjectDeleteRequest): Promise<ProjectDeleteResponse> {
+    return { deleted: await this.projectRegistry().deleteProject(request.projectId) }
+  }
+
   @Remote('projectDirs')
   async projectDirs(workspaceId: string): Promise<ProjectDirsResponse> {
     return await projectDirs(this.ctx.fs, workspaceId)
@@ -265,6 +328,17 @@ export class CodexShell extends TypertRemoteService {
   @Remote('projectAddDir')
   async projectAddDir(workspaceId: string, path: string): Promise<ProjectAddDirResponse> {
     return await projectAddDir(this.ctx.fs, workspaceId, path)
+  }
+}
+
+/** Project one registry entity into its Remote value. */
+function projectView(project: ProjectEntityLike): ProjectView {
+  return {
+    projectId: String(project.id),
+    name: project.name,
+    roots: [...project.roots],
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
   }
 }
 

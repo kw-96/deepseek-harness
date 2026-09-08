@@ -9,6 +9,13 @@ export const zh = {
   operationFailed: '操作未完全完成',
   restartRequired: '状态已保存，重启当前配置后生效', runtimeSwitch: '尝试即时切换',
   categoryOfficial: '官方', categoryThirdParty: '第三方', entriesCount: '个插件',
+  mcpTab: 'MCP', mcpTitle: 'MCP 服务', mcpEmpty: '暂无 MCP 服务。',
+  mcpAdd: '新增 MCP', mcpEdit: '编辑', mcpRemove: '删除', mcpSave: '保存', mcpCancel: '取消',
+  mcpServerName: '服务名', mcpTransport: '传输方式', mcpStdio: '本地进程', mcpHttp: 'HTTP 端点',
+  mcpCommand: '启动命令', mcpArgs: '参数（空格分隔）', mcpCwd: '工作目录', mcpUrl: '端点 URL',
+  mcpHeaders: '请求头（每行 KEY=VALUE）', mcpEnv: '环境变量（每行 KEY=VALUE）',
+  mcpTimeout: '调用超时（毫秒，留空为默认）', mcpEnabled: '启用', mcpManaged: '可编辑', mcpUnmanaged: '只读',
+  mcpRemoveConfirm: '确认删除该 MCP 服务？', mcpRestartRequired: '已保存，重启当前配置后生效', mcpSaveFailed: '保存失败',
 } as const
 
 export type LocaleKey = keyof typeof zh
@@ -24,6 +31,13 @@ export const en: Record<LocaleKey, string> = {
   operationFailed: 'The operation did not fully complete',
   restartRequired: 'Saved; restart the active profile to apply', runtimeSwitch: 'Runtime switch attempted',
   categoryOfficial: 'Official', categoryThirdParty: 'Third-party', entriesCount: 'plugins',
+  mcpTab: 'MCP', mcpTitle: 'MCP servers', mcpEmpty: 'No MCP servers are configured.',
+  mcpAdd: 'Add MCP', mcpEdit: 'Edit', mcpRemove: 'Remove', mcpSave: 'Save', mcpCancel: 'Cancel',
+  mcpServerName: 'Server name', mcpTransport: 'Transport', mcpStdio: 'Local process', mcpHttp: 'HTTP endpoint',
+  mcpCommand: 'Command', mcpArgs: 'Arguments (space separated)', mcpCwd: 'Working directory', mcpUrl: 'Endpoint URL',
+  mcpHeaders: 'Headers (one KEY=VALUE per line)', mcpEnv: 'Environment (one KEY=VALUE per line)',
+  mcpTimeout: 'Call timeout (ms, blank for default)', mcpEnabled: 'Enabled', mcpManaged: 'Editable', mcpUnmanaged: 'Read-only',
+  mcpRemoveConfirm: 'Remove this MCP server?', mcpRestartRequired: 'Saved; restart the active profile to apply', mcpSaveFailed: 'Save failed',
 }
 
 /** Bilingual functional-group labels keyed by group id. Unknown ids render as-is. */

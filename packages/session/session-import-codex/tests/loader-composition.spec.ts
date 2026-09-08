@@ -313,6 +313,41 @@ describe('session-import-codex through a real Loader composition', () => {
     expect((await first.workspaceRegistry.resolveByPath(workspace))?.sessionIds).toContain(id)
   })
 
+  it('groups by the Codex thread-level cwd and imports threads only in the state index', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    const codexHome = join(root, 'codex')
+    await mkdir(codexHome)
+    await writeCodexFixture(codexHome)
+    const overrideWorkspace = join(root, 'override-workspace')
+    const indexedWorkspace = join(root, 'indexed-workspace')
+    await mkdir(overrideWorkspace)
+    await mkdir(indexedWorkspace)
+
+    const db = new DatabaseSync(join(codexHome, 'state_5.sqlite'))
+    db.exec('CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, cwd TEXT NOT NULL, name TEXT, archived INTEGER NOT NULL DEFAULT 0)')
+    db.prepare('INSERT INTO threads (id, rollout_path, cwd, name, archived) VALUES (?, ?, ?, ?, ?)')
+      .run('thread-1', join(codexHome, 'thread-1.jsonl'), overrideWorkspace, '整理后的标题', 0)
+    db.prepare('INSERT INTO threads (id, rollout_path, cwd, name, archived) VALUES (?, ?, ?, ?, ?)')
+      .run('indexed-only', join(codexHome, 'indexed-only.jsonl'), indexedWorkspace, '索引独有线程', 0)
+    db.close()
+    await writeFile(join(codexHome, 'indexed-only.jsonl'), [
+      JSON.stringify({ timestamp: '2026-01-01T00:00:00.000Z', type: 'session_meta', payload: { session_id: 'indexed-only' } }),
+      JSON.stringify({ timestamp: '2026-01-01T00:00:01.000Z', type: 'response_item', payload: { type: 'message', id: 'u1', role: 'user', content: [{ type: 'input_text', text: 'indexed question' }], internal_chat_message_metadata_passthrough: { turn_id: 'turn-1', create_time: 1 } } }),
+      '',
+    ].join('\n'))
+
+    const first = await loadComposition(compositionRows())
+    const result = await first.codexImport.run()
+
+    const overridden = SessionId('codex-thread-1')
+    const indexed = SessionId('codex-indexed-only')
+    expect(result).toMatchObject({ imported: 3, updated: 0, skippedExisting: 0, skippedEmpty: 1, deferredActive: 0 })
+    expect(first.sessions.get(overridden)?.header.cwd).toBe(overrideWorkspace)
+    expect(first.sessions.get(indexed)?.header.cwd).toBe(indexedWorkspace)
+    expect((await first.workspaceRegistry.resolveByPath(overrideWorkspace))?.sessionIds).toContain(overridden)
+    expect((await first.workspaceRegistry.resolveByPath(indexedWorkspace))?.sessionIds).toContain(indexed)
+  })
+
   it('records runs through the Remote and serves them as history', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
     await mkdir(join(root, 'codex'))

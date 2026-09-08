@@ -47,7 +47,7 @@ kind: "package-reference"
 
 - 自动导入默认关闭。开启 `autoSync` 后会立即执行一轮扫描，再按 `syncIntervalMs` 重复；“立即导入”始终执行一轮扫描。
 - 每个导入会话使用固定 id：`codex-` 加 Codex 线程 id。重复扫描会比较完整转换快照，替换已经变化的导入日志，并对账唯一匹配的工作区成员关系。会话被 live Agent 持有时会延后到下一轮扫描。
-- 会话标题优先来自 Codex 的 `session_index.jsonl`，缺失时回退到第一条用户消息；会话 `cwd` 取线程内最新的绝对 command 或 MCP cwd,否则用配置的 `cwd`。
+- 会话标题优先来自 `state_5.sqlite` 中 Codex 整理后的线程名，其次 `session_index.jsonl`，再回退到第一条用户消息；会话 `cwd` 取 `state_5.sqlite` 中 Codex 的线程级工作目录（否则用配置的 `cwd`），因此 DSH 工作区分组与 Codex 的项目视图一致。
 - 导入会话同时落盘并发布为活跃会话，随后挂入具有相同规范化 `cwd` 的工作区：它会出现在 Web 会话列表的对应工作目录下，并在重启后保留。
 - 单个线程读取或转换失败只记录警告并跳过,不会中断整轮扫描。
 - 没有 Codex thread store 时,插件记录"无可导入"并正常加载。

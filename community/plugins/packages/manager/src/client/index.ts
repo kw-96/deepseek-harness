@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import remoteContribution from 'dsh-plugin-manager/remote'
+import { McpServersPanel, type McpServersPanelApi } from './McpServersPanel.js'
 import { PluginManagerTab, type PluginManagerTabApi } from './PluginManagerTab.js'
 import { en, zh, type LocaleKey } from './locales.js'
 
@@ -23,9 +24,18 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       setCategoryEnabled: async (category, enabled) => unwrap(await scope.remote.pluginManager.setCategoryEnabled(category, enabled)),
       setPackageEnabled: async (packageName, enabled) => unwrap(await scope.remote.pluginManager.setPackageEnabled(packageName, enabled)),
     }
+    const mcpApi: McpServersPanelApi = {
+      list: async () => unwrap(await scope.remote.pluginManager.listMcpServers()),
+      save: async (input, enabled) => unwrap(await scope.remote.pluginManager.saveMcpServer(input, enabled)),
+      remove: async (serverName) => unwrap(await scope.remote.pluginManager.removeMcpServer(serverName)),
+      setEnabled: async (serverName, enabled) => unwrap(await scope.remote.pluginManager.setMcpServerEnabled(serverName, enabled)),
+    }
     scope.slots.inject('settings.plugins.tab', () => scope.slots.register({
       name: 'settings.plugins.tab', id: 'all', order: 10, label: () => t('tab'), locale: 'settings.pluginManager', inject: () => ({ ...api, t, locale: t('localeId') }),
     }, PluginManagerTab))
+    scope.slots.inject('settings.plugins.tab', () => scope.slots.register({
+      name: 'settings.plugins.tab', id: 'mcp', order: 11, label: () => t('mcpTab'), locale: 'settings.pluginManager', inject: () => ({ ...mcpApi, t, locale: t('localeId') }),
+    }, McpServersPanel))
   })
   return async () => { await feature.dispose(); disposeLocale(); await disposeRemote() }
 }
@@ -37,3 +47,5 @@ function unwrap<T>(result: { ok: true; value: T } | { ok: false; error: { code: 
 
 export { PluginManagerTab } from './PluginManagerTab.js'
 export type { PluginManagerTabApi, PluginManagerTabProps } from './PluginManagerTab.js'
+export { McpServersPanel } from './McpServersPanel.js'
+export type { McpServersPanelApi, McpServersPanelProps } from './McpServersPanel.js'

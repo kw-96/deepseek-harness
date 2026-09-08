@@ -13,6 +13,7 @@ import { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence
 import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import WorkspaceRegistry, {
+  ProjectId,
   WorkspaceId,
   WorkspaceMoveInvalidError,
   WorkspaceOrderInvalidError,
@@ -147,8 +148,8 @@ function record(path: string, sessionIds: string[], createdAt = '2026-07-24T00:0
  * Media written before archivedSessionIds existed omit the field; keeping the
  * fixtures in that shape continuously proves the schema default upgrades them.
  */
-type StoredDomainState = Omit<WorkspaceDomainState, 'archivedSessionIds'>
-  & Partial<Pick<WorkspaceDomainState, 'archivedSessionIds'>>
+type StoredDomainState = Omit<WorkspaceDomainState, 'archivedSessionIds' | 'projectIds'>
+  & Partial<Pick<WorkspaceDomainState, 'archivedSessionIds' | 'projectIds'>>
 
 function storedPool(
   entries: Array<[string, WorkspaceRecord]>,
@@ -200,7 +201,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     await fiber.await()
     expect(ctx.workspaceRegistry.list()).toEqual([])
     expect(list).toHaveBeenCalledTimes(1)
-    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [] })
+    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], projectIds: [], archivedSessionIds: [] })
   })
 
   it('bootstraps once from list headers only, in workspace/session createdAt order', async () => {
@@ -233,6 +234,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     expect(storedState(result.pool)).toEqual({
       initialized: true,
       workspaceIds: result.registry.list().map(workspace => workspace.id),
+      projectIds: [],
       archivedSessionIds: [],
     })
   })
@@ -262,7 +264,7 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     const second = await harness({ pool, sessions: [header('late', late, 100)] })
     expect(second.list).not.toHaveBeenCalled()
     expect(second.registry.list()).toEqual([])
-    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [] })
+    expect(storedState(pool)).toEqual({ initialized: true, workspaceIds: [], projectIds: [], archivedSessionIds: [] })
   })
 
   it('reuses partial records after a bootstrap record write fails', async () => {
@@ -490,7 +492,7 @@ describe('WorkspaceRegistry create and lookup', () => {
     await expect(result.registry.delete(workspace.id)).resolves.toBe(false)
     expect(result.registry.get(workspace.id)).toBeUndefined()
     expect(result.registry.list()).toEqual([])
-    expect(storedState(result.pool)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [] })
+    expect(storedState(result.pool)).toEqual({ initialized: true, workspaceIds: [], projectIds: [], archivedSessionIds: [] })
     expect(result.pool.media.get('workspace')!.tables.get('workspaces')!.has(workspace.id)).toBe(false)
     await expect(realpath(dir)).resolves.toBe(dir)
     expect(result.list).toHaveBeenCalledTimes(1)
@@ -533,6 +535,7 @@ describe('WorkspaceRegistry create and lookup', () => {
     expect(storedState(pool)).toEqual({
       initialized: true,
       workspaceIds: [],
+      projectIds: [],
       archivedSessionIds: [],
       pendingMutation: { operation: 'delete', workspaceId: workspace.id },
     })
@@ -541,6 +544,7 @@ describe('WorkspaceRegistry create and lookup', () => {
     expect(storedState(pool)).toEqual({
       initialized: true,
       workspaceIds: [reregistered.id],
+      projectIds: [],
       archivedSessionIds: [],
     })
     await first.fiber.dispose()
@@ -821,7 +825,7 @@ describe('explicit membership projection', () => {
     const createRecovery = await harness({ pool: interruptedCreate })
     expect(createRecovery.registry.list()).toEqual([])
     expect(interruptedCreate.media.get('workspace')!.tables.get('workspaces')!.has(createId)).toBe(false)
-    expect(storedState(interruptedCreate)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [] })
+    expect(storedState(interruptedCreate)).toEqual({ initialized: true, workspaceIds: [], projectIds: [], archivedSessionIds: [] })
 
     const interruptedDelete = storedPool(
       [[deleteId, record(deleteDir, [])]],
@@ -834,7 +838,7 @@ describe('explicit membership projection', () => {
     const deleteRecovery = await harness({ pool: interruptedDelete })
     expect(deleteRecovery.registry.list()).toEqual([])
     expect(interruptedDelete.media.get('workspace')!.tables.get('workspaces')!.has(deleteId)).toBe(false)
-    expect(storedState(interruptedDelete)).toEqual({ initialized: true, workspaceIds: [], archivedSessionIds: [] })
+    expect(storedState(interruptedDelete)).toEqual({ initialized: true, workspaceIds: [], projectIds: [], archivedSessionIds: [] })
 
     const corruptPending = storedPool(
       [[deleteId, record(deleteDir, [])]],
@@ -944,5 +948,55 @@ describe('registry-global session archive', () => {
     )
     const upgraded = await harness({ pool: legacy })
     expect(upgraded.registry.archivedSessionIds).toEqual([])
+  })
+})
+
+describe('project grouping', () => {
+  it('creates, lists, renames, and deletes projects with durable roots', async () => {
+    const rootA = await makeDir('proj-a')
+    const rootB = await makeDir('proj-b')
+    const result = await harness({})
+
+    const project = await result.registry.createProject('FlowX', [rootA, rootB])
+    expect(result.registry.listProjects().map(item => item.name)).toEqual(['FlowX'])
+    expect(result.registry.getProject(project.id)?.roots).toEqual([rootA, rootB])
+
+    await project.setName('FlowX 重构')
+    await project.setRoots([rootA])
+    expect(result.registry.getProject(project.id)?.name).toBe('FlowX 重构')
+    expect(result.registry.getProject(project.id)?.roots).toEqual([rootA])
+
+    await expect(result.registry.deleteProject(project.id)).resolves.toBe(true)
+    expect(result.registry.listProjects()).toEqual([])
+    await expect(result.registry.deleteProject(project.id)).resolves.toBe(false)
+  })
+
+  it('resolves the owning project by longest root prefix', async () => {
+    const parent = await makeDir('flowx-parent')
+    const child = await makeDir('flowx-parent-child')
+    const result = await harness({})
+    const broad = await result.registry.createProject('Broad', [parent])
+    const narrow = await result.registry.createProject('Narrow', [child])
+
+    expect(result.registry.projectForPath(child)?.id).toBe(narrow.id)
+    expect(result.registry.projectForPath(parent)?.id).toBe(broad.id)
+    expect(result.registry.projectForPath(await makeDir('unrelated'))).toBeUndefined()
+  })
+
+  it('reorders projects and persists the project tier across restarts', async () => {
+    const rootA = await makeDir('order-a')
+    const rootB = await makeDir('order-b')
+    const pool = new MemoryMediaPool()
+    const first = await harness({ pool })
+    const a = await first.registry.createProject('A', [rootA])
+    const b = await first.registry.createProject('B', [rootB])
+    await first.registry.insertProjectBefore(b.id, a.id)
+    expect(first.registry.listProjects().map(item => item.id)).toEqual([b.id, a.id])
+    await first.fiber.dispose()
+
+    const second = await harness({ pool })
+    expect(second.registry.listProjects().map(item => item.name)).toEqual(['B', 'A'])
+    await expect(second.registry.insertProjectBefore(ProjectId('missing'), undefined))
+      .rejects.toThrow(/unknown project/)
   })
 })

@@ -19,6 +19,19 @@ dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-
 dsh plugin --profile web remove dsh-codex-shell
 ```
 
+## 开发 / Develop (source link + hot reload)
+
+保持 `dsh web`（或桌面壳）运行，然后执行：
+
+```sh
+node community/plugins/dev.mjs codex-shell
+```
+
+脚本会把插件以源码 link 挂载进 web profile、在 `cordis.patch.yml` 启用
+Cordis HMR 并指向源码目录，再启动 host/client 双面 watch 构建。之后修改
+源码，host 侧由 Cordis HMR 热替换、client 侧由 `client-hmr` 推送浏览器
+热重载，无需重启服务或手动刷新页面。
+
 或手动在 profile 的 `cordis.patch.yml` 里 insert：
 
 ```yaml

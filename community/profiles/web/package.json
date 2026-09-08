@@ -31,7 +31,7 @@
     "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.3.tgz",
     "dsh-doc": "0.1.1",
     "dsh-ocr-local": "0.3.3",
-    "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.0.tgz",
+    "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.1.tgz",
     "ntes-dsh-market": "^0.7.13"
   }
 }

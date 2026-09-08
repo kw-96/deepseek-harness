@@ -10,7 +10,7 @@ import { Files, GitBranch, FolderTree, Blocks, Terminal, StickyNote, Globe, Serv
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse,
+  ProjectAddDirResponse, ProjectDirsResponse, ProjectView,
 } from 'dsh-codex-shell/types'
 import type { SessionMetaStore } from './session-meta.js'
 import { PanelController, usePanelState } from './panel-controller.js'
@@ -78,6 +78,11 @@ export interface CodexApi {
   projectDirs: (workspaceId: string) => Promise<ProjectDirsResponse>
   projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<ProjectDirsResponse>
   projectAddDir: (workspaceId: string, path: string) => Promise<ProjectAddDirResponse>
+  projectList: () => Promise<{ projects: readonly ProjectView[] }>
+  projectCreate: (request: { name: string; roots?: readonly string[] }) => Promise<{ project: ProjectView }>
+  projectRename: (request: { projectId: string; name: string }) => Promise<{ project: ProjectView }>
+  projectSetRoots: (request: { projectId: string; roots: readonly string[] }) => Promise<{ project: ProjectView }>
+  projectDelete: (request: { projectId: string }) => Promise<{ deleted: boolean }>
 }
 
 /** 插件管家 remote 投射的一条清单行。 */

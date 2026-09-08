@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.md
-2026-09-07-codex-import-reconciliation.md: 951e43b64af261277439196a962a84ceacb105f6
-2026-09-07-codex-import-reconciliation.zh.md: 44e3714ddddf9c202042f55c17499868ffc46950
+2026-09-07-codex-import-reconciliation.md: 0a97d79b4f8eecbc2ad9379c2e12b4b5554f7200
+2026-09-07-codex-import-reconciliation.zh.md: bcdc54910604d9fb2e498599180f6375c3764ae3

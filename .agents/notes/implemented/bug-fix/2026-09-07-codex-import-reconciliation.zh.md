@@ -10,7 +10,7 @@ Codex 导入会从 `thread_history_1.sqlite` 读取每条线程，但固定 DSH 
 
 ## Decision
 
-每一轮扫描都会转换每个非空 Codex 线程，并将完整事件日志与 header 同已存储的 `codex-<threadId>` 快照比较。索引标题缺失时回退到第一条用户消息。最新绝对 command 或 MCP cwd 写入 header cwd。无变化快照只修复工作区成员关系。变化快照会替换持久 JSONL artifact，并替换非 Agent 所有的活跃会话；目标工作区挂入前，所有旧工作区账户先 detach 该 id。Agent 所有的会话会延后并在下一轮报告。
+每一轮扫描都会转换每个非空 Codex 线程，并将完整事件日志与 header 同已存储的 `codex-<threadId>` 快照比较。整理名缺失时回退到索引标题，再回退到第一条用户消息。`state_5.sqlite` 中 Codex 的线程级 cwd 写入 header cwd；没有索引条目时回退到最新绝对 command 或 MCP cwd。无变化快照只修复工作区成员关系。变化快照会替换持久 JSONL artifact，并替换非 Agent 所有的活跃会话；目标工作区挂入前，所有旧工作区账户先 detach 该 id。Agent 所有的会话会延后并在下一轮报告。
 
 `SessionPersistence.replace` 是显式 opt-in 能力：不支持的 provider 会失败大声。JSONL 通过持久 replacement journal 实现它，因此跨 cwd 迁移会在再次发现会话前恢复旧 artifact 或完成清理。
 

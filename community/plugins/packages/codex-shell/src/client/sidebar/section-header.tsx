@@ -15,6 +15,7 @@ export interface SectionHeaderProps {
   onOrganize: (mode: OrganizeMode) => void
   onSort: (mode: SortMode) => void
   onAddWorkspace: () => void
+  onAddProject: () => void
   t: TFn
 }
 
@@ -84,6 +85,11 @@ export function SectionHeader(props: SectionHeaderProps): React.ReactNode {
             label={props.t('sortManual')}
             trailing={props.sort === 'manual' ? '✓' : undefined}
             onClick={() => { props.onSort('manual'); setOpen(false) }}
+          />
+          <MenuSep />
+          <MenuItem
+            label={props.t('addProject')}
+            onClick={() => { props.onAddProject(); setOpen(false) }}
           />
         </div>
       )}

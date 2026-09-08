@@ -10,7 +10,7 @@ Codex imports read every thread from `thread_history_1.sqlite`, but a fixed DSH 
 
 ## Decision
 
-Every sweep converts every non-empty Codex thread and compares its complete event log plus header with the stored `codex-<threadId>` snapshot. A missing index title falls back to the first user message. The latest absolute command or MCP cwd is the header cwd. Unchanged snapshots only repair workspace membership. Changed snapshots replace their durable JSONL artifact and replace the non-Agent live session; all prior workspace accounts detach the id before the target workspace attaches it. An Agent-owned session is deferred and reported for the next sweep.
+Every sweep converts every non-empty Codex thread and compares its complete event log plus header with the stored `codex-<threadId>` snapshot. A missing curated name falls back to the index title, then the first user message. Codex's thread-level cwd from `state_5.sqlite` is the header cwd, falling back to the latest absolute command or MCP cwd when no index entry exists. Unchanged snapshots only repair workspace membership. Changed snapshots replace their durable JSONL artifact and replace the non-Agent live session; all prior workspace accounts detach the id before the target workspace attaches it. An Agent-owned session is deferred and reported for the next sweep.
 
 `SessionPersistence.replace` is an explicit opt-in capability: unsupported providers reject loudly. JSONL implements it with a persisted replacement journal, so a cross-cwd rehome either restores the old artifact or finishes cleanup before discovery resumes.
 

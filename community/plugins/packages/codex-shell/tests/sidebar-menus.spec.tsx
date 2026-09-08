@@ -165,6 +165,7 @@ describe('section header', () => {
         onOrganize={onOrganize}
         onSort={onSort}
         onAddWorkspace={vi.fn()}
+        onAddProject={vi.fn()}
         t={t}
       />,
     )

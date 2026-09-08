@@ -10,11 +10,13 @@ import type { ReactNode } from 'react'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
   GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse,
+  ProjectAddDirResponse, ProjectDirsResponse, ProjectView,
 } from 'dsh-codex-shell/types'
 
 export type SessionId = string
 export type WorkspaceId = string
+
+export type { ProjectView } from 'dsh-codex-shell/types'
 
 /** Minimal durable session row the sidebar renders. */
 export interface SessionSummaryLike {
@@ -113,6 +115,11 @@ export interface CodexShellRemoteFace {
   projectDirs(workspaceId: string): Promise<RemoteResult<ProjectDirsResponse>>
   projectSetDirs(workspaceId: string, dirs: readonly string[]): Promise<RemoteResult<ProjectDirsResponse>>
   projectAddDir(workspaceId: string, path: string): Promise<RemoteResult<ProjectAddDirResponse>>
+  projectList(): Promise<RemoteResult<{ projects: readonly ProjectView[] }>>
+  projectCreate(request: { name: string; roots?: readonly string[] }): Promise<RemoteResult<{ project: ProjectView }>>
+  projectRename(request: { projectId: string; name: string }): Promise<RemoteResult<{ project: ProjectView }>>
+  projectSetRoots(request: { projectId: string; roots: readonly string[] }): Promise<RemoteResult<{ project: ProjectView }>>
+  projectDelete(request: { projectId: string }): Promise<RemoteResult<{ deleted: boolean }>>
 }
 
 /** Typert client remote face the gateway provides. */

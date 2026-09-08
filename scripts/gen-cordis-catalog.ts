@@ -600,6 +600,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   DomainSpec: 'storage.md',
   DomainChanged: 'storage.md',
   DomainFacility: 'storage.md',
+  Project: 'workspace.md',
+  ProjectId: 'workspace.md',
   Workspace: 'workspace.md',
   WorkspaceArchiveSessionRequest: 'workspace.md',
   WorkspaceArchiveValue: 'workspace.md',

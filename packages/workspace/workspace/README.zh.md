@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-workspace` 为宿主提供一组持久 workspace：命名用户目录，每个目录带有在其中运行的会话，并在重启之间保持稳定顺序。借助它，UI 可以显示项目侧边栏、把会话附加到正确的项目、把会话从分组中隐藏而不丢失它，以及移除项目——移除绝不会删除文件夹或会话历史，它们变成 Ungrouped。在需要持久项目分组的 GUI 或宿主组合中使用它；headless 与最小运行可以完全省略它。此包只面向宿主侧：模型、工具与 agent loop 永远不会看到它，因此不会增加任何 token、提示词或请求上下文。它需要会话存储与持久化后端一并挂载；设置只需几行组合配置。
+`dsh-workspace` 为宿主提供一组持久 workspace：命名用户目录，每个目录带有在其中运行的会话，并在重启之间保持稳定顺序。一个持久的 `projects` 层把这些 workspace 归入命名、多 root 的项目之下，因此侧栏可以镜像 Codex 式“项目 / 工作区 / 会话”层级。UI 可以显示该层级、把会话附加到正确的工作区、把会话从分组中隐藏而不丢失它，以及移除项目或工作区——移除绝不会删除文件夹或会话历史，它们变成 Ungrouped。在需要持久分组的 GUI 或宿主组合中使用它；headless 与最小运行可以完全省略它。此包只面向宿主侧：模型、工具与 agent loop 永远不会看到它，因此不会增加任何 token、提示词或请求上下文。它需要会话存储与持久化后端一并挂载；设置只需几行组合配置。
 
 ## 目录
 
@@ -59,6 +59,21 @@ await project.setTitle('Renamed')
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
 
+### 将工作区归入项目
+
+用一个显示名称和有序目录 roots 列表创建项目层。工作区归入最长 root 前缀命中其规范路径的项目，因此一个逻辑项目可以拥有多个检出目录。项目有自己的稳定顺序；重命名、改 roots、重排和删除项目都不会触及下面的工作区或会话：
+
+```text
+// Host consumer code:
+const project = await ctx.workspaceRegistry.createProject('deepseek-harness', ['E:\\KW\\qtGit\\deepseek-harness'])
+await project.setName('deepseek-harness')
+await project.setRoots(['E:\\KW\\qtGit\\deepseek-harness', 'E:\\KW\\qtGit\\97a7\\deepseek-harness'])
+ctx.workspaceRegistry.listProjects() // shows projects in their own durable order
+ctx.workspaceRegistry.projectForPath('E:\\KW\\qtGit\\deepseek-harness') // the owning project
+```
+
+空 root 绝不命中，较长的 root 在平局时优先。路径不被任何 root 命中的工作区保持 Ungrouped。
+
 ### 将会话归入项目
 
 会话加入它运行目录所在的项目：在项目目录中创建会话，它就会出现在该项目下，新到旧排列。一个会话只能属于一个项目。目录无法校验的会话——没有记录目录，或目录被移动、删除——无法加入，保持 Ungrouped。
@@ -95,14 +110,15 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`WorkspaceRegistry` 服务、头部索引、引导、操作串行化 |
 | [`src/entity.ts`](src/entity.ts) | 包私有 `Workspace` 实现及其唯一的 `mutate` 写入路径 |
+| [`src/project.ts`](src/project.ts) | 包私有 `Project` 实现及其唯一的 `mutate` 写入路径 |
 | [`src/spec.ts`](src/spec.ts) | 领域声明：记录 schema、注册表状态、`defineDomain` 规范 |
-| [`src/types.ts`](src/types.ts) | 公开 `Workspace` 接口与 `WorkspaceId` 品牌 |
+| [`src/types.ts`](src/types.ts) | 公开 `Workspace` 与 `Project` 接口及其 id 品牌 |
 | [`src/paths.ts`](src/paths.ts) | `realpath` 唯一性规范 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件：实体缓存镜像持久表 |
 
 ### 持久形态
 
-注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`archivedSessionIds` 与可选 `pendingMutation` 标记的全局状态。在 `archivedSessionIds` 存在之前写入的记录会通过 schema 默认值解析为空集合。
+注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表、一张以 `ProjectId` 为键的 `projects` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`projectIds`（项目层顺序）、`archivedSessionIds` 与可选 `pendingMutation` 标记的全局状态。在 `archivedSessionIds` 或 `projectIds` 存在之前写入的记录会通过各自 schema 默认值解析为空集合。
 
 ### 生命周期
 

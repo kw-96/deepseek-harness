@@ -2863,6 +2863,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a fresh ordered array of workspace entities.',
       },
       {
+        signature: 'createProject(name: string, roots: readonly string[] = []): Promise<Project>',
+        description: 'Create a project grouping over ordered directory roots.',
+        parameters: [{ name: 'name', description: 'Display tier name.' }, { name: 'roots', description: 'Ordered directory roots whose prefix matches workspaces.' }],
+        returns: 'the newly durable project.',
+      },
+      {
+        signature: 'getProject(id: ProjectId): Project | undefined',
+        description: 'Look up a project by id.',
+        parameters: [{ name: 'id', description: 'Project id.' }],
+        returns: 'the project, or `undefined` when unknown.',
+      },
+      {
+        signature: 'listProjects(): Project[]',
+        description: 'Synchronous project projection in durable registry order.',
+        parameters: [],
+        returns: 'a fresh ordered array of project entities.',
+      },
+      {
+        signature: 'projectForPath(path: string): Project | undefined',
+        description: 'Resolve the project owning one canonical directory path by longest root prefix; the empty root never matches, and longer roots win ties.',
+        parameters: [{ name: 'path', description: 'Canonical directory path to classify.' }],
+        returns: 'the owning project, or `undefined` when no root prefixes it.',
+      },
+      {
+        signature: 'deleteProject(id: ProjectId): Promise<boolean>',
+        description: 'Delete one project registration; its directory roots and workspaces are retained. The durable order is updated before the table deletion; a failed table write restores the prior order. Unknown ids are an idempotent no-op.',
+        parameters: [{ name: 'id', description: 'Project to remove.' }],
+        returns: '`true` when a record was deleted, `false` when it was unknown.',
+      },
+      {
+        signature: 'insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>',
+        description: 'Move one project within the durable display order, DOM-insertBefore-like.',
+        parameters: [{ name: 'id', description: 'The project to move.' }, { name: 'beforeId', description: 'Project to insert before; omitted appends.' }],
+        returns: 'the complete committed project order.',
+      },
+      {
         signature: 'delete(id: WorkspaceId): Promise<boolean>',
         description: 'Delete one workspace registration while retaining its directory and every session log. The durable order is updated before the table deletion; a failed table write restores the prior order and keeps the entity published. Unknown ids are an idempotent no-op for domain callers.',
         parameters: [{ name: 'id', description: 'Workspace registration to remove.' }],
@@ -4595,6 +4631,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PreToolDecision',
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+  },
+  {
+    name: 'Project',
+    declaration: 'export interface Project {\n    readonly id: ProjectId;\n    readonly name: string;\n    readonly roots: readonly string[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    setName(name: string): Promise<void>;\n    setRoots(roots: readonly string[]): Promise<void>;\n}',
   },
   {
     name: 'ProjectionChangeListener',

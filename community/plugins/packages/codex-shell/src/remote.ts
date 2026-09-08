@@ -3,13 +3,16 @@ import { z } from 'zod'
 import type {
   FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions, FsWriteResponse,
   GitBranchesResponse, GitCheckoutResponse, GitCommitResponse, GitDiffResponse, GitLogResponse,
-  GitSimpleResponse, GitStatusResponse, ProjectAddDirResponse, ProjectDirsResponse, ProjectSetDirsResponse,
+  GitSimpleResponse, GitStatusResponse, ProjectAddDirResponse, ProjectCreateRequest, ProjectDeleteRequest,
+  ProjectDeleteResponse, ProjectDirsResponse, ProjectListResponse, ProjectRenameRequest, ProjectSetDirsResponse,
+  ProjectSetRootsRequest, ProjectValue,
   TerminalFollowFrame, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse, TerminalReadResponse,
   TerminalResizeResponse, TerminalSendResponse, TerminalWriteResponse,
 } from './types.js'
 import {
   codexOk, fsContentSearchValue, fsListValue, fsNameSearchValue, fsReadValue, fsSearchOptions,
-  gitBranchValue, gitLogValue, gitStatusValue, projectAddValue, projectDirsValue,
+  gitBranchValue, gitLogValue, gitStatusValue, projectAddValue, projectDeleteValue, projectDirsValue, projectListValue,
+  projectValue,
   terminalFollowValue, terminalListValue, terminalOkValue, terminalOpenOptions, terminalOpenValue,
   terminalReadValue, terminalSendValue,
 } from './types.js'
@@ -76,6 +79,11 @@ const descriptors = [
   descriptor('projectDirs', [parameter('workspaceId', z.string())], projectDirsValue, 'ProjectDirsResponse'),
   descriptor('projectSetDirs', [parameter('workspaceId', z.string()), parameter('dirs', z.array(z.string()))], projectDirsValue, 'ProjectSetDirsResponse'),
   descriptor('projectAddDir', [parameter('workspaceId', z.string()), parameter('path', z.string())], projectAddValue, 'ProjectAddDirResponse'),
+  descriptor('projectList', [], projectListValue, 'ProjectListResponse'),
+  descriptor('projectCreate', [parameter('request', z.object({ name: z.string(), roots: z.array(z.string()).optional() }))], projectValue, 'ProjectValue'),
+  descriptor('projectRename', [parameter('request', z.object({ projectId: z.string(), name: z.string() }))], projectValue, 'ProjectValue'),
+  descriptor('projectSetRoots', [parameter('request', z.object({ projectId: z.string(), roots: z.array(z.string()) }))], projectValue, 'ProjectValue'),
+  descriptor('projectDelete', [parameter('request', z.object({ projectId: z.string() }))], projectDeleteValue, 'ProjectDeleteResponse'),
 ] as const
 
 export const TYPERT_REMOTE: TypertRemoteContribution = { package: 'dsh-codex-shell', descriptors }
@@ -116,6 +124,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/projectDirs': (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
     'codexShell/projectSetDirs': (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
     'codexShell/projectAddDir': (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>
+    'codexShell/projectList': () => Promise<RemoteResult<ProjectListResponse>>
+    'codexShell/projectCreate': (request: ProjectCreateRequest) => Promise<RemoteResult<ProjectValue>>
+    'codexShell/projectRename': (request: ProjectRenameRequest) => Promise<RemoteResult<ProjectValue>>
+    'codexShell/projectSetRoots': (request: ProjectSetRootsRequest) => Promise<RemoteResult<ProjectValue>>
+    'codexShell/projectDelete': (request: ProjectDeleteRequest) => Promise<RemoteResult<ProjectDeleteResponse>>
   }
   interface TypertRemoteNamespaceMap {
     codexShell: {
@@ -149,6 +162,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       projectDirs: (workspaceId: string) => Promise<RemoteResult<ProjectDirsResponse>>
       projectSetDirs: (workspaceId: string, dirs: readonly string[]) => Promise<RemoteResult<ProjectSetDirsResponse>>
       projectAddDir: (workspaceId: string, path: string) => Promise<RemoteResult<ProjectAddDirResponse>>
+      projectList: () => Promise<RemoteResult<ProjectListResponse>>
+      projectCreate: (request: ProjectCreateRequest) => Promise<RemoteResult<ProjectValue>>
+      projectRename: (request: ProjectRenameRequest) => Promise<RemoteResult<ProjectValue>>
+      projectSetRoots: (request: ProjectSetRootsRequest) => Promise<RemoteResult<ProjectValue>>
+      projectDelete: (request: ProjectDeleteRequest) => Promise<RemoteResult<ProjectDeleteResponse>>
     }
   }
 }

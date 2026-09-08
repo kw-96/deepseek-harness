@@ -47,7 +47,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 - Automatic import is disabled by default. Enabling `autoSync` runs one sweep immediately and then repeats it at `syncIntervalMs`; **Import now** always runs one sweep.
 - Each imported session keeps a fixed id: `codex-` plus the Codex thread id. Re-runs compare its complete converted snapshot, replace changed imported logs, and reconcile exactly one matching Workspace membership. A session owned by a live Agent is deferred until a later sweep.
-- The session title comes from Codex's `session_index.jsonl` when present, otherwise from the first user message. The session `cwd` comes from the latest absolute command or MCP cwd in the thread (the configured `cwd` otherwise).
+- The session title comes from Codex's curated thread name in `state_5.sqlite`, otherwise `session_index.jsonl`, otherwise the first user message. The session `cwd` comes from Codex's thread-level working directory in `state_5.sqlite` (the configured `cwd` otherwise), so DSH workspace grouping mirrors Codex's project view.
 - Imported sessions are stored durably and published live, then attached to a Workspace with the same canonical `cwd`, so they appear under the matching working directory in the Web session list and remain listed after restart.
 - A thread whose store or conversion fails is skipped with a warning; one broken thread never stops the sweep.
 - With no Codex thread store, the plugin logs that there is nothing to import and loads normally.

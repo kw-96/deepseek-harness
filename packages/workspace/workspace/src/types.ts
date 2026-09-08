@@ -15,10 +15,18 @@ import type {} from '@deepseek-ai/dsh-typert-protocol'
  */
 export type WorkspaceId = Branded<'WorkspaceId'>
 
+/**
+ * Identifies one project record. A generated uuid; the display name can be
+ * rewritten and roots can change, so the anchor stays stable.
+ */
+export type ProjectId = Branded<'ProjectId'>
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** No registration carries that Workspace identity. */
     'workspace/not-found': { readonly workspaceId: WorkspaceId }
+    /** No registration carries that Project identity. */
+    'project/not-found': { readonly projectId: ProjectId }
   }
 }
 
@@ -101,4 +109,41 @@ export interface Workspace {
    * @returns `'ok'` when the directory exists, `'missing-dir'` otherwise.
    */
   status(): Promise<'ok' | 'missing-dir'>
+}
+
+/**
+ * One project: a stable id over a display name and an ordered list of
+ * directory roots. Workspaces group under the project whose longest root
+ * prefixes their canonical path; roots may span several directories so one
+ * logical project can own multiple checkout directories.
+ */
+export interface Project {
+  /** Stable record id (generated uuid). */
+  readonly id: ProjectId
+
+  /** Display name shown in the sidebar project tier. */
+  readonly name: string
+
+  /** Ordered directory roots, in user order. */
+  readonly roots: readonly string[]
+
+  /** ISO-8601 creation instant. */
+  readonly createdAt: string
+
+  /** ISO-8601 instant of the last durable mutation. */
+  readonly updatedAt: string
+
+  /**
+   * Replace the display name durably.
+   * @param name - New name; any non-empty string, duplicates allowed.
+   * @returns resolution after durability.
+   */
+  setName(name: string): Promise<void>
+
+  /**
+   * Replace the ordered directory roots durably.
+   * @param roots - New ordered root paths.
+   * @returns resolution after durability.
+   */
+  setRoots(roots: readonly string[]): Promise<void>
 }

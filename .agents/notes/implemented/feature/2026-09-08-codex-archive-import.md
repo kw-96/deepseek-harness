@@ -10,7 +10,7 @@ Codex keeps older conversations under `archived_sessions/*.jsonl`. The current i
 
 ## Decision
 
-The importer reads legacy archived rollout files, normalizes `session_meta`, `turn_context`, `event_msg`, and `response_item` records into the same `CodexThreadRecord` consumed by the current converter, and then uses the same title, cwd, snapshot reconciliation, and workspace rules as current threads. Archived files deduplicate by `session_id`, retaining the latest rollout. When a current SQLite thread shares that id, the current thread wins and the archive copy is skipped.
+The importer reads Codex's authoritative thread index from `state_5.sqlite` (`threads.rollout_path`, `threads.cwd`, `threads.name`, `threads.archived`). For each indexed thread it reads that rollout file, normalizing `session_meta`, `turn_context`, `event_msg`, and `response_item` records into the same `CodexThreadRecord` consumed by the current converter. Index entries also cover threads the current SQLite store or the legacy archive directory miss. Thread-level cwd and curated name override derived values, so DSH workspace grouping mirrors Codex's project view and archived threads keep their curated titles. When the current SQLite thread and an archived rollout share a session id, the current thread wins and the archive copy is skipped.
 
 ## Alternatives considered
 
@@ -20,4 +20,4 @@ The importer reads legacy archived rollout files, normalizes `session_meta`, `tu
 
 ## Consequences
 
-Archived-only Codex conversations become normal DSH sessions. Legacy rollout item types without a current mapping remain omitted from the transcript, while current SQLite threads continue to provide the authoritative version when both sources exist.
+Archived-only and index-only Codex conversations become normal DSH sessions under Codex's thread-level project directories. Legacy rollout item types without a current mapping remain omitted from the transcript, while current SQLite threads continue to provide the authoritative event content when both sources exist.

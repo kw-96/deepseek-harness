@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cordis HMR plugin manager for DeepSeek Harness (DSH): hot-load, inspect, enable, disable, group, and manage runtime plugins",
   "keywords": [
     "deepseek-harness",
@@ -89,7 +89,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.host.json && tsdown --config tsdown.host.config.ts && tsc -p tsconfig.client.json && tsdown --config tsdown.client.config.ts",
     "test": "pnpm run contracts && vitest run",
     "test:watch": "vitest",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-plugin-manager-0.1.0.tgz manager",
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-plugin-manager-0.1.1.tgz manager",
     "prepare": "pnpm run build"
   },
   "dependencies": {

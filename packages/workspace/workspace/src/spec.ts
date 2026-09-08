@@ -9,10 +9,11 @@ import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
-import type { WorkspaceId } from './types.ts'
+import type { ProjectId, WorkspaceId } from './types.ts'
 
 /** Workspace id schema at the durable boundary; branding has no runtime representation. */
 const workspaceId = z.string().transform(value => value as WorkspaceId)
+const projectId = z.string().transform(value => value as ProjectId)
 
 /**
  * Durable shape of one workspace record. `path` is the `fs.realpath` canon
@@ -29,6 +30,21 @@ export const workspaceRecord = z.object({
 
 /** One stored workspace record, inferred from {@link workspaceRecord}. */
 export type WorkspaceRecord = z.infer<typeof workspaceRecord>
+
+/**
+ * Durable shape of one project record. `name` is the display tier; `roots`
+ * are ordered directory roots whose prefix matches a workspace's canonical
+ * path; timestamps are ISO-8601 strings.
+ */
+export const projectRecord = z.object({
+  name: z.string(),
+  roots: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+/** One stored project record, inferred from {@link projectRecord}. */
+export type ProjectRecord = z.infer<typeof projectRecord>
 
 /**
  * Recoverable two-write mutation marker. The marker is persisted before the
@@ -52,6 +68,7 @@ const workspacePendingMutation = z.discriminatedUnion('operation', [
 export const workspaceDomainState = z.object({
   initialized: z.boolean(),
   workspaceIds: z.array(workspaceId),
+  projectIds: z.array(projectId).default([]),
   archivedSessionIds: z.array(z.string().transform(value => brandString<SessionId>(value))).default([]),
   pendingMutation: workspacePendingMutation.optional(),
 })
@@ -70,7 +87,10 @@ export const workspaceDomainSpec = defineDomain({
   version: 2,
   global: {
     schema: workspaceDomainState,
-    initial: { initialized: false, workspaceIds: [], archivedSessionIds: [] },
+    initial: { initialized: false, workspaceIds: [], projectIds: [], archivedSessionIds: [] },
   },
-  tables: { workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord) },
+  tables: {
+    workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord),
+    projects: domainTable<ProjectId, ProjectRecord>(projectRecord),
+  },
 })

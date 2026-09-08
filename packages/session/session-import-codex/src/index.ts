@@ -23,7 +23,7 @@ import {
 } from './settings.ts'
 import { loadCodexThreads } from './sqlite.ts'
 import { loadCodexArchivedThreads, readCodexRollout } from './archive/read.ts'
-import { loadCodexThreadIndex, type CodexThreadIndexEntry } from './state.ts'
+import { loadCodexProjects, loadCodexThreadIndex, type CodexProjectIndexEntry, type CodexThreadIndexEntry } from './state.ts'
 import type { CodexImportSession, CodexImportSweepResult, CodexThreadRecord, ImportBounds } from './types.ts'
 import { CodexImportReconciler, type CodexImportSnapshot } from './workspace.ts'
 
@@ -157,6 +157,29 @@ function importSnapshot(
   }
 }
 
+/** Compare two root lists for durable project reconciliation. */
+function sameRoots(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((root, index) => root === right[index])
+}
+
+/**
+ * Reconcile DSH projects from Codex projects by name; created projects keep
+ * Codex's root set and existing projects adopt a changed root set.
+ * @param ctx - context exposing the workspace registry.
+ * @param entries - Codex projects ordered by Codex position.
+ */
+async function reconcileProjects(ctx: Context, entries: readonly CodexProjectIndexEntry[]): Promise<void> {
+  const byName = new Map(ctx.workspaceRegistry.listProjects().map(project => [project.name, project]))
+  for (const entry of entries) {
+    const project = byName.get(entry.name)
+    if (project === undefined) {
+      await ctx.workspaceRegistry.createProject(entry.name, entry.roots)
+    } else if (!sameRoots(project.roots, entry.roots)) {
+      await project.setRoots(entry.roots)
+    }
+  }
+}
+
 /**
  * Run one idempotent import sweep over the Codex thread store. Never rejects:
  * a missing or unreadable store, a failed conversion, and a failed write are
@@ -199,6 +222,18 @@ export async function runImportSweep(
     return { summary, sessions }
   }
   const indexById = new Map(indexEntries.map(entry => [entry.threadId, entry]))
+  let codexProjects: CodexProjectIndexEntry[]
+  try {
+    codexProjects = await loadCodexProjects(config.codexHome)
+  } catch (error: unknown) {
+    ctx.logger.warn(`session-import-codex: could not read Codex projects at ${JSON.stringify(config.codexHome)}: ${String(error)}`)
+    codexProjects = []
+  }
+  try {
+    await reconcileProjects(ctx, codexProjects)
+  } catch (error: unknown) {
+    ctx.logger.warn(`session-import-codex: could not reconcile Codex projects: ${String(error)}`)
+  }
   const current = currentRecords ?? []
   const currentIds = new Set(current.map(record => record.threadId))
   const records: CodexThreadRecord[] = [...current, ...archivedRecords.filter(record => !currentIds.has(record.threadId))]

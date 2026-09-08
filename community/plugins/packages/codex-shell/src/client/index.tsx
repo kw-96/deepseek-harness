@@ -192,6 +192,11 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     detachSession: async (workspaceId, sessionId) => {
       await workspaces.detachSession(workspaceId, sessionId)
     },
+    listProjects: async () => unwrap(await codexRemote.projectList()),
+    createProject: async (name, roots) => unwrap(await codexRemote.projectCreate({ name, ...(roots === undefined ? {} : { roots }) })),
+    renameProject: async (projectId, name) => unwrap(await codexRemote.projectRename({ projectId, name })),
+    setProjectRoots: async (projectId, roots) => unwrap(await codexRemote.projectSetRoots({ projectId, roots })),
+    deleteProject: async projectId => unwrap(await codexRemote.projectDelete({ projectId })),
     openWorkspacePath: async (path) => {
       const openPath = sessionRemote?.openWorkspacePath
       if (openPath === undefined) throw new Error('session.openWorkspacePath unavailable')
@@ -247,6 +252,11 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       projectDirs: async workspaceId => unwrap(await codexRemote.projectDirs(workspaceId)),
       projectSetDirs: async (workspaceId, dirs) => unwrap(await codexRemote.projectSetDirs(workspaceId, dirs)),
       projectAddDir: async (workspaceId, path) => unwrap(await codexRemote.projectAddDir(workspaceId, path)),
+      projectList: async () => unwrap(await codexRemote.projectList()),
+      projectCreate: async request => unwrap(await codexRemote.projectCreate(request)),
+      projectRename: async request => unwrap(await codexRemote.projectRename(request)),
+      projectSetRoots: async request => unwrap(await codexRemote.projectSetRoots(request)),
+      projectDelete: async request => unwrap(await codexRemote.projectDelete(request)),
     },
     pluginManager,
     marketplace,

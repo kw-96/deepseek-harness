@@ -74,6 +74,20 @@ export const gitBranchValue = z.object({
 
 export const projectDirsValue = z.object({ dirs: z.array(z.string()).readonly() }).readonly()
 
+export const projectViewValue = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  roots: z.array(z.string()).readonly(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).readonly()
+
+export const projectListValue = z.object({ projects: z.array(projectViewValue).readonly() }).readonly()
+
+export const projectValue = z.object({ project: projectViewValue }).readonly()
+
+export const projectDeleteValue = z.object({ deleted: z.boolean() }).readonly()
+
 export const projectAddValue = z.object({ dirs: z.array(z.string()).readonly(), rejected: z.string().nullable() }).readonly()
 
 export const terminalStatusValue = z.union([
@@ -155,6 +169,20 @@ export interface ProjectSetDirsRequest { workspaceId: string; dirs: readonly str
 export interface ProjectSetDirsResponse { dirs: readonly string[] }
 export interface ProjectAddDirRequest { workspaceId: string; path: string }
 export interface ProjectAddDirResponse { dirs: readonly string[]; rejected: string | null }
+export interface ProjectView {
+  projectId: string
+  name: string
+  roots: readonly string[]
+  createdAt: string
+  updatedAt: string
+}
+export interface ProjectListResponse { projects: readonly ProjectView[] }
+export interface ProjectCreateRequest { name: string; roots?: readonly string[] }
+export interface ProjectValue { project: ProjectView }
+export interface ProjectRenameRequest { projectId: string; name: string }
+export interface ProjectSetRootsRequest { projectId: string; roots: readonly string[] }
+export interface ProjectDeleteRequest { projectId: string }
+export interface ProjectDeleteResponse { deleted: boolean }
 export interface TerminalOpenOptions {
   cwd?: string
   name?: string

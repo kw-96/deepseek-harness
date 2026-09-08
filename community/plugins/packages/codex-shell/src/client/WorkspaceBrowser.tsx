@@ -14,7 +14,7 @@ import { useSessionSearch } from './sidebar/search/use-session-search.js'
 import type { SessionMenuActions } from './sidebar/session-menu.js'
 import type { WorkspaceMenuActions } from './sidebar/workspace-menu.js'
 import type {
-  SearchResultLike, SelectorHook, SessionId, SessionListStateLike,
+  ProjectView, SearchResultLike, SelectorHook, SessionId, SessionListStateLike,
   TFn, WorkspaceSnapshotLike,
 } from './faces.js'
 import css from './styles.module.css'
@@ -37,6 +37,11 @@ export interface CodexBrowserInjected {
   attachSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
   moveSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
   detachSession: (workspaceId: string, sessionId: SessionId) => Promise<void>
+  listProjects: () => Promise<{ projects: readonly ProjectView[] }>
+  createProject: (name: string, roots?: readonly string[]) => Promise<{ project: ProjectView }>
+  renameProject: (projectId: string, name: string) => Promise<{ project: ProjectView }>
+  setProjectRoots: (projectId: string, roots: readonly string[]) => Promise<{ project: ProjectView }>
+  deleteProject: (projectId: string) => Promise<{ deleted: boolean }>
   openWorkspacePath: (path: string) => Promise<void>
   openTerminalForSession: (sessionId: SessionId, cwd?: string) => Promise<void>
   exportSessionMarkdown: (sessionId: SessionId) => Promise<string | null>
@@ -68,6 +73,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
     renameSession, forkSession, renameWorkspace, deleteWorkspace, archiveSession,
     insertSessionBefore, moveSession, detachSession, openWorkspacePath, openTerminalForSession,
     exportSessionMarkdown, canExportMarkdown, meta, prefs, t,
+    listProjects, createProject, renameProject, setProjectRoots, deleteProject,
   } = props
   const list = useSessions(state => state)
   const workspaces = useWorkspaces(state => state.items)
@@ -82,6 +88,30 @@ export function CodexBrowser(props: CodexBrowserProps) {
   const [renameDraft, setRenameDraft] = useState('')
   const [prefsSnap, setPrefs] = useBrowserPrefs(prefs)
   const [rev, bump] = useState(0)
+  const [projects, setProjects] = useState<readonly ProjectView[]>([])
+
+  const refreshProjects = async (): Promise<void> => {
+    try {
+      setProjects((await listProjects()).projects)
+    } catch {
+      // 项目读取失败时保留当前列表
+    }
+  }
+
+  useEffect(() => {
+    void refreshProjects()
+  }, [])
+
+  const addProject = async (): Promise<void> => {
+    const name = window.prompt(t('newProjectName'))
+    if (name === null || name.trim() === '') return
+    try {
+      await createProject(name.trim())
+      await refreshProjects()
+    } catch {
+      // 创建失败保持当前项目列表
+    }
+  }
 
   useEffect(() => {
     if (!(wide && searchOnExpand)) return
@@ -240,6 +270,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
           onOrganize={mode => { setPrefs({ organize: mode }); bump(n => n + 1) }}
           onSort={mode => { setPrefs({ sort: mode }); bump(n => n + 1) }}
           onAddWorkspace={requestAddWorkspaceOpen}
+          onAddProject={() => { void addProject() }}
           t={t}
         />
       )}
@@ -257,6 +288,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
           organize={prefsSnap.organize}
           sort={prefsSnap.sort}
           prefs={prefs}
+          projects={projects}
           onToggleGroup={key => { setCollapsed(prev => toggleSet(prev, key)) }}
           onOpen={open}
           onWorkspaceMenu={(event, workspaceId) => { openMenu(event, { workspaceId, isWorkspace: true }) }}

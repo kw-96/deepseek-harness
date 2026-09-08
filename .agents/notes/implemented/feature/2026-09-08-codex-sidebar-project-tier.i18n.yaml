@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-08-codex-sidebar-project-tier.md
+2026-09-08-codex-sidebar-project-tier.md: dffec25614c292fcc5fea8238f4f1f334dae2a3b
+2026-09-08-codex-sidebar-project-tier.zh.md: 68a62faca4af0859f498291b803f134d5d69cac7
