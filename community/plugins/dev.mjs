@@ -53,18 +53,24 @@ const watchOnly = process.argv.includes('--watch-only')
 function enableHmr(root) {
   const before = existsSync(patchFile) ? readFileSync(patchFile, 'utf8') : '[]\n'
   if (before.includes('id: hmr')) return
+  // cordis.patch.yml 顶层是 flow collection（`[ {…}, {…} ]`），hmr 条目必须用
+  // 同款 flow 语法；旧的块序列写法（`- id: hmr`）会触发 YAML 解析失败。
   const entry = [
     '  # Managed by community dev: enable Cordis HMR for linked plugins.',
-    '  - id: hmr',
-    '    disabled: false',
-    '    config:',
-    '      root:',
-    `        - ${root.replace(/\\/g, '/')}`,
+    '  {',
+    '    id: hmr,',
+    '    disabled: false,',
+    '    config: {',
+    '      root: [',
+    `        ${root.replace(/\\/g, '/')}`,
+    '      ]',
+    '    }',
+    '  }',
   ].join('\n')
   const close = before.lastIndexOf(']')
   const next = close < 0
     ? `${before.trimEnd()}\n[\n${entry}\n]\n`
-    : `${before.slice(0, close)}${entry}\n${before.slice(close)}`
+    : `${before.slice(0, close).trimEnd()},\n${entry}\n${before.slice(close)}`
   writeFileSync(patchFile, next)
 }
 
