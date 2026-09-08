@@ -67,6 +67,17 @@ function toSnapshot(row: IssueRow): IssueSnapshot {
   }
 }
 
+/** 统计聚合所需的轻量工单行。 */
+export interface StatsRow {
+  expectedDeliveryDate: string
+  projectName: string
+  artCategory: string
+  aiPipelineTime: unknown
+  designQuantity: unknown
+  gameProduct: string
+  assigneeName: string
+}
+
 /** 持久化工单快照，供巡检按更新时间复用。 */
 export class IssueRepository {
   constructor(private readonly db: Database.Database) {}
@@ -89,6 +100,30 @@ export class IssueRepository {
   /** 返回已入库工单总数。 */
   count(): number {
     return (this.db.prepare('SELECT COUNT(*) AS total FROM issues').get() as { total: number }).total
+  }
+
+  /**
+   * 返回统计聚合需要的轻量行；可选按期望交付日期（含端点）筛选。
+   * @param startDate YYYY-MM-DD 起始日期，缺省不限制
+   * @param endDate YYYY-MM-DD 结束日期，缺省不限制
+   */
+  listStatsRows(startDate?: string, endDate?: string): StatsRow[] {
+    const rows = this.db.prepare(`SELECT
+      expected_delivery_date expectedDeliveryDate, project_name projectName, art_category artCategory,
+      ai_pipeline_time aiPipelineTime, design_quantity designQuantity,
+      game_product gameProduct, assignee_name assigneeName
+      FROM issues
+      WHERE (substr(expected_delivery_date,1,10) BETWEEN ? AND ?)
+      ORDER BY expected_delivery_date ASC, id ASC`)
+      .all(startDate ?? '', endDate ?? '9999-12-31') as Array<Omit<StatsRow, 'aiPipelineTime' | 'designQuantity'> & {
+      aiPipelineTime: string
+      designQuantity: string
+    }>
+    return rows.map((row) => ({
+      ...row,
+      aiPipelineTime: fromCell(row.aiPipelineTime),
+      designQuantity: fromCell(row.designQuantity),
+    }))
   }
 
   /** 覆盖写入工单快照。 */

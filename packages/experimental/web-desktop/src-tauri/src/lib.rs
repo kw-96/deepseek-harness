@@ -10,14 +10,23 @@ use std::env;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 const READY_PREFIX: &str = "dsh web: http";
 const READY_TIMEOUT: Duration = Duration::from_secs(180);
 const DIST_INDEX_ENV: &str = "DSH_WEB_DIST_INDEX";
+
+type BootLogs = Arc<Mutex<Vec<String>>>;
+
+/// 返回启动页加载前已经产生的启动日志，补齐 WebView 尚未监听期间丢失的行。
+#[tauri::command]
+fn get_boot_logs(logs: tauri::State<BootLogs>) -> Vec<String> {
+  logs.lock().map(|guard| guard.clone()).unwrap_or_default()
+}
 
 struct HarnessChild {
   child: Child,
@@ -76,10 +85,13 @@ fn apply_no_window(command: &mut Command) {
   }
 }
 
-fn spawn_dsh_web(extra_args: &[String]) -> Result<(HarnessChild, std::process::ChildStdout), String> {
+fn spawn_dsh_web(
+  extra_args: &[String],
+  on_line: &mut dyn FnMut(&str),
+) -> Result<(HarnessChild, std::process::ChildStdout, std::process::ChildStderr), String> {
   let (cli, cwd) = resolve::resolve_dsh_cli()?;
   let dist_snapshot = match cwd.as_ref() {
-    Some(root) => Some(snapshot::snapshot_web_dist(root)?),
+    Some(root) => Some(snapshot::snapshot_web_dist(root, on_line)?),
     None => None,
   };
 
@@ -119,13 +131,34 @@ fn spawn_dsh_web(extra_args: &[String]) -> Result<(HarnessChild, std::process::C
     .stdout
     .take()
     .ok_or_else(|| "dsh web stdout was not piped".to_string())?;
+  let stderr = child
+    .stderr
+    .take()
+    .ok_or_else(|| "dsh web stderr was not piped".to_string())?;
   Ok((
     HarnessChild {
       child,
       dist_snapshot,
     },
     stdout,
+    stderr,
   ))
+}
+
+/// 持续把一行流读入 channel；读线程在 EOF 后关闭发送端。
+fn pump_lines<R: BufRead + Send + 'static>(reader: R, tx: mpsc::Sender<String>) {
+  thread::spawn(move || {
+    for line in reader.lines() {
+      match line {
+        Ok(line) => {
+          if tx.send(line).is_err() {
+            break;
+          }
+        }
+        Err(_) => break,
+      }
+    }
+  });
 }
 
 fn extract_ready_url(line: &str) -> Option<String> {
@@ -142,16 +175,19 @@ fn extract_ready_url(line: &str) -> Option<String> {
   }
 }
 
-fn wait_for_ready_url(stdout: std::process::ChildStdout) -> Result<String, String> {
-  let reader = BufReader::new(stdout);
+fn wait_for_ready_url(
+  rx: &mpsc::Receiver<String>,
+  handle: &tauri::AppHandle,
+) -> Result<String, String> {
   let started = Instant::now();
-  for line in reader.lines() {
+  for line in rx.iter() {
     if started.elapsed() > READY_TIMEOUT {
       break;
     }
-    let line = line.map_err(|error| format!("failed reading dsh web stdout: {error}"))?;
+    let ready = extract_ready_url(&line);
+    let _ = handle.emit("boot-log", &line);
     eprintln!("{line}");
-    if let Some(url) = extract_ready_url(&line) {
+    if let Some(url) = ready {
       return Ok(url);
     }
   }
@@ -174,18 +210,33 @@ pub fn run() {
   let extra_args = passthrough_args();
 
   let app = tauri::Builder::default()
+    .invoke_handler(tauri::generate_handler![get_boot_logs])
     .setup(move |app| {
       let handle = app.handle().clone();
+      let logs: BootLogs = Arc::new(Mutex::new(Vec::new()));
+      app.manage(Arc::clone(&logs));
+      let boot_logs = Arc::clone(&logs);
       thread::spawn(move || {
         let result = (|| -> Result<(), String> {
-          let (harness, stdout) = spawn_dsh_web(&extra_args)?;
+          let emit_handle = handle.clone();
+          let emit_logs = Arc::clone(&boot_logs);
+          let mut emit_line = move |line: &str| {
+            if let Ok(mut guard) = emit_logs.lock() {
+              guard.push(line.to_string());
+            }
+            let _ = emit_handle.emit("boot-log", line);
+          };
+          let (harness, stdout, stderr) = spawn_dsh_web(&extra_args, &mut emit_line)?;
           {
             let mut guard = child_for_setup
               .lock()
               .map_err(|_| "child lock poisoned".to_string())?;
             *guard = Some(harness);
           }
-          let url = wait_for_ready_url(stdout)?;
+          let (tx, rx) = mpsc::channel::<String>();
+          pump_lines(BufReader::new(stderr), tx.clone());
+          pump_lines(BufReader::new(stdout), tx);
+          let url = wait_for_ready_url(&rx, &handle)?;
           let parsed = url
             .parse::<url::Url>()
             .map_err(|error| format!("invalid harness URL {url}: {error}"))?;
@@ -194,6 +245,8 @@ pub fn run() {
             .ok_or_else(|| "main webview window missing".to_string())?
             .navigate(parsed)
             .map_err(|error| format!("failed to navigate to harness URL: {error}"))?;
+          // 就绪后继续消费输出，避免 stdout/stderr 管道写满后阻塞 dsh web。
+          for _line in rx.iter() {}
           Ok(())
         })();
 

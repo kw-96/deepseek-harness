@@ -2,7 +2,7 @@
   display: flex;
   align-items: stretch;
   flex: none;
-  height: 36px;
+  height: 40px;
   background: var(--dsw-specific-sidebar-fill, #16181d);
   border-bottom: 0.5px solid var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.08));
   color: var(--dsw-alias-label-primary, #e8eaed);
@@ -40,8 +40,8 @@
 }
 
 .iconBtn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -63,10 +63,10 @@
 }
 
 .menuBtn {
-  height: 28px;
+  height: 32px;
   padding: 0 10px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
 }
 
@@ -83,7 +83,6 @@
   padding: 6px;
   border-radius: 10px;
   background: var(--dsw-alias-bg-overlay, #2a2d33);
-  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin, rgba(255, 255, 255, 0.1));
   box-shadow: var(--dsw-elevation-prominent, 0 8px 24px rgba(0, 0, 0, 0.35));
   z-index: 50;
 }
@@ -128,7 +127,6 @@
 
 .winBtn {
   width: 46px;
-  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

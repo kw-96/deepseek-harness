@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -97,6 +97,9 @@ if (!watchOnly) {
     } catch {
       // 目标不存在则忽略。
     }
+    // 作用域包（如 @ruihuahe/...）的父目录在全新 profile 上尚不存在，
+    // junction 的创建要求目标父目录就位。
+    mkdirSync(dirname(target), { recursive: true })
     symlinkSync(plugin.dir, target, 'junction')
     ensureBundle(plugin.name)
   }

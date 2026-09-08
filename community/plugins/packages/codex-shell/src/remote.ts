@@ -47,7 +47,7 @@ const descriptors = [
   descriptor('fsSearchName', [parameter('root', z.string()), parameter('query', z.string()), parameter('options', fsSearchOptions.optional())], fsNameSearchValue, 'FsNameSearchResponse'),
   descriptor('fsSearchContent', [parameter('root', z.string()), parameter('query', z.string()), parameter('options', fsSearchOptions.optional())], fsContentSearchValue, 'FsContentSearchResponse'),
   descriptor('gitStatus', [parameter('cwd', z.string())], gitStatusValue, 'GitStatusResponse'),
-  descriptor('gitLog', [parameter('cwd', z.string()), parameter('count', optNumber)], gitLogValue, 'GitLogResponse'),
+  descriptor('gitLog', [parameter('cwd', z.string()), parameter('count', optNumber), parameter('path', optString)], gitLogValue, 'GitLogResponse'),
   descriptor('gitDiff', [parameter('cwd', z.string()), parameter('path', optString), parameter('staged', optBoolean)], z.object({ text: z.string() }).readonly(), 'GitDiffResponse'),
   descriptor('gitStage', [parameter('cwd', z.string()), parameter('path', optString)], codexOk, 'GitSimpleResponse'),
   descriptor('gitUnstage', [parameter('cwd', z.string()), parameter('path', optString)], codexOk, 'GitSimpleResponse'),
@@ -100,7 +100,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/fsSearchName': (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsNameSearchResponse>>
     'codexShell/fsSearchContent': (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsContentSearchResponse>>
     'codexShell/gitStatus': (cwd: string) => Promise<RemoteResult<GitStatusResponse>>
-    'codexShell/gitLog': (cwd: string, count?: number) => Promise<RemoteResult<GitLogResponse>>
+    'codexShell/gitLog': (cwd: string, count?: number, path?: string) => Promise<RemoteResult<GitLogResponse>>
     'codexShell/gitDiff': (cwd: string, path?: string, staged?: boolean) => Promise<RemoteResult<GitDiffResponse>>
     'codexShell/gitStage': (cwd: string, path?: string) => Promise<RemoteResult<GitSimpleResponse>>
     'codexShell/gitUnstage': (cwd: string, path?: string) => Promise<RemoteResult<GitSimpleResponse>>
@@ -138,7 +138,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       fsSearchName: (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsNameSearchResponse>>
       fsSearchContent: (root: string, query: string, options?: FsSearchOptions) => Promise<RemoteResult<FsContentSearchResponse>>
       gitStatus: (cwd: string) => Promise<RemoteResult<GitStatusResponse>>
-      gitLog: (cwd: string, count?: number) => Promise<RemoteResult<GitLogResponse>>
+      gitLog: (cwd: string, count?: number, path?: string) => Promise<RemoteResult<GitLogResponse>>
       gitDiff: (cwd: string, path?: string, staged?: boolean) => Promise<RemoteResult<GitDiffResponse>>
       gitStage: (cwd: string, path?: string) => Promise<RemoteResult<GitSimpleResponse>>
       gitUnstage: (cwd: string, path?: string) => Promise<RemoteResult<GitSimpleResponse>>

@@ -35,7 +35,7 @@ import {
   type PreviewFixtureManifest,
 } from '@deepseek-ai/dsh-experimental-webworker-runtime'
 import { captureStableAria, compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
-import { newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
+import { expandOwningTurnProcess, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
 
 const DIST_ROOT = fileURLToPath(new URL('../dist', import.meta.url))
 
@@ -183,7 +183,10 @@ async function respond(
   overrides: ReadonlyMap<string, string>,
 ): Promise<void> {
   const path = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
-  const relative = normalize(decodeURIComponent(path)).replace(/^\/+/, '')
+  // `normalize` resolves traversal, and on Windows it turns the leading
+  // separator into a backslash; strip either kind, then canonicalize the rest
+  // to forward slashes so the override-map keys (`preview/…`) still match.
+  const relative = normalize(decodeURIComponent(path)).replace(/^[\\/]+/, '').replaceAll('\\', '/')
   try {
     const body = await readFile(overrides.get(relative) ?? join(DIST_ROOT, relative))
     response.writeHead(200, { 'content-type': MIME[extname(relative)] ?? 'application/octet-stream' })
@@ -244,8 +247,6 @@ async function within<T>(work: Promise<T>, ms: number, stalled: string): Promise
 it('boots the packed worker deployment to an interactive page', async () => {
   requirePreviewPages()
   const assets = requireVfsAssets()
-  // TEMP diagnostic: inspect override keys.
-  console.log('TEMP overrides keys:', JSON.stringify([...assets.overrides.keys()]))
   try {
     const site = await serveDist(assets.overrides)
     try {
@@ -396,12 +397,24 @@ async function bootPreview(origin: string, browser: Browser): Promise<void> {
     await page.getByText(SHOWCASE_TAIL, { exact: true }).waitFor({ timeout: 30_000 })
 
     expect(await page.getByText(SHOWCASE_OLDEST, { exact: true }).count()).toBe(0)
-    await page.getByText('PREVIEW.md', { exact: true }).waitFor()
-    await page.getByText('src/preview.ts', { exact: true }).waitFor()
-    await page.getByText('Update to-do list', { exact: true }).waitFor()
-    await page.getByText('Error: ENOENT: no such file, open missing.txt', { exact: true }).waitFor()
+    // The settled turns render compact-folded, so each tool-carried file link
+    // lives in a collapsed process region until its owning turn is expanded.
+    const previewFile = page.getByText('PREVIEW.md', { exact: true })
+    await expandOwningTurnProcess(page, previewFile)
+    await previewFile.waitFor()
+    const previewSource = page.getByText('src/preview.ts', { exact: true })
+    await expandOwningTurnProcess(page, previewSource)
+    await previewSource.waitFor()
+    const todoUpdate = page.getByText('Update to-do list', { exact: true })
+    await expandOwningTurnProcess(page, todoUpdate)
+    await todoUpdate.waitFor()
+    const missingFile = page.getByText('Error: ENOENT: no such file, open missing.txt', { exact: true })
+    await expandOwningTurnProcess(page, missingFile)
+    await missingFile.waitFor()
 
-    const subagents = page.getByRole('button', { name: '2 subagents' })
+    // Both settled subagent turns now render their lineage controls; pick the
+    // first visible one the way the sidebar does.
+    const subagents = page.getByRole('button', { name: '2 subagents' }).first()
     await subagents.waitFor({ timeout: 15_000 })
     await subagents.hover()
     const catalog = page.getByRole('tree', { name: 'Subagent sessions' })
@@ -446,10 +459,7 @@ async function bootEmptyPreview(origin: string, browser: Browser): Promise<void>
       treeActive,
       BOOT_TIMEOUT_MS,
       `empty preview boot: the worker never reported "${TREE_ACTIVE}"`,
-    ).catch((error: unknown) => {
-      // TEMP diagnostic: surface what the worker said before the milestone gave up.
-      throw new Error(`${String(error)}\nconsoleErrors=${JSON.stringify(consoleErrors, null, 2)}\npageErrors=${JSON.stringify(pageErrors.map(item => String(item)), null, 2)}\nfailedResponses=${JSON.stringify(failedResponses, null, 2)}`)
-    })
+    )
     expect(bootLine).toContain(`image lowering=${WRAPPER_CONTRACT}`)
     expect(bootLine).toContain('data overlays=0')
     await page.getByRole('textbox', { name: 'Choose workspace' }).waitFor({ timeout: HERO_TIMEOUT_MS })

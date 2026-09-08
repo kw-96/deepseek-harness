@@ -44,6 +44,7 @@ export const en = {
   'desktop.nav.forward': 'Forward',
   'desktop.window.minimize': 'Minimize',
   'desktop.window.maximize': 'Maximize',
+  'desktop.window.restore': 'Restore',
   'desktop.menu.file': 'File',
   'desktop.menu.edit': 'Edit',
   'desktop.menu.view': 'View',

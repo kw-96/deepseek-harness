@@ -42,6 +42,7 @@ export const zh = {
   'desktop.nav.forward': '前进',
   'desktop.window.minimize': '最小化',
   'desktop.window.maximize': '最大化',
+  'desktop.window.restore': '还原',
   'desktop.menu.file': '文件',
   'desktop.menu.edit': '编辑',
   'desktop.menu.view': '视图',

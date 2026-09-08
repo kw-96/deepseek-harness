@@ -36,6 +36,9 @@ export function setZoom(factor: number): void {
 
 /** Run a document editing command when the browser supports it. */
 export function editCommand(command: string): void {
+  // execCommand is the only browser path for the edit-menu commands
+  // (undo/redo/cut/copy/paste/delete/select-all); deprecated but retained.
+  // oxlint-disable-next-line typescript/no-deprecated
   try { document.execCommand(command) } catch { /* unsupported command */ }
 }
 

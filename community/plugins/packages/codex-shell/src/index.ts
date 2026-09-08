@@ -90,8 +90,8 @@ export class CodexShell extends TypertRemoteService {
   }
 
   @Remote('gitLog')
-  async gitLog(cwd: string, count?: number): Promise<GitLogResponse> {
-    return await gitLog(this.ctx.shell, cwd, count)
+  async gitLog(cwd: string, count?: number, path?: string): Promise<GitLogResponse> {
+    return await gitLog(this.ctx.shell, cwd, count, path)
   }
 
   @Remote('gitDiff')

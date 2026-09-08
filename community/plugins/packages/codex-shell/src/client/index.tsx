@@ -11,6 +11,8 @@
  * 槽位核心仍会对每个名字做加载期强校验。
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { useEffect, useRef } from 'react'
+import { PanelLeftOpen } from 'lucide-react'
 import remoteContribution from 'dsh-codex-shell/remote'
 import { SessionMetaStore } from './session-meta.js'
 import { BrowserPrefsStore } from './sidebar/prefs.js'
@@ -31,6 +33,72 @@ export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces', 'c
 function unwrap<T>(result: { ok: true; value: T } | { ok: false; error: { code: string; message: string } }): T {
   if (result.ok) return result.value
   throw new Error(`${result.error.code}: ${result.error.message}`)
+}
+
+/** 是否运行在 Tauri 桌面壳（与 ui-layout 的探测一致）。 */
+function isDesktopShell(): boolean {
+  if (typeof window === 'undefined') return false
+  const candidate = window as Window & { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
+  return candidate.__TAURI_INTERNALS__ !== undefined || candidate.__TAURI__ !== undefined
+}
+
+/**
+ * 侧栏顶部品牌区控制（占用 sidebar.brand.mark 槽）：
+ * - 宽态 Web：隐藏品牌按钮本身，保留壳层行与行内折叠按钮（位于
+ *   新会话按钮上方），并压缩行高避免大片空白；
+ * - 宽态桌面壳：整行隐藏（标题栏已提供开合）；
+ * - 轨道态 Web：渲染常显的「打开侧栏」图标（壳层展开按钮即本槽内容，
+ *   不再需要悬浮才出现）；
+ * - 轨道态桌面壳：隐藏展开按钮（标题栏已提供开合）。
+ */
+function SidebarBrandControls(): React.ReactNode {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const anchor = ref.current
+    if (anchor === null) return
+    const button = anchor.closest('button')
+    if (button === null) return
+    const desktop = isDesktopShell()
+    const row = button.parentElement
+    const wide = button.querySelector('[data-slot="sidebar.brand.name"]') !== null
+    if (wide) {
+      // 宽态：品牌按钮隐藏；桌面壳连整行一起隐藏（行内无其它控件）。
+      button.style.display = 'none'
+      if (desktop) {
+        if (row !== null) row.style.display = 'none'
+        return () => {
+          button.style.display = ''
+          if (row !== null) row.style.display = ''
+        }
+      }
+      // Web：压缩空品牌行，让壳层折叠按钮贴住新会话按钮上方。
+      const priorHeight = row?.style.height ?? ''
+      const priorPadding = row?.style.padding ?? ''
+      if (row !== null) {
+        row.style.height = '28px'
+        row.style.padding = '0 4px'
+      }
+      return () => {
+        button.style.display = ''
+        if (row !== null) {
+          row.style.height = priorHeight
+          row.style.padding = priorPadding
+        }
+      }
+    }
+    // 轨道态：桌面壳隐藏展开按钮，Web 保留（本组件渲染常显打开图标）。
+    if (desktop && row !== null) {
+      row.style.display = 'none'
+      return () => { row.style.display = '' }
+    }
+    return undefined
+  }, [])
+  return (
+    <>
+      <div ref={ref} style={{ display: 'none' }} />
+      <PanelLeftOpen size={18} aria-hidden="true" />
+    </>
+  )
 }
 
 interface SessionHistoryValueLike {
@@ -210,7 +278,6 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     canExportMarkdown: (connection as ConnectionProbeLike).api?.sessions?.history !== undefined,
     meta,
     prefs,
-    toggleSidebar: () => { layout?.toggleSidebar() },
   })
 
   const addWorkspaceInject = (): AddWorkspaceInjected => ({
@@ -276,16 +343,12 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeBrandName = slots.inject('sidebar.brand.name', () => slots.register({
     name: 'sidebar.brand.name', id: 'codex-hide-brand-name', locale: 'codex-shell',
   }, () => null))
-  // 隐藏侧栏顶部品牌行（DeepSeek 图标 + 文字）：mark 槽渲染一条全局样式，
-  // 只隐藏「同时包含 mark 与 name 槽」的品牌按钮所在行；折叠轨道态的
-  // 展开按钮不含 name 槽，不受影响。折叠入口改由项目标题栏提供。
-  const BRAND_ROW_HIDE_CSS = `
-    div:has(> button:has([data-slot="sidebar.brand.mark"]):has([data-slot="sidebar.brand.name"])) { display: none; }
-  `
-  const HideBrandMark = () => <style>{BRAND_ROW_HIDE_CSS}</style>
+  // 侧栏顶部品牌区控制：mark 槽挂载 SidebarBrandControls ——
+  // Web 宽态隐藏品牌按钮、保留壳层折叠按钮并压缩行高；轨道态常显
+  // 打开图标；桌面独立窗口两种状态都不显示开合控件（标题栏负责）。
   const disposeBrandMark = slots.inject('sidebar.brand.mark', () => slots.register({
-    name: 'sidebar.brand.mark', id: 'codex-hide-brand-mark', locale: 'codex-shell',
-  }, HideBrandMark))
+    name: 'sidebar.brand.mark', id: 'codex-sidebar-brand-controls', locale: 'codex-shell',
+  }, SidebarBrandControls))
   // 添加工作区弹窗挂在侧栏页脚槽位（只承载弹窗与打开器，页脚无可见按钮；
   // 打开入口为标题栏「+」与桌面标题栏 File → Open Workspace）。
   const disposeAddWorkspace = slots.inject('sidebar.footer.action', () => slots.register({

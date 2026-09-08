@@ -153,7 +153,6 @@ describe('section header', () => {
         onSort={onSort}
         onAddWorkspace={vi.fn()}
         onAddProject={vi.fn()}
-        onCollapseSidebar={vi.fn()}
         t={t}
       />,
     )

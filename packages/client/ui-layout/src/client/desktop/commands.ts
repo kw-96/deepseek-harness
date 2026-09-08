@@ -32,7 +32,8 @@ export function dispatchDesktopCommand(command: DesktopCommand): void {
  */
 export function onDesktopCommand(handler: (command: DesktopCommand) => void): () => void {
   const listener = (event: Event): void => {
-    const detail = (event as CustomEvent<DesktopCommandDetail>).detail
+    // Unrelated same-name events may carry no detail payload at runtime.
+    const detail = (event as CustomEvent<DesktopCommandDetail | undefined>).detail
     if (detail === undefined) return
     handler(detail.command)
   }

@@ -2,10 +2,10 @@
  * Codex-style desktop title bar: sidebar toggle, back/forward, File/Edit/View
  * menus, drag region, and Windows window controls. Mounted only in Tauri.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelIcon } from './icons.tsx'
+import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelIcon, RestoreIcon } from './icons.tsx'
 import { buildMenus, navigateDropdownKey, tryRunMenuShortcut, type DesktopTitleBarT, type MenuId } from './menus.ts'
 import {
   canGoBack, canGoForward, createSessionHistory, goBack, goForward, pushSessionVisit,
@@ -35,6 +35,7 @@ export type DesktopTitleBarProps = {
 export function DesktopTitleBar(props: DesktopTitleBarProps) {
   const { t, sidebarCollapsed, toggleSidebar, toggleDetails, toggleBottom, openBottom, openSession, useSessions } = props
   const [menu, setMenu] = useState<MenuId | null>(null)
+  const [maximized, setMaximized] = useState(false)
   const historyRef = useRef(createSessionHistory())
   const navigating = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
@@ -42,6 +43,8 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
   const sessionIds = useSessions(s => s.ids)
   const [, setTick] = useState(0)
   const refreshHistory = useCallback(() => { setTick(n => n + 1) }, [])
+  // getCurrentWindow() returns a fresh proxy per call; memoize a stable face.
+  const win = useMemo(() => getDesktopWindow(), [])
 
   useEffect(() => {
     if (navigating.current) { navigating.current = false; return }
@@ -49,10 +52,46 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
     refreshHistory()
   }, [current, refreshHistory])
 
+  // Track the desktop window's maximized state so the button reflects it.
+  useEffect(() => {
+    if (win === undefined) return
+    let disposed = false
+    let unlisten: (() => void) | undefined
+    const sync = (): void => {
+      // 读取失败时保留上一状态；resize 事件与切换后的主动刷新会再次同步。
+      void win.isMaximized().then((value) => { if (!disposed) setMaximized(value) }).catch(() => {})
+    }
+    sync()
+    void win.onResized?.(sync).then((fn) => {
+      if (disposed) { fn(); return }
+      unlisten = fn
+    }).catch(() => { /* 订阅被拒绝时仍靠切换后的主动刷新同步 */ })
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [win])
+
+  // 切换最大化后主动回读状态，不单依赖 resize 事件。
+  const toggleMaximize = (): void => {
+    void (async () => {
+      if (win === undefined) return
+      await win.toggleMaximize()
+      setMaximized(await win.isMaximized())
+    })()
+  }
+
   useEffect(() => {
     if (menu === null) return
     const onPointer = (event: PointerEvent): void => {
-      if (rootRef.current?.contains(event.target as Node) === true) return
+      const target = event.target
+      const root = rootRef.current
+      if (root === null) return
+      // 点击已打开的下拉面板内部：保持展开，条目自身的 onClick 负责关闭。
+      const openDropdown = root.querySelector('[data-desktop-menu]')
+      if (target instanceof Node && openDropdown !== null && openDropdown.contains(target)) return
+      // 点击任一菜单按钮：交给按钮自身的开合逻辑。
+      if (target instanceof Element && target.closest('button[aria-haspopup="menu"]') !== null) return
       setMenu(null)
     }
     const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setMenu(null) }
@@ -80,7 +119,6 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
     if (next !== undefined) openSession(next)
   }
 
-  const win = getDesktopWindow()
   const history = historyRef.current
   const backEnabled = canGoBack(history)
   const forwardEnabled = canGoForward(history)
@@ -135,7 +173,7 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
               aria-haspopup="menu"
               aria-controls={`desktop-menu-${entry.id}`}
               onClick={() => { setMenu(cur => cur === entry.id ? null : entry.id) }}
-              onKeyDown={event => {
+              onKeyDown={(event) => {
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
                 event.preventDefault()
                 setMenu(entry.id)
@@ -151,7 +189,7 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
                 className={css.dropdown}
                 role="menu"
                 aria-label={entry.label}
-                onKeyDown={event => { navigateDropdownKey(event, () => { setMenu(null) }) }}
+                onKeyDown={(event) => { navigateDropdownKey(event, () => { setMenu(null) }) }}
               >
                 {entry.items.map((item, index) => item.kind === 'sep'
                   ? <div key={`sep-${index}`} className={css.sep} role="separator" />
@@ -175,17 +213,25 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
       </div>
       <div
         className={css.drag}
-        onMouseDown={event => {
-          if (event.button === 0) void win?.startDragging()
+        onMouseDown={(event) => {
+          if (event.button !== 0) return
+          // 菜单展开时先收起菜单，不启动窗口拖拽。
+          if (menu !== null) { setMenu(null); return }
+          void win?.startDragging()
         }}
-        onDoubleClick={() => { void win?.toggleMaximize() }}
+        onDoubleClick={toggleMaximize}
       />
       <div className={css.controls}>
         <button type="button" className={css.winBtn} aria-label={t('desktop.window.minimize')} onClick={() => { void win?.minimize() }}>
           <MinIcon />
         </button>
-        <button type="button" className={css.winBtn} aria-label={t('desktop.window.maximize')} onClick={() => { void win?.toggleMaximize() }}>
-          <MaxIcon />
+        <button
+          type="button"
+          className={css.winBtn}
+          aria-label={t(maximized ? 'desktop.window.restore' : 'desktop.window.maximize')}
+          onClick={toggleMaximize}
+        >
+          {maximized ? <RestoreIcon /> : <MaxIcon />}
         </button>
         <button type="button" className={`${css.winBtn} ${css.closeBtn}`} aria-label={t('close')} onClick={() => { void win?.close() }}>
           <CloseIcon />

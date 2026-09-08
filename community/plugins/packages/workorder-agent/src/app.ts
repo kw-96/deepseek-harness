@@ -5,12 +5,13 @@ import { todayInShanghai } from './domain/dates.js'
 import { toAdminIssue } from './plugins/admin/issues.js'
 import { adminPage } from './plugins/admin/page.js'
 import { createRateLimit } from './plugins/admin/rateLimit.js'
-import { dateRangeSchema, issueIdSchema, messageIdSchema, previewIdSchema, resendPreviewSchema, resumeMessageSchema, runtimeSettingsSchema, sendPreviewSchema } from './plugins/admin/validation.js'
+import { dateRangeSchema, issueIdSchema, messageIdSchema, previewIdSchema, resendPreviewSchema, resumeMessageSchema, runtimeSettingsSchema, sendPreviewSchema, statsQuerySchema } from './plugins/admin/validation.js'
 import { GcpClient } from './plugins/gcp/client.js'
 import { GcpIssueService } from './plugins/gcp/service.js'
 import { PopoClient } from './plugins/popo/client.js'
 import { PopoDeliveryService } from './plugins/popo/delivery.js'
 import { startScheduler } from './plugins/scheduler/scheduler.js'
+import { WorkorderStatsService } from './plugins/stats/service.js'
 import { WorkorderStore } from './plugins/store/store.js'
 import { GcpWebhookHandler } from './plugins/webhook/handler.js'
 import { InspectionWorkflow } from './plugins/workflow/service.js'
@@ -29,6 +30,7 @@ export async function createApp(config: AppConfig, agentRouter?: WorkorderAgentR
   const issues = new GcpIssueService(gcp, config.projects, config.completedStatusId, store.issues)
   const delivery = new PopoDeliveryService(store, new PopoClient(config.popo.url, config.popo.secret))
   const workflow = new InspectionWorkflow(issues, store, delivery, config.gcp.host)
+  const stats = new WorkorderStatsService(store)
   const webhook = new GcpWebhookHandler(store, gcp, config.projects, config.gcp.host, agentRouter)
   webhook.start()
   const stopScheduler = startScheduler(workflow, store)
@@ -100,6 +102,11 @@ export async function createApp(config: AppConfig, agentRouter?: WorkorderAgentR
     if (!parsed.success) return context.json({ error: '工单标识无效' }, 400)
     const issue = store.issues.get(parsed.data)
     return issue ? context.json(toAdminIssue(issue, config.gcp.host)) : context.json({ error: '工单不存在' }, 404)
+  })
+  app.get('/api/admin/stats', (context) => {
+    const parsed = statsQuerySchema.safeParse({ startDate: context.req.query('startDate'), endDate: context.req.query('endDate') })
+    if (!parsed.success) return context.json({ error: parsed.error.issues[0]?.message ?? '统计查询参数无效' }, 400)
+    return context.json(stats.compute(parsed.data.startDate, parsed.data.endDate))
   })
   app.get('/api/admin/popo/capabilities', (context) => context.json({
     configured: Boolean(config.popo.url), signed: Boolean(config.popo.secret), available: store.health().ready,

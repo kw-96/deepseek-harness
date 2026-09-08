@@ -43,3 +43,11 @@ export const runtimeSettingsSchema = z.object({
   automaticSendEnabled: z.boolean().optional(),
   webhookProcessingEnabled: z.boolean().optional(),
 }).refine((value) => Object.values(value).some((item) => item !== undefined), '至少提供一项设置')
+
+const DATE_QUERY = z.string().regex(DATE_PATTERN).refine(validDate, '日期无效').optional()
+
+/** 数据统计查询参数：日期可缺省，同时提供时校验先后顺序。 */
+export const statsQuerySchema = z.object({
+  startDate: DATE_QUERY,
+  endDate: DATE_QUERY,
+}).refine((value) => !value.startDate || !value.endDate || value.startDate <= value.endDate, '开始日期不能晚于结束日期')

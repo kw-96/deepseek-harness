@@ -2,8 +2,11 @@
 
 use std::env;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
 use std::time::SystemTime;
 
 /// Matches root `package.json` `packageManager`.
@@ -87,7 +90,11 @@ fn corepack_program(node_dir: &Path) -> PathBuf {
 }
 
 /// Run `corepack pnpm@VERSION <args…>` with bundled Node on PATH.
-pub fn run_corepack_pnpm(repo_root: &Path, args: &[&str]) -> Result<(), String> {
+pub fn run_corepack_pnpm(
+  repo_root: &Path,
+  args: &[&str],
+  on_line: &mut dyn FnMut(&str),
+) -> Result<(), String> {
   let node_dir = find_bundled_node_dir(repo_root)?;
   let corepack = corepack_program(&node_dir);
   if !corepack.is_file() {
@@ -130,19 +137,69 @@ pub fn run_corepack_pnpm(repo_root: &Path, args: &[&str]) -> Result<(), String> 
   apply_no_window(&mut command);
 
   let label = format!("corepack pnpm@{PNPM_VERSION} {}", args.join(" "));
-  let output = command
-    .output()
+  let mut child = command
+    .spawn()
     .map_err(|error| format!("failed to run `{label}`: {error}"))?;
-  if output.status.success() {
+
+  // 流式转发 stdout/stderr，同时保留末尾行用于失败摘要。
+  let (tx, rx) = mpsc::channel::<String>();
+  if let Some(stderr) = child.stderr.take() {
+    let tx = tx.clone();
+    thread::spawn(move || {
+      for line in BufReader::new(stderr).lines() {
+        match line {
+          Ok(line) => {
+            if tx.send(line).is_err() {
+              break;
+            }
+          }
+          Err(_) => break,
+        }
+      }
+    });
+  }
+  if let Some(stdout) = child.stdout.take() {
+    let tx = tx.clone();
+    thread::spawn(move || {
+      for line in BufReader::new(stdout).lines() {
+        match line {
+          Ok(line) => {
+            if tx.send(line).is_err() {
+              break;
+            }
+          }
+          Err(_) => break,
+        }
+      }
+    });
+  }
+  drop(tx);
+
+  let mut tail: Vec<String> = Vec::new();
+  for line in rx {
+    on_line(&line);
+    tail.push(line);
+  }
+
+  let status = child
+    .wait()
+    .map_err(|error| format!("failed to wait for `{label}`: {error}"))?;
+  if status.success() {
     return Ok(());
   }
-  let stderr = String::from_utf8_lossy(&output.stderr);
-  let stdout = String::from_utf8_lossy(&output.stdout);
-  let detail = [stderr.trim(), stdout.trim()]
+  let detail = tail
     .into_iter()
-    .find(|s| !s.is_empty())
-    .unwrap_or("command failed with no output");
-  Err(format!("`{label}` failed:\n{detail}"))
+    .rev()
+    .take(40)
+    .collect::<Vec<_>>()
+    .into_iter()
+    .rev()
+    .collect::<Vec<_>>()
+    .join("\n");
+  Err(format!(
+    "`{label}` failed:\n{}",
+    if detail.is_empty() { "command failed with no output" } else { &detail }
+  ))
 }
 
 fn file_mtime(path: &Path) -> Option<SystemTime> {
@@ -163,12 +220,15 @@ pub fn needs_install(repo_root: &Path) -> bool {
 }
 
 /// Run `pnpm install` via bundled corepack when the lockfile is newer than modules.
-pub fn ensure_dependencies(repo_root: &Path) -> Result<(), String> {
+pub fn ensure_dependencies(
+  repo_root: &Path,
+  on_line: &mut dyn FnMut(&str),
+) -> Result<(), String> {
   if env::var_os("DSH_DESKTOP_SKIP_INSTALL").is_some() {
     return Ok(());
   }
   if !needs_install(repo_root) {
     return Ok(());
   }
-  run_corepack_pnpm(repo_root, &["install"])
+  run_corepack_pnpm(repo_root, &["install"], on_line)
 }

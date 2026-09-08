@@ -225,12 +225,9 @@ export class ClientSessions implements ISessions {
     this.selection = createSnapshotStore<SessionSelection>(
       {},
       { persist: { name: 'dsh.sessions.current' } })
-    const restored = this.selection.getSnapshot()
-    this.manager = new SessionManager(
-      remote,
-      restored.sessionId,
-      restored.subagentAddress,
-    )
+    // 启动/刷新不恢复上次停留的会话：保持无选择，由 ui-workspace 的
+    // 导航策略落到最近工作区的“新建会话”页面。
+    this.manager = new SessionManager(remote)
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, current: undefined, phase: 'pending',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,

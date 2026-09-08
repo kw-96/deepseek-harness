@@ -32,7 +32,7 @@ export interface CodexApi {
   fsSearchName: (root: string, query: string, options?: FsSearchOptions) => Promise<FsNameSearchResponse>
   fsSearchContent: (root: string, query: string, options?: FsSearchOptions) => Promise<FsContentSearchResponse>
   gitStatus: (cwd: string) => Promise<GitStatusResponse>
-  gitLog: (cwd: string, count?: number) => Promise<GitLogResponse>
+  gitLog: (cwd: string, count?: number, path?: string) => Promise<GitLogResponse>
   gitDiff: (cwd: string, path?: string, staged?: boolean) => Promise<GitDiffResponse>
   gitStage: (cwd: string, path?: string) => Promise<{ ok: true }>
   gitUnstage: (cwd: string, path?: string) => Promise<{ ok: true }>
@@ -152,9 +152,7 @@ export function CodexRightPanel({
               api={api}
               t={t}
               cwd={sessionCwd}
-              workspaceTitle={t('workspaceFolder')}
               sessionId={currentId}
-              meta={meta}
             />
           )}
           {state.tab === 'git' && <GitPanel api={api} t={t} cwd={sessionCwd} />}

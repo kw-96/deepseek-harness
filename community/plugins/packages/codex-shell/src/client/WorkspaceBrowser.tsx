@@ -48,7 +48,6 @@ export interface CodexBrowserInjected {
   canExportMarkdown: boolean
   meta: SessionMetaStore
   prefs: BrowserPrefsStore
-  toggleSidebar: () => void
 }
 
 export interface CodexBrowserProps extends CodexBrowserInjected {
@@ -271,7 +270,6 @@ export function CodexBrowser(props: CodexBrowserProps) {
           onSort={mode => { setPrefs({ sort: mode }); bump(n => n + 1) }}
           onAddWorkspace={requestAddWorkspaceOpen}
           onAddProject={() => { void addProject() }}
-          onCollapseSidebar={props.toggleSidebar}
           t={t}
         />
       )}

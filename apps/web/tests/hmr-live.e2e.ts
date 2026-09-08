@@ -1,7 +1,7 @@
 /** Published dsh web + pnpm dev:web → browser HMR, with no page reload. */
 
 import { existsSync, globSync } from 'node:fs'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
@@ -12,7 +12,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { readClientBuildRecord } from '../../../scripts/client-build-environment.ts'
 import { pnpmInvocation } from '../../../scripts/pnpm-invocation.ts'
-import { REPO_ROOT } from './support.ts'
+import { connectFreshWorkspace, REPO_ROOT } from './support.ts'
 
 function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, string>): SubprocessSpawnSpec {
   return {
@@ -90,6 +90,11 @@ async function stopTree(child: SubprocessHandle): Promise<void> {
 
 it('hot-reloads a real client-plugin source edit without refreshing the page', async () => {
   const world = await mkdtemp(join(tmpdir(), 'dsh-web-hmr-world-'))
+  // Pin English before the first boot: the scenario hot-edits the en hero
+  // copy, so the page must render the en surface rather than whatever locale
+  // a preference-less fresh home falls back to.
+  await mkdir(join(world, '.dsh'), { recursive: true })
+  await writeFile(join(world, '.dsh', 'settings.yaml'), 'locale:\n  preference: en\n')
   const sourcePath = join(REPO_ROOT, 'packages/client/ui-conversation/src/client/locales.ts')
   const binPath = join(REPO_ROOT, 'apps/cli/lib/bin.js')
   if (!existsSync(binPath)) throw new Error('HMR browser test needs the built dsh bin; run pnpm run build first')
@@ -133,7 +138,16 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(String(error)))
     await page.goto(baseUrl, { waitUntil: 'load' })
-    await page.getByText(oldText, { exact: true }).waitFor({ timeout: 15_000 })
+    // A fresh harness home lands on the versioned first-run notice before the
+    // workspace chooser; the dev:web watcher runs beside this boot, so wait
+    // for the surface to settle, dismiss the notice, connect a workspace, then
+    // the blank session hero can paint.
+    const picker = page.getByRole('textbox', { name: 'Choose workspace' })
+    await picker.waitFor({ state: 'visible', timeout: 60_000 })
+    const continueButton = page.getByRole('button', { name: 'Continue', exact: true })
+    if (await continueButton.count() > 0 && await continueButton.isVisible()) await continueButton.click()
+    await connectFreshWorkspace(page, world)
+    await page.getByText(oldText, { exact: true }).waitFor({ timeout: 30_000 })
     const pageIdentity = await page.evaluate(() => {
       // In-page code: an import would not survive serialization, and the page
       // entropy source available in every context is getRandomValues.

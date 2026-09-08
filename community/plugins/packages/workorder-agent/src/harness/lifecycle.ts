@@ -60,7 +60,8 @@ export class WorkorderPluginLifecycle {
     try {
       appConfig = toAppConfig(config)
     } catch (error) {
-      console.error('工单插件启动失败：配置不完整', error)
+      // 未配置是引导页的预期状态：静默等待前端保存后再热加载。
+      this.ctx.logger.debug(`工单插件等待配置：${error instanceof Error ? error.message : String(error)}`)
       await this.mountGateway(bootstrapRoute(config, (patch) => this.writeSettings(patch)))
       return
     }

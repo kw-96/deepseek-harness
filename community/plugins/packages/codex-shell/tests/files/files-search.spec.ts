@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { grepPathspecs, pathAllowed, splitGlobs } from '../src/host/globs.js'
+import { grepPathspecs, pathAllowed, splitGlobs } from '../../src/host/globs.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 

@@ -141,8 +141,8 @@ describe('codex-shell registration against the real SlotCore', () => {
     expect(core.entries('sidebar.footer.action').some(entry => entry.options.id === 'codex-add-workspace')).toBe(true)
     // 隐藏侧栏顶部品牌文字：占用 brand.name 槽位。
     expect(core.entries('sidebar.brand.name').some(entry => entry.options.id === 'codex-hide-brand-name')).toBe(true)
-    // 隐藏侧栏顶部品牌图标：占用 brand.mark 槽位（渲染隐藏品牌行的全局样式）。
-    expect(core.entries('sidebar.brand.mark').some(entry => entry.options.id === 'codex-hide-brand-mark')).toBe(true)
+    // 品牌区控制：占用 brand.mark 槽位（隐藏品牌按钮/行，轨道态渲染常显打开图标）。
+    expect(core.entries('sidebar.brand.mark').some(entry => entry.options.id === 'codex-sidebar-brand-controls')).toBe(true)
 
     disposer()
   })

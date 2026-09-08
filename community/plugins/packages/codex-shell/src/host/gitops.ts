@@ -111,9 +111,18 @@ export async function gitStatus(shell: ShellExecutor, cwd: string): Promise<GitS
   return { isRepo: true, ...parsePorcelainV2(out.stdout) }
 }
 
-/** Decorated short log (subject/author/date/refs per commit). */
-export async function gitLog(shell: ShellExecutor, cwd: string, count = 50): Promise<GitLogResponse> {
-  const out = await git(shell, cwd, ['log', `-${Math.max(1, Math.min(count, 200))}`, '--format=%h%x1f%s%x1f%an%x1f%ai%x1f%D'])
+/**
+ * Decorated short log (subject/author/date/refs per commit)；可选按路径
+ * 过滤，用于文件面板底部「每个文件对应的 git 时间线」。
+ * @param shell shell 执行器
+ * @param cwd 仓库工作目录
+ * @param count 条目上限
+ * @param path 限定某文件的提交历史；缺省为全仓库
+ */
+export async function gitLog(shell: ShellExecutor, cwd: string, count = 50, path?: string): Promise<GitLogResponse> {
+  const args = ['log', `-${Math.max(1, Math.min(count, 200))}`, '--format=%h%x1f%s%x1f%an%x1f%ai%x1f%D']
+  if (path !== undefined && path.trim() !== '') args.push('--', path)
+  const out = await git(shell, cwd, args)
   const entries = out.stdout.split('\n').filter(line => line !== '').map(line => {
     const [hash, subject, author, date, refs] = line.split('\x1f')
     return { hash: hash ?? '', subject: subject ?? '', author: author ?? '', date: date ?? '', refs: refs ?? '' }

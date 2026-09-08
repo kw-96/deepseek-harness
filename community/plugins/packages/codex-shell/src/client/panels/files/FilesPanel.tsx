@@ -1,14 +1,19 @@
-/** 文件树 + 可收起/展开的工作区搜索，根目录为会话工作区。 */
+/**
+ * 文件面板（VSCode/Cursor 式 Explorer）：顶部搜索栏、只读根目录名
+ * 标题行、树形目录就地展开/收起（懒加载子目录、缩进层级）、选中
+ * 文件预览，以及底部「每个文件对应的 git 时间线」（未选中文件时
+ * 显示仓库最近提交）。
+ */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen } from 'lucide-react'
 import type { CodexApi } from '../../RightPanel.js'
 import type { FsListEntry } from 'dsh-codex-shell/types'
-import type { SessionMetaStore } from '../../session-meta.js'
 import type { SessionId, TFn } from '../../faces.js'
 import { FilesPreview, type FilesPreviewState } from './FilesPreview.js'
 import { FilesSearchBar } from './FilesSearchBar.js'
 import { FilesSearchResults } from './FilesSearchResults.js'
+import { FilesTimeline } from './FilesTimeline.js'
 import { useFilesSearch, type FilesSearchForm } from './useFilesSearch.js'
 import css from '../../styles.module.css'
 
@@ -16,9 +21,7 @@ interface FilesPanelProps {
   api: CodexApi
   t: TFn
   cwd?: string | undefined
-  workspaceTitle: string
   sessionId?: SessionId | undefined
-  meta: SessionMetaStore
 }
 
 interface DirState {
@@ -36,17 +39,26 @@ const emptyPreview: FilesPreviewState = {
   path: null, kind: 'text', content: '', truncated: false, dirty: false, saving: false,
 }
 
+/** 根目录名（不含路径），盘符根等无末段时回退为原路径。 */
+export function dirName(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '')
+  if (trimmed === '') return path
+  const idx = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'))
+  return idx < 0 ? trimmed : trimmed.slice(idx + 1)
+}
+
 /**
  * 右侧文件面板。
  * @param props API、文案与会话工作目录
  */
-export function FilesPanel({ api, t, cwd, workspaceTitle }: FilesPanelProps): React.ReactNode {
+export function FilesPanel({ api, t, cwd }: FilesPanelProps): React.ReactNode {
   const [root, setRoot] = useState<string>(cwd ?? '')
-  const [dir, setDir] = useState<DirState>({ entries: [], truncated: false, error: null })
+  const [dirs, setDirs] = useState<ReadonlyMap<string, DirState>>(new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [preview, setPreview] = useState<FilesPreviewState>(emptyPreview)
   const [form, setForm] = useState<FilesSearchForm>(initialForm)
   const [replaceBusy, setReplaceBusy] = useState(false)
+  const autoExpanded = useRef(false)
   const { search, replaceAll } = useFilesSearch(api, root, form)
   const querying = form.query.trim() !== ''
 
@@ -55,31 +67,40 @@ export function FilesPanel({ api, t, cwd, workspaceTitle }: FilesPanelProps): Re
   }, [cwd, root])
 
   const loadDir = useCallback(async (path: string): Promise<void> => {
-    setDir({ entries: [], truncated: false, error: null })
     try {
       const result = await api.fsList(path)
-      setDir({ entries: result.entries, truncated: result.truncated, error: null })
+      setDirs(prev => new Map(prev).set(path, { entries: result.entries, truncated: result.truncated, error: null }))
+      // 打开面板即展开根目录下的第一层子目录，让树形结构直接可见。
+      if (path === root && !autoExpanded.current) {
+        autoExpanded.current = true
+        const childDirs = result.entries.filter(entry => entry.kind === 'directory')
+        setExpanded(prev => new Set([...prev, ...childDirs.map(entry => `${path}\\${entry.name}`)]))
+        for (const entry of childDirs) void loadDir(`${path}\\${entry.name}`)
+      }
     } catch (error) {
-      setDir({ entries: [], truncated: false, error: error instanceof Error ? error.message : String(error) })
+      setDirs(prev => new Map(prev).set(path, {
+        entries: [], truncated: false, error: error instanceof Error ? error.message : String(error),
+      }))
     }
-  }, [api])
+  }, [api, root])
 
   useEffect(() => {
     if (root === '') return
     void loadDir(root)
   }, [root, loadDir])
 
-  const openPath = async (path: string, isDir: boolean): Promise<void> => {
-    if (isDir) {
-      await loadDir(path)
-      setExpanded(prev => {
-        const next = new Set(prev)
-        if (next.has(path)) next.delete(path)
-        else next.add(path)
-        return next
-      })
-      return
-    }
+  /** 展开/收起目录；首次展开时懒加载其条目。 */
+  const toggleDir = (path: string): void => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+    if (!dirs.has(path)) void loadDir(path)
+  }
+
+  const openFile = async (path: string): Promise<void> => {
     try {
       const result = await api.fsRead(path, 512 * 1024)
       setPreview({ path, kind: result.kind, content: result.content, truncated: result.truncated, dirty: false, saving: false })
@@ -99,17 +120,35 @@ export function FilesPanel({ api, t, cwd, workspaceTitle }: FilesPanelProps): Re
     }
   }
 
-  const crumbs = useMemo(() => {
-    const parts = root.split(/[\\/]/).filter(part => part !== '')
-    const list: { label: string; path: string }[] = []
-    let current = ''
-    for (const part of parts) {
-      current = current === '' ? part : `${current}\\${part}`
-      list.push({ label: part, path: current })
-    }
-    return list
-  }, [root])
+  /** 递归渲染某目录的条目行（目录展开时继续渲染其子层）。 */
+  const renderEntries = (path: string, depth: number): React.ReactNode[] => {
+    const state = dirs.get(path)
+    if (state === undefined || state.error !== null) return []
+    return state.entries.map(entry => {
+      const childPath = `${path}\\${entry.name}`
+      const isDir = entry.kind === 'directory'
+      const isOpen = isDir && expanded.has(childPath)
+      return (
+        <Fragment key={childPath}>
+          <div className={depth > 0 ? `${css.fileRow} ${css.fileRowNested}` : css.fileRow}
+            style={{ paddingLeft: 8 + depth * 16 }}
+            onClick={() => { isDir ? toggleDir(childPath) : void openFile(childPath) }}>
+            {isDir
+              ? (isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />)
+              : <span style={{ width: 12, flex: 'none' }} />}
+            {isDir
+              ? <Folder size={14} style={{ flex: 'none', opacity: 0.7 }} />
+              : <File size={14} style={{ flex: 'none', opacity: 0.7 }} />}
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
+            {entry.size !== null && <span style={{ opacity: 0.5, fontSize: 11 }}>{entry.size}</span>}
+          </div>
+          {isOpen && renderEntries(childPath, depth + 1)}
+        </Fragment>
+      )
+    })
+  }
 
+  const rootState = dirs.get(root)
   const replaceLabel = search.replaceMessage === null
     ? null
     : search.replaceMessage === 'failed'
@@ -118,48 +157,33 @@ export function FilesPanel({ api, t, cwd, workspaceTitle }: FilesPanelProps): Re
 
   return (
     <div className={css.filesRoot}>
-      <div className={css.pathCrumbs}>
-        <button type="button" className={css.crumb} onClick={() => { void loadDir(root) }}>{workspaceTitle}</button>
-        {crumbs.slice(1).map(crumb => (
-          <span key={crumb.path}>
-            <span style={{ opacity: 0.5 }}> / </span>
-            <button type="button" className={css.crumb} onClick={() => { void loadDir(crumb.path) }}>{crumb.label}</button>
-          </span>
-        ))}
-      </div>
       <FilesSearchBar form={form} onChange={setForm} replaceBusy={replaceBusy} t={t}
         onReplaceAll={() => {
           setReplaceBusy(true)
           void replaceAll().finally(() => { setReplaceBusy(false) })
         }} />
+      <div className={css.filesDirHead}>
+        <span className={css.filesDirName} title={root}>{dirName(root)}</span>
+      </div>
       <div className={css.filesScroll}>
         {querying
           ? <FilesSearchResults search={search} root={root} t={t} replaceLabel={replaceLabel}
-              onOpen={(path, isDir) => { void openPath(path, isDir) }} />
-          : dir.error !== null
-            ? <div className={css.error}>{dir.error}</div>
-            : dir.entries.length === 0
-              ? <div className={css.emptyWrap}><FolderOpen size={22} /><span>{t('filesEmpty')}</span></div>
-              : dir.entries.map(entry => {
-                  const childPath = `${root}\\${entry.name}`
-                  const isDir = entry.kind === 'directory'
-                  return (
-                    <div key={entry.name} className={css.fileRow} onClick={() => { void openPath(childPath, isDir) }}>
-                      {isDir
-                        ? (expanded.has(childPath) ? <ChevronDown size={12} /> : <ChevronRight size={12} />)
-                        : <span style={{ width: 12, flex: 'none' }} />}
-                      {isDir
-                        ? <Folder size={14} style={{ flex: 'none', opacity: 0.7 }} />
-                        : <File size={14} style={{ flex: 'none', opacity: 0.7 }} />}
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</span>
-                      {entry.size !== null && <span style={{ opacity: 0.5, fontSize: 11 }}>{entry.size}</span>}
-                    </div>
-                  )
-                })}
-        {!querying && dir.truncated && <div className={css.note}>…</div>}
+              onOpen={(path, isDir) => {
+                if (isDir) toggleDir(path)
+                else void openFile(path)
+              }} />
+          : rootState === undefined
+            ? null
+            : rootState.error !== null
+              ? <div className={css.error}>{rootState.error}</div>
+              : rootState.entries.length === 0
+                ? <div className={css.emptyWrap}><FolderOpen size={22} /><span>{t('filesEmpty')}</span></div>
+                : renderEntries(root, 0)}
+        {!querying && rootState?.truncated === true && <div className={css.note}>…</div>}
       </div>
       <FilesPreview preview={preview} onChange={setPreview} onSave={() => { void savePreview() }}
         onClose={() => { setPreview(emptyPreview) }} t={t} />
+      <FilesTimeline api={api} cwd={root} path={preview.path} t={t} />
     </div>
   )
 }

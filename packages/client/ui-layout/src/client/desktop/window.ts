@@ -10,6 +10,9 @@ export interface DesktopAppWindow {
   close(): Promise<void>
   setFullscreen(fullscreen: boolean): Promise<void>
   isFullscreen(): Promise<boolean>
+  isMaximized(): Promise<boolean>
+  /** Subscribe to window resizes; resolves with an unlisten function. */
+  onResized?(handler: () => void): Promise<() => void>
   startDragging(): Promise<void>
 }
 

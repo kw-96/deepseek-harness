@@ -9,17 +9,23 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// Skipped when `DSH_DESKTOP_SKIP_WEB_BUILD` is set. Uses repo-bundled Node +
 /// corepack pnpm so peer hosts need no global pnpm.
-pub fn ensure_web_frontend(repo_root: &Path) -> Result<(), String> {
+pub fn ensure_web_frontend(
+  repo_root: &Path,
+  on_line: &mut dyn FnMut(&str),
+) -> Result<(), String> {
   if std::env::var_os("DSH_DESKTOP_SKIP_WEB_BUILD").is_some() {
     return Ok(());
   }
-  run_corepack_pnpm(repo_root, &["run", "build:web"])
+  run_corepack_pnpm(repo_root, &["run", "build:web"], on_line)
 }
 
 /// Install if needed, rebuild the frontend, then snapshot dist for this session.
-pub fn snapshot_web_dist(repo_root: &Path) -> Result<PathBuf, String> {
-  ensure_dependencies(repo_root)?;
-  ensure_web_frontend(repo_root)?;
+pub fn snapshot_web_dist(
+  repo_root: &Path,
+  on_line: &mut dyn FnMut(&str),
+) -> Result<PathBuf, String> {
+  ensure_dependencies(repo_root, &mut *on_line)?;
+  ensure_web_frontend(repo_root, &mut *on_line)?;
 
   let source = repo_root.join("apps").join("web").join("dist");
   let index = source.join("index.html");
