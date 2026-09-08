@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的 Codex 线程导入为 DeepSeek Harness 会话。它把每个线程转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按线程当前工作目录对账 DSH 工作区归属。Web 会话列表因此会把导入的 Codex 对话归入其当前工作目录。自动导入默认关闭；开启设置卡片的开关后会先执行一轮对账，再按配置间隔执行。导入器只读取 Codex，不会向 Codex 回写。
+`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的当前 Codex 线程和归档 rollout 会话导入为 DeepSeek Harness 会话。它把每个来源转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按来源工作目录对账 DSH 工作区归属。当前 SQLite 线程与归档 rollout 共享 id 时，当前线程优先，因此一个 Codex 会话不会产生重复 DSH 会话。自动导入默认关闭；开启设置卡片的开关后会先执行一轮对账，再按配置间隔执行。导入器只读取 Codex，不会向 Codex 回写。
 
 ## 目录
 
@@ -35,7 +35,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `codexHome` | `CODEX_HOME`,其次 `~/.codex` | 包含 `thread_history_1.sqlite` 与 `session_index.jsonl` 的目录 |
+| `codexHome` | `CODEX_HOME`,其次 `~/.codex` | 包含 `thread_history_1.sqlite`、`session_index.jsonl` 与可选 `archived_sessions/*.jsonl` 的目录 |
 | `cwd` | 进程 cwd | 线程没有命令 cwd 时,写入导入会话头的绝对工作目录 |
 | `maxToolResultChars` | `20,000` | 导入工具结果文本的最大 UTF-16 码元数 |
 | `maxTitleChars` | `300` | 导入会话标题的最大 UTF-16 码元数 |
@@ -131,7 +131,7 @@ Indirectly, through the imported session logs the agent loop later continues.
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
-- **仅当前 Codex 存储** — 导入器读取 `thread_history_1.sqlite`;`archived_sessions/` 下的旧版 `*.jsonl` rollout 不导入。
+- **当前线程优先** — 当前 SQLite 线程与归档 rollout 共享 Codex 会话 id 时，导入当前线程并跳过归档副本。
 - **活跃会话延后** — 被 live Agent 持有的导入会话不会在扫描中替换；设置卡会报告延后数量，后续扫描会继续对账。
 - **保真度简化** — Codex 的 `reasoning`、`contextCompaction` 与原始文件 diff 不转录;代理消息的 phase 元数据被丢弃,每条代理消息对应一个 DSH step 而非 Codex 原始分组。
 - **工具结果有界** — 超出 `maxToolResultChars` 的结果文本被截断,以保持持久日志有界。
@@ -145,6 +145,6 @@ Indirectly, through the imported session logs the agent loop later continues.
 
 本开发备注是维护者的工作上下文:开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-上面的已知限制列表就是工作队列:旧版 rollout 导入和更深的转录保真度。[Codex 导入对账](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.zh.md)持有当前重同步规则。
+上面的已知限制列表就是工作队列:更深的归档 rollout 保真度和更广的旧条目覆盖。[Codex 归档导入](../../../.agents/notes/implemented/feature/2026-09-08-codex-archive-import.zh.md)持有来源优先规则，[Codex 导入对账](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.zh.md)持有当前快照替换规则。
 
 </details>

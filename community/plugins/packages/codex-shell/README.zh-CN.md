@@ -13,7 +13,8 @@ Codex 工作流风格的一体化 DeepSeek Harness Web 插件，把工作区/会
 ## 安装
 
 ```sh
-dsh plugin --profile web add dsh-codex-shell@0.6.5
+dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-shell-0.6.5.tgz
+dsh plugin --profile web remove dsh-codex-shell
 ```
 
 或手动在 profile 的 `cordis.patch.yml` 里 insert：

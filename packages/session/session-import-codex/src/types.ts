@@ -33,12 +33,14 @@ export interface CodexThreadTurn {
   readonly status: string
 }
 
-/** One Codex thread assembled from the thread-history store plus its optional index title. */
+/** One Codex thread assembled from the current store or an archived rollout. */
 export interface CodexThreadRecord {
   /** Codex thread id; the imported DSH session id is `codex-<threadId>`. */
   readonly threadId: string
   /** Human title from `session_index.jsonl` when Codex recorded one. */
   readonly title?: string
+  /** Archived rollout or source-level cwd when no current command carries one. */
+  readonly cwd?: string
   /** Items in rollout order. */
   readonly items: readonly CodexThreadItem[]
   /** Turn boundaries for this thread, in start order. */

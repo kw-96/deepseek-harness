@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import-codex` imports threads from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each thread into a standard DSH event log, stores it durably, publishes it live, and reconciles its Workspace membership against the thread's current working directory. The Web session list therefore places imported Codex conversations under their current working directories. Automatic import is off by default; enabling the settings-card toggle runs one reconciliation and then uses the configured interval. The importer reads Codex only and never writes back to it.
+`dsh-session-import-codex` imports current Codex threads and archived rollout sessions from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each source into a standard DSH event log, stores it durably, publishes it live, and reconciles its Workspace membership against the source working directory. The current SQLite thread wins when it shares an id with an archived rollout, so one Codex session never produces a duplicate DSH session. Automatic import is off by default; enabling the settings-card toggle runs one reconciliation and then uses the configured interval. The importer reads Codex only and never writes back to it.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Mount this package with session persistence and `dsh-workspace` already composed
 
 | Field | Default | Meaning |
 |---|---|---|
-| `codexHome` | `CODEX_HOME`, then `~/.codex` | Directory containing `thread_history_1.sqlite` and `session_index.jsonl` |
+| `codexHome` | `CODEX_HOME`, then `~/.codex` | Directory containing `thread_history_1.sqlite`, `session_index.jsonl`, and optional `archived_sessions/*.jsonl` |
 | `cwd` | process cwd | Absolute working directory recorded on imported headers when a thread carries no command cwd |
 | `maxToolResultChars` | `20,000` | Maximum UTF-16 code units of imported tool-result text |
 | `maxTitleChars` | `300` | Maximum UTF-16 code units of an imported session title |
@@ -130,7 +130,7 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 
 ## Known Limitations and Deferred Work
 
-- **Current Codex store only** — the importer reads `thread_history_1.sqlite`; legacy rollouts under `archived_sessions/` (the older `*.jsonl` format) are not imported.
+- **Current-thread precedence** — when a current SQLite thread and archived rollout share a Codex session id, the current thread is imported and the archived copy is skipped.
 - **Active-session deferral** — an imported session currently owned by a live Agent is not replaced during a sweep; the settings card reports it as deferred and a later sweep reconciles it.
 - **Simplified fidelity** — Codex `reasoning`, `contextCompaction`, and raw file diffs are not transcribed; agent-message phase metadata is dropped, and each agent message becomes one DSH step rather than Codex's original grouping.
 - **Bounded tool results** — result text beyond `maxToolResultChars` is truncated to keep the durable log bounded.
@@ -144,6 +144,6 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 
 This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
 
-The Known Limitations list above is the working queue: legacy rollout import and deeper transcript fidelity. [Codex import reconciliation](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.md) owns the current resync rules.
+The Known Limitations list above is the working queue: deeper archived-rollout fidelity and broader legacy item coverage. [Codex archive import](../../../.agents/notes/implemented/feature/2026-09-08-codex-archive-import.md) owns the source-priority rule, and [Codex import reconciliation](../../../.agents/notes/implemented/bug-fix/2026-09-07-codex-import-reconciliation.md) owns current-snapshot replacement.
 
 </details>

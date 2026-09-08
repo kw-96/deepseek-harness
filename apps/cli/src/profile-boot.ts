@@ -253,12 +253,18 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // objects in place. Reusing one parsed patch object across applications
   // would bake a user override into the bundle's in-memory insert row, so
   // removing the override could never revert the row to the bundle default.
-  const composeLive = (): PatchOptions[] => structuredClone([
-    ...composed.bundlePatches,
-    ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
-    ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
-    ...composed.overlays,
-  ])
+  // 每次 live 组合都重新解析 bundle 列表，使 `dsh plugin add/remove`
+  // 写回的 package.json bundles 变化在运行中生效（加载或卸载 bundle）。
+  const composeLive = async (_userPatches: PatchOptions[]): Promise<PatchOptions[]> => {
+    const liveProfile = loadProfile(NAME, options.profile, INSTALL_ANCHOR, undefined, { userLayer: false })
+    await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, profile: liveProfile })
+    return structuredClone([
+      ...liveProfile.layers.flatMap(layer => layer.patches),
+      ...loadOptionalPatches(NAME, liveProfile.patchPath) ?? [],
+      ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
+      ...composed.overlays,
+    ])
+  }
   // Cloned for the same insert-aliasing reason as composeLive: the boot
   // application must not mutate the objects later reloads recompose from.
   const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
@@ -300,11 +306,19 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       await watchUserPatches(ctx, {
         binName: NAME,
         filename: composed.profile.patchPath,
+        load: () => [],
         compose: composeLive,
       })
       await watchUserPatches(ctx, {
         binName: NAME,
         filename: homePatchPath(),
+        load: () => [],
+        compose: composeLive,
+      })
+      await watchUserPatches(ctx, {
+        binName: NAME,
+        filename: join(composed.profile.dir, 'package.json'),
+        load: () => [],
         compose: composeLive,
       })
     } catch (error) {

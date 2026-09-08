@@ -60,13 +60,13 @@ function asNonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
-/** Join the `text` fields of Codex content blocks (`input_text`-shaped arrays). */
+/** Join supported text fields of current and archived Codex content blocks. */
 function joinTextBlocks(content: unknown): string {
   if (!Array.isArray(content)) return ''
   const parts: string[] = []
   for (const block of content) {
     const record = asRecord(block)
-    if (record === undefined || record['type'] !== 'text') continue
+    if (record === undefined || !['text', 'input_text', 'output_text'].includes(String(record['type']))) continue
     const text = asNonEmptyString(record['text'])
     if (text !== undefined) parts.push(text)
   }
@@ -271,7 +271,7 @@ function deriveCwd(record: CodexThreadRecord, fallbackCwd: string): string {
       latest = { cwd, time: item.createdAtMs }
     }
   }
-  return latest?.cwd ?? fallbackCwd
+  return latest?.cwd ?? record.cwd ?? fallbackCwd
 }
 
 /**

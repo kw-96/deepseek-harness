@@ -291,6 +291,28 @@ describe('session-import-codex through a real Loader composition', () => {
     expect((await first.sessionPersistence.list())).toEqual([])
   })
 
+  it('imports an archived rollout when the current Codex SQLite store is absent', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    const codexHome = join(root, 'codex')
+    const workspace = join(root, 'archive-workspace')
+    await mkdir(join(codexHome, 'archived_sessions'), { recursive: true })
+    await mkdir(workspace)
+    const rows = [
+      { timestamp: '2026-01-01T00:00:00.000Z', type: 'session_meta', payload: { session_id: 'archive-only', cwd: workspace } },
+      { timestamp: '2026-01-01T00:00:01.000Z', type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1', started_at: 1 } },
+      { timestamp: '2026-01-01T00:00:02.000Z', type: 'response_item', payload: { type: 'message', id: 'u1', role: 'user', content: [{ type: 'input_text', text: 'archived import' }], internal_chat_message_metadata_passthrough: { turn_id: 'turn-1', create_time: 2 } } },
+      { timestamp: '2026-01-01T00:00:03.000Z', type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-1', completed_at: 3 } },
+    ]
+    await writeFile(join(codexHome, 'archived_sessions', 'rollout-archive-only.jsonl'), `${rows.map(row => JSON.stringify(row)).join('\n')}\n`)
+    const first = await loadComposition(compositionRows())
+
+    const result = await first.codexImport.run()
+    const id = SessionId('codex-archive-only')
+    expect(result).toMatchObject({ imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
+    expect(first.sessions.get(id)?.header.cwd).toBe(workspace)
+    expect((await first.workspaceRegistry.resolveByPath(workspace))?.sessionIds).toContain(id)
+  })
+
   it('records runs through the Remote and serves them as history', async () => {
     root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
     await mkdir(join(root, 'codex'))

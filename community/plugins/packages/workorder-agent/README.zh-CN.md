@@ -17,18 +17,20 @@
 
 配置以前端为主，不需要预置环境变量：
 
-1. 打开 Harness 设置页，找到 `workorder-agent` 命名空间，填写管理令牌、
-   Webhook 令牌、易协作 GCP 用户 Key、POPO 群机器人地址与签名、数据目录和
-   项目 ID。令牌字段为密钥类型，界面按脱敏处理，保存后即时生效。
-2. 打开插件管理界面，编辑 `workorder-agent-gcp-mcp` 的连接配置，把
-   `gcp-host` 与 `gcp-user-key` 请求头填写为真实值。
+1. 首次启动后打开 `/workorder-agent`，在引导页填写管理令牌、Webhook 令牌、
+   易协作 GCP 用户 Key、POPO 群机器人地址与签名、数据目录和项目 ID。
+2. 保存后配置写入 Harness 的 `workorder-agent` 设置命名空间并立即重载，随后
+   该地址即为独立工单控制面。
+
+Agent 语义复核所需的 `gcp` MCP 连接不随本页创建，需要时可在插件管理界面手动
+添加并填写 `gcp-host` 与 `gcp-user-key` 请求头。
 
 环境变量仅在存在时作为首次默认值回退：`ADMIN_TOKEN`、`WEBHOOK_TOKEN`、
 `GCP_USER_KEY`、`GCP_MCP_URL`、`GCP_HOST`、`POPO_WEBHOOK_URL`、
 `POPO_WEBHOOK_SECRET`、`DATA_DIR` 及项目 ID 系列变量。
 
-`enabled` 为 false 或必要令牌缺失时，Host 插件会停用运行时而不会拖垮 Web
-宿主；在设置页补全配置后会自动重新挂载。
+`enabled` 为 false 时 Host 插件不会挂载控制面；必要令牌缺失时显示引导页，
+补全后自动加载控制面，两者都不会拖垮 Web 宿主。
 
 ## 开发
 

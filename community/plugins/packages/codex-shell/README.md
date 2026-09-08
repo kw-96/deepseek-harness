@@ -15,7 +15,8 @@ A Codex-workflow-styled integrated workspace shell for DeepSeek Harness (DSH): t
 ## 安装 / Install
 
 ```sh
-dsh plugin --profile web add dsh-codex-shell@0.6.5
+dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-shell-0.6.5.tgz
+dsh plugin --profile web remove dsh-codex-shell
 ```
 
 或手动在 profile 的 `cordis.patch.yml` 里 insert：

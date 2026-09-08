@@ -22,7 +22,9 @@ import {
   type CodexImportSettings,
 } from './settings.ts'
 import { loadCodexThreads } from './sqlite.ts'
-import type { CodexImportSession, CodexImportSweepResult, ImportBounds } from './types.ts'
+import { loadCodexArchivedThreads, readCodexRollout } from './archive/read.ts'
+import { loadCodexThreadIndex, type CodexThreadIndexEntry } from './state.ts'
+import type { CodexImportSession, CodexImportSweepResult, CodexThreadRecord, ImportBounds } from './types.ts'
 import { CodexImportReconciler, type CodexImportSnapshot } from './workspace.ts'
 
 export { CodexImportController } from './remote.ts'
@@ -51,9 +53,9 @@ export const DEFAULT_SYNC_INTERVAL_MS = 60_000
 /** Plugin configuration: Codex source location and import caps. */
 export interface Config {
   /**
-   * Codex home directory (the directory containing `thread_history_1.sqlite`
-   * and `session_index.jsonl`). Omitted to resolve from `CODEX_HOME`, then
-   * `~/.codex`.
+   * Codex home directory containing the current thread store, optional title
+   * index, and legacy `archived_sessions` rollouts. Omitted to resolve from
+   * `CODEX_HOME`, then `~/.codex`.
    */
   codexHome?: string
   /**
@@ -172,16 +174,51 @@ export async function runImportSweep(
   const summary = { imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 }
   const sessions: CodexImportSession[] = []
   const reconciler = new CodexImportReconciler(ctx)
-  let records
+  let currentRecords
   try {
-    records = await loadCodexThreads(config.codexHome)
+    currentRecords = await loadCodexThreads(config.codexHome)
   } catch (error: unknown) {
     ctx.logger.warn(`session-import-codex: could not read the Codex thread store at ${JSON.stringify(config.codexHome)}: ${String(error)}`)
+  }
+  let archivedRecords: CodexThreadRecord[]
+  try {
+    archivedRecords = await loadCodexArchivedThreads(config.codexHome)
+  } catch (error: unknown) {
+    ctx.logger.warn(`session-import-codex: could not read Codex archived sessions at ${JSON.stringify(join(config.codexHome, 'archived_sessions'))}: ${String(error)}`)
+    archivedRecords = []
+  }
+  let indexEntries: CodexThreadIndexEntry[]
+  try {
+    indexEntries = await loadCodexThreadIndex(config.codexHome)
+  } catch (error: unknown) {
+    ctx.logger.warn(`session-import-codex: could not read the Codex state index at ${JSON.stringify(config.codexHome)}: ${String(error)}`)
+    indexEntries = []
+  }
+  if (currentRecords === undefined && archivedRecords.length === 0 && indexEntries.length === 0) {
+    ctx.logger.info(`session-import-codex: no current, archived, or indexed Codex thread store under ${JSON.stringify(config.codexHome)}; nothing to import`)
     return { summary, sessions }
   }
-  if (records === undefined) {
-    ctx.logger.info(`session-import-codex: no Codex thread store at ${JSON.stringify(join(config.codexHome, 'thread_history_1.sqlite'))}; nothing to import`)
-    return { summary, sessions }
+  const indexById = new Map(indexEntries.map(entry => [entry.threadId, entry]))
+  const current = currentRecords ?? []
+  const currentIds = new Set(current.map(record => record.threadId))
+  const records: CodexThreadRecord[] = [...current, ...archivedRecords.filter(record => !currentIds.has(record.threadId))]
+  const covered = new Set(records.map(record => record.threadId))
+  for (const entry of indexEntries) {
+    if (covered.has(entry.threadId)) continue
+    const record = await readCodexRollout(entry.rolloutPath)
+    if (record === undefined) continue
+    records.push(record)
+    covered.add(record.threadId)
+  }
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index] as CodexThreadRecord
+    const indexed = indexById.get(record.threadId)
+    if (indexed === undefined) continue
+    records[index] = {
+      ...record,
+      ...(indexed.cwd === undefined ? {} : { cwd: indexed.cwd }),
+      ...(indexed.name === undefined ? {} : { title: indexed.name }),
+    }
   }
   for (const record of records) {
     if (signal.aborted) break

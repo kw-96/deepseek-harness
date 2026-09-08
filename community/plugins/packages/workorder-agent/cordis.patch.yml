@@ -1,6 +1,6 @@
-# workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host 与 GCP MCP。
-# 配置以前端为主：Host 配置在 Harness 设置页的 workorder-agent 命名空间填写。
-# 设置卡首次保存易协作 Key 时，会创建并维护名为 gcp 的 MCP 服务。
+# workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host。
+# 配置以前端为主：首次启动时 /workorder-agent 显示引导页，保存后写入
+# Harness 的 workorder-agent 设置命名空间并热加载控制面。
 # 环境变量仅在存在时作为首次默认值回退。
 - insert:
     - id: workorder-agent-host

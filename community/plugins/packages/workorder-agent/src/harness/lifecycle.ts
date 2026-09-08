@@ -5,6 +5,7 @@ import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import { createApp, type AppRuntime } from '../app.js'
 import type { AppConfig } from '../config.js'
 import { HarnessWorkorderAgent } from './agent.js'
+import { bootstrapRoute, type BootstrapWrite } from './bootstrap.js'
 import { controlPanelNavigationScript } from './navigation.js'
 import { toAppConfig, type PluginConfig } from './pluginConfig.js'
 
@@ -16,6 +17,8 @@ export class WorkorderPluginLifecycle {
   private active = false
   private lastKey?: string
   private queue: Promise<void> = Promise.resolve()
+  /** 由 Host 注入的设置写入器，未配置时引导页用它保存并重载。 */
+  writeSettings: BootstrapWrite = () => Promise.reject(new Error('设置服务不可用'))
 
   /**
    * @param ctx 拥有 WebServer 的插件上下文
@@ -58,32 +61,38 @@ export class WorkorderPluginLifecycle {
       appConfig = toAppConfig(config)
     } catch (error) {
       console.error('工单插件启动失败：配置不完整', error)
+      await this.mountGateway(bootstrapRoute(config, (patch) => this.writeSettings(patch)))
       return
     }
     const agentRouter = new HarnessWorkorderAgent(this.ctx)
     let runtime: AppRuntime | undefined
-    let unregister: (() => void) | undefined
     try {
       runtime = await createApp(appConfig, agentRouter)
-      const gateway = new Hono()
-      gateway.get('/workorder-agent/', (context) => context.redirect('/workorder-agent'))
-      gateway.route('/workorder-agent', runtime.app)
-      const listener = getRequestListener(gateway.fetch, { hostname: this.ctx.webServer.host })
-      unregister = this.ctx.webServer.register({
-        kind: 'prefix',
-        path: '/workorder-agent',
-        handler: listener,
-      })
+      await this.mountGateway(runtime.app)
       this.runtime = runtime
       this.agentRouter = agentRouter
-      this.unregister = unregister
       this.active = true
     } catch (error) {
-      unregister?.()
       await runtime?.close()
       await agentRouter.close()
       console.error('工单插件启动失败', error)
+      await this.mountGateway(bootstrapRoute(config, (patch) => this.writeSettings(patch)))
     }
+  }
+
+  /** 将业务应用挂到 /workorder-agent 前缀，并补根路径重定向。 */
+  private async mountGateway(app: Hono): Promise<void> {
+    this.unregister?.()
+    const gateway = new Hono()
+    gateway.get('/workorder-agent/', (context) => context.redirect('/workorder-agent'))
+    gateway.route('/workorder-agent', app)
+    const listener = getRequestListener(gateway.fetch, { hostname: this.ctx.webServer.host })
+    this.unregister = this.ctx.webServer.register({
+      kind: 'prefix',
+      path: '/workorder-agent',
+      handler: listener,
+    })
+    this.active = true
   }
 
   private async stopNow(): Promise<void> {

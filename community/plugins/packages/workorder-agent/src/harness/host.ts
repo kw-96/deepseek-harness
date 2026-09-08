@@ -21,6 +21,10 @@ export async function apply(ctx: Context, config: PluginConfig): Promise<void> {
   const lifecycle = new WorkorderPluginLifecycle(ctx)
   let source = (): PluginConfig => config
   ctx.inject(['settings'], (settingsCtx) => {
+    lifecycle.writeSettings = async (patch): Promise<void> => {
+      await settingsCtx.settings.update(WORKORDER_SETTINGS_NS, patch)
+      await lifecycle.apply(source())
+    }
     settingsCtx.settings.installSection(ctx, WORKORDER_SETTINGS_NS, Config, config, {
       setSource: (current: () => PluginConfig): void => {
         source = current
