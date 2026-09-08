@@ -7,7 +7,9 @@ nodeLinker: hoisted
 
 allowBuilds:
   '@webkong/dsh-plugin-sidebar@https://codeload.github.com/webkong/dsh-plugin-sidebar/tar.gz/eed642b18b178c2a453e228288e91d64e1cbdb6e': true
-  better-sqlite3: true
+  # better-sqlite3 自带预编译二进制（prebuilds/win32-x64.node），无需源码编译；
+  # 显式拒绝 node-gyp 构建，避免无 Visual Studio 的机器安装失败。
+  better-sqlite3: false
 
 publicHoistPattern: '@dap-dsh-plugins/netease-auth'
 minimumReleaseAgeExclude:
