@@ -1,7 +1,7 @@
 {
   "name": "dsh-codex-shell",
   "version": "0.6.5",
-  "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, right-edge files/git/projects/plugins/commands panel, pinned summary overlay, and session context actions - one bundle plugin",
+  "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, right-edge files/git/projects/commands/summary/browser panel, pinned summary overlay, and session context actions - one bundle plugin",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",

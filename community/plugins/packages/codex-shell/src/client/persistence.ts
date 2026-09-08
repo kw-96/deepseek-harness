@@ -38,7 +38,7 @@ export function writePersisted(key: string, value: string): void {
   }
 }
 
-/** React state backed by localStorage (mirrors the marketplace preference hook). */
+/** React state backed by localStorage. */
 export function usePersistedState<T>(key: string, fallback: T): [T, Dispatch<SetStateAction<T>>] {
   const deserializer = useMemo(() => ((raw: string) => JSON.parse(raw) as T), [])
   const [value, setValue] = useState<T>(() => readPersisted(key, fallback, deserializer))

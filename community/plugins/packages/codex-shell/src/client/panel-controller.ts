@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 
-export type PanelKind = 'files' | 'git' | 'projects' | 'plugins' | 'mcp' | 'skills' | 'commands' | 'summary' | 'browser'
+export type PanelKind = 'files' | 'git' | 'projects' | 'commands' | 'summary' | 'browser'
 
 export interface PanelState {
   open: boolean

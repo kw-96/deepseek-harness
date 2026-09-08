@@ -40,17 +40,9 @@ three-column workspace (sidebar | conversation | workbench).
      commit, branches, log
    - Projects: per-workspace additional directories (add/remove/browse),
      persisted under `$DSH_HOME/storages/dsh-codex-shell/dirs.json`
-   - Plugins: two segmented views — installed runtime inventory (enable/
-     disable, protected entries locked) and the plugin market, grouped by
-     functional category with a docked detail pane (selection shows facts and
-     actions instead of appending rows below the list); market install uses a
-     two-step inline confirm
-   - MCP: manager-owned `@deepseek-ai/dsh-mcp-client` patch rows — list, add,
-     edit, remove, enable/disable (stdio and streamable-http transports);
-     user-authored rows are listed read-only and never rewritten
-   - Skills: list the user skill root (`$DSH_HOME/skills`) with search, and
-     toggle each skill's model invocation by editing the SKILL.md
-     `disable-model-invocation` frontmatter flag
+   - Plugins / MCP / Skills are intentionally not surfaced in the workbench;
+     they are viewed and configured through the host's Settings → Plugins
+     page instead
    - Commands: current session's user prompts, newest first
    - Summary: per-session pinned notes (localStorage)
    - Browser: URL bar + sandboxed iframe
@@ -70,6 +62,5 @@ three-column workspace (sidebar | conversation | workbench).
   the declaration alive under shadowing). Never declare
   `conversation.details.tool` — the shadowed DetailsPanel keeps it, so tool
   cards stay registered and return when the plugin is removed.
-- Host data only through the `codexShell` Typert Remote (fs/git/project dirs);
-  plugin-manager and marketplace remotes are optional, probed at render time.
+- Host data only through the `codexShell` Typert Remote (fs/git/project dirs).
 - Platform: web desktop, light and dark themes.

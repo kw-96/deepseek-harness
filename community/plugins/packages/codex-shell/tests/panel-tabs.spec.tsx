@@ -14,7 +14,7 @@ const t = (key: string): string => (zh as Record<string, string>)[key] ?? key
 const styles = readFileSync(resolve(process.cwd(), 'src/client/styles.module.css'), 'utf8')
 
 const ids: readonly PanelKind[] = [
-  'files', 'git', 'projects', 'plugins', 'mcp', 'skills', 'commands', 'summary', 'browser',
+  'files', 'git', 'projects', 'commands', 'summary', 'browser',
 ]
 
 function tabs(): readonly TabBarTab[] {
@@ -38,17 +38,17 @@ describe('codex-shell TabBar', () => {
     renderBar('files')
     const visible = screen.getAllByRole('tab')
     expect(visible.map(tab => tab.textContent)).toEqual([
-      'files文件', 'gitGit', 'projects项目', 'plugins插件', 'mcpMCP',
+      'files文件', 'gitGit', 'projects项目', 'commands命令', 'summary摘要',
     ])
     expect(screen.getByRole('button', { name: '更多标签' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '关闭面板' })).toBeTruthy()
   })
 
   it('swaps an active overflow tab into the fifth visible slot', () => {
-    renderBar('summary')
+    renderBar('browser')
     const visible = screen.getAllByRole('tab')
     expect(visible.map(tab => tab.textContent)).toEqual([
-      'files文件', 'gitGit', 'projects项目', 'plugins插件', 'summary摘要',
+      'files文件', 'gitGit', 'projects项目', 'commands命令', 'browser浏览器',
     ])
   })
 
@@ -57,11 +57,9 @@ describe('codex-shell TabBar', () => {
     renderBar('files', onSelect)
     fireEvent.click(screen.getByRole('button', { name: '更多标签' }))
     const items = screen.getAllByRole('menuitem')
-    expect(items.map(item => item.textContent)).toEqual([
-      'skillsSkills', 'commands命令', 'summary摘要', 'browser浏览器',
-    ])
+    expect(items.map(item => item.textContent)).toEqual(['browser浏览器'])
     fireEvent.click(items[0] as HTMLElement)
-    expect(onSelect).toHaveBeenCalledWith('skills')
+    expect(onSelect).toHaveBeenCalledWith('browser')
   })
 
   it('renders collapsible change groups with compact file paths and status', () => {

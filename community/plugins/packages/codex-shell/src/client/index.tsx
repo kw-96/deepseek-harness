@@ -1,8 +1,11 @@
 /**
  * dsh-codex-shell 浏览器入口：挂载 codexShell Remote 并注册界面 ——
- * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、侧栏页脚的添加工作区
- * 入口、停靠进宿主 details 第三列的右侧工作台面板、以及会话头的面板
- * 开合按钮。面板开合通过 ctx.layout 与宿主第三列双向同步。
+ * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、隐藏侧栏顶部品牌
+ * 文字（DSH 本地构建）、挂在侧栏页脚槽位的添加工作区弹窗（页脚无
+ * 可见按钮）、停靠进宿主 details 第三列的右侧工作台面板（文件/Git/
+ * 项目/命令/摘要/浏览器）、以及会话头的面板开合按钮。插件/MCP/Skills
+ * 统一走宿主「设置 → 插件」，本插件不再注册对应面板。
+ * 面板开合通过 ctx.layout 与宿主第三列双向同步。
  *
  * 对宿主编译采用本地结构面（faces.ts）而非宿主编排类型线；运行时的
  * 槽位核心仍会对每个名字做加载期强校验。
@@ -12,7 +15,7 @@ import remoteContribution from 'dsh-codex-shell/remote'
 import { SessionMetaStore } from './session-meta.js'
 import { BrowserPrefsStore } from './sidebar/prefs.js'
 import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
-import { CodexRightPanel, type CodexPanelInjected, type CodexMcpManager, type CodexSkillsManager, type CommandPrompt } from './RightPanel.js'
+import { CodexRightPanel, type CodexPanelInjected, type CommandPrompt } from './RightPanel.js'
 import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
 import { BottomTerminalPanel } from './bottom/BottomTerminalPanel.js'
 import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
@@ -133,10 +136,6 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const sessionRemote = ctx.get('remote.session') as {
     openWorkspacePath?: (request: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>
   } | undefined
-  const pluginManager = probeRemote(ctx, 'pluginManager') as CodexPanelInjected['pluginManager']
-  const marketplace = probeRemote(ctx, 'marketplace') as CodexPanelInjected['marketplace']
-  const mcpManager = probeMcpManager(pluginManager)
-  const skillsManager = probeSkillsManager(pluginManager)
 
   /** 面板开合与宿主 details 列同步；布局服务缺失时降级为纯本地状态。 */
   const setColumnOpen = (open: boolean): void => {
@@ -258,10 +257,6 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       projectSetRoots: async request => unwrap(await codexRemote.projectSetRoots(request)),
       projectDelete: async request => unwrap(await codexRemote.projectDelete(request)),
     },
-    pluginManager,
-    marketplace,
-    mcpManager,
-    skillsManager,
     history: sessionId => readPrompts(connection, sessionId),
     setColumnOpen,
   })
@@ -275,7 +270,13 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     locale: 'codex-shell',
     inject: browserInject,
   }, CodexBrowser))
-  // 添加工作区入口放在侧栏页脚（root 作用域，宽/窄两态均可用）。
+  // 隐藏侧栏顶部品牌文字（宿主 fallback 显示「DSH 本地构建」+ 版本号）：
+  // 注册空渲染组件占用 single 槽位，品牌行只剩图标按钮。
+  const disposeBrandName = slots.inject('sidebar.brand.name', () => slots.register({
+    name: 'sidebar.brand.name', id: 'codex-hide-brand-name', locale: 'codex-shell',
+  }, () => null))
+  // 添加工作区弹窗挂在侧栏页脚槽位（只承载弹窗与打开器，页脚无可见按钮；
+  // 打开入口为标题栏「+」与桌面标题栏 File → Open Workspace）。
   const disposeAddWorkspace = slots.inject('sidebar.footer.action', () => slots.register({
     name: 'sidebar.footer.action', id: 'codex-add-workspace', order: 0,
     locale: 'codex-shell',
@@ -303,37 +304,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     disposeBottom()
     disposePanel()
     disposeAddWorkspace()
+    disposeBrandName()
     disposeBrowser()
     disposeLocale()
     await disposeRemote()
   }
-}
-
-/** 读取一个可选 remote 命名空间（插件管家/市场包）。 */
-function probeRemote(ctx: Context, name: string): unknown {
-  return ctx.get(`remote.${name}`)
-}
-
-/** 探测 pluginManager 命名空间上的 MCP 方法；任一缺失即整体不可用。 */
-function probeMcpManager(pluginManager: unknown): CodexMcpManager | undefined {
-  const candidate = pluginManager as Partial<CodexMcpManager> | undefined
-  if (
-    candidate === undefined
-    || typeof candidate.listMcpServers !== 'function'
-    || typeof candidate.saveMcpServer !== 'function'
-    || typeof candidate.removeMcpServer !== 'function'
-    || typeof candidate.setMcpServerEnabled !== 'function'
-  ) return undefined
-  return candidate as CodexMcpManager
-}
-
-/** 探测 pluginManager 命名空间上的 Skills 方法；任一缺失即整体不可用。 */
-function probeSkillsManager(pluginManager: unknown): CodexSkillsManager | undefined {
-  const candidate = pluginManager as Partial<CodexSkillsManager> | undefined
-  if (
-    candidate === undefined
-    || typeof candidate.listSkills !== 'function'
-    || typeof candidate.setSkillModelInvocation !== 'function'
-  ) return undefined
-  return candidate as CodexSkillsManager
 }

@@ -162,7 +162,7 @@ export function AddWorkspaceAction({ wide, useSessions, fsList, createWorkspace,
                 <FolderSearch size={14} />
               </button>
             </div>
-            {loading && <div className={css.empty}>{t('pluginLoading')}</div>}
+            {loading && <div className={css.empty}>{t('loading')}</div>}
             {error !== null && <div className={css.error}>{error}</div>}
             {!loading && error === null && (
               <div className={css.pickerList}>

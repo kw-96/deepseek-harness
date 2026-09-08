@@ -232,7 +232,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     return (
       <>
         {searchLoading
-          ? <div className={css.empty}>{t('pluginLoading')}</div>
+          ? <div className={css.empty}>{t('loading')}</div>
           : searchItems.length === 0
             ? <div className={css.empty}>{t('filesEmpty')}</div>
             : searchItems.map(item => (
