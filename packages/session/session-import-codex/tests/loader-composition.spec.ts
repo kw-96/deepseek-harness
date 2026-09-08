@@ -135,27 +135,25 @@ describe('session-import-codex through a real Loader composition', () => {
     expect(first.sessions.get(id)).toBeUndefined()
     const run = await first.codexImport.run()
     expect(run.imported).toBe(2)
-    const session = first.sessions.get(id)
-    if (session === undefined) throw new Error('imported session missing from live store')
-    expect(session.header.cwd).toBe(join(root, 'workspace'))
-    expect(session.header.createdAt).toBe(1000)
-    expect(session.snapshotEvents().map(event => event.type)).toEqual([
-      'turn/start', 'user/message', 'session/title', 'assistant/message',
-      'tool/call', 'tool/result', 'turn/end', 'session/end-seed',
-    ])
-    expect(session.deriveMessages()).toHaveLength(3)
-    const title = session.snapshotEvents().find(event => event.type === 'session/title')
-    if (title === undefined || title.type !== 'session/title') throw new Error('missing title event')
-    expect(title.data.title).toBe('整理校验表')
-
+    // 导入只写持久化，不进入 live store，避免无 Agent 的残留会话让后续 resume 撞上 already exists。
+    expect(first.sessions.get(id)).toBeUndefined()
     const snapshot = await first.sessionPersistence.stat(id)
-    expect(snapshot).toBeDefined()
-    const listed = await first.sessionPersistence.list()
-    expect(listed.some(row => row.header.id === id)).toBe(true)
+    if (snapshot === undefined) throw new Error('imported session missing from persistence')
+    expect(snapshot.header.cwd).toBe(join(root, 'workspace'))
+    expect(snapshot.header.createdAt).toBe(1000)
     const handle = await first.sessionPersistence.open(id, 'read')
     const stored = await handle.read()
     await handle.close()
-    expect(stored).toEqual(session.snapshotEvents())
+    expect(stored.map(event => event.type)).toEqual([
+      'turn/start', 'user/message', 'session/title', 'assistant/message',
+      'tool/call', 'tool/result', 'turn/end', 'session/end-seed',
+    ])
+    const title = stored.find(event => event.type === 'session/title')
+    if (title === undefined || title.type !== 'session/title') throw new Error('missing title event')
+    expect(title.data.title).toBe('整理校验表')
+
+    const listed = await first.sessionPersistence.list()
+    expect(listed.some(row => row.header.id === id)).toBe(true)
 
     const workspace = await first.workspaceRegistry.resolveByPath(join(root, 'workspace'))
     expect(workspace?.sessionIds).toEqual([id])
@@ -189,7 +187,6 @@ describe('session-import-codex through a real Loader composition', () => {
     const result = await first.codexImport.run()
     const id = SessionId('codex-thread-1')
     expect(result).toMatchObject({ imported: 0, updated: 1, skippedExisting: 1, skippedEmpty: 1, deferredActive: 0 })
-    expect(first.sessions.get(id)?.header.cwd).toBe(nextWorkspace)
     expect((await first.sessionPersistence.stat(id))?.header.cwd).toBe(nextWorkspace)
     const oldWorkspace = await first.workspaceRegistry.resolveByPath(join(root, 'workspace'))
     const newWorkspace = await first.workspaceRegistry.resolveByPath(nextWorkspace)
@@ -262,8 +259,8 @@ describe('session-import-codex through a real Loader composition', () => {
     }
     const raced = await runImportSweep(second, resolvedConfig(), new AbortController().signal)
     expect(raced.summary).toEqual({ imported: 1, updated: 0, skippedExisting: 1, skippedEmpty: 1, deferredActive: 0 })
-    expect(second.sessions.get(SessionId('codex-thread-1'))).toBeDefined()
-    expect(second.sessions.get(SessionId('codex-thread-2'))).toBeUndefined()
+    expect((await second.sessionPersistence.stat(SessionId('codex-thread-1')))?.header.id).toBe(SessionId('codex-thread-1'))
+    expect((await second.sessionPersistence.stat(SessionId('codex-thread-2')))).toBeUndefined()
   })
 
   it('logs a failed write and still imports later threads', async () => {
@@ -278,8 +275,8 @@ describe('session-import-codex through a real Loader composition', () => {
     }
     const result = await runImportSweep(first, resolvedConfig(), new AbortController().signal)
     expect(result.summary).toEqual({ imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 1, deferredActive: 0 })
-    expect(first.sessions.get(SessionId('codex-thread-1'))).toBeUndefined()
-    expect(first.sessions.get(SessionId('codex-thread-2'))).toBeDefined()
+    expect((await first.sessionPersistence.stat(SessionId('codex-thread-1')))).toBeUndefined()
+    expect((await first.sessionPersistence.stat(SessionId('codex-thread-2')))?.header.id).toBe(SessionId('codex-thread-2'))
   })
 
   it('reports nothing to import when the codex store is absent', async () => {
@@ -309,7 +306,7 @@ describe('session-import-codex through a real Loader composition', () => {
     const result = await first.codexImport.run()
     const id = SessionId('codex-archive-only')
     expect(result).toMatchObject({ imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 })
-    expect(first.sessions.get(id)?.header.cwd).toBe(workspace)
+    expect((await first.sessionPersistence.stat(id))?.header.cwd).toBe(workspace)
     expect((await first.workspaceRegistry.resolveByPath(workspace))?.sessionIds).toContain(id)
   })
 
@@ -342,8 +339,8 @@ describe('session-import-codex through a real Loader composition', () => {
     const overridden = SessionId('codex-thread-1')
     const indexed = SessionId('codex-indexed-only')
     expect(result).toMatchObject({ imported: 3, updated: 0, skippedExisting: 0, skippedEmpty: 1, deferredActive: 0 })
-    expect(first.sessions.get(overridden)?.header.cwd).toBe(overrideWorkspace)
-    expect(first.sessions.get(indexed)?.header.cwd).toBe(indexedWorkspace)
+    expect((await first.sessionPersistence.stat(overridden))?.header.cwd).toBe(overrideWorkspace)
+    expect((await first.sessionPersistence.stat(indexed))?.header.cwd).toBe(indexedWorkspace)
     expect((await first.workspaceRegistry.resolveByPath(overrideWorkspace))?.sessionIds).toContain(overridden)
     expect((await first.workspaceRegistry.resolveByPath(indexedWorkspace))?.sessionIds).toContain(indexed)
   })

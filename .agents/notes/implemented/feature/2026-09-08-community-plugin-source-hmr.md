@@ -10,7 +10,7 @@ Community plugins (`dsh-codex-shell` and friends) install as tarball bundles int
 
 ## Decision
 
-`community/plugins/dev.mjs` discovers every community bundle plugin, links each into the web profile from its source directory, appends an enabled `hmr` row to the profile `cordis.patch.yml` whose `root` points at the plugin sources, then starts each plugin's host/client `tsc --watch` and `tsdown --watch` stages. `profile-boot` spawns this script whenever the script exists while booting the `web` profile, so `dsh web` and the desktop shell start with the loop already running; a released environment without the source tree has no script and skips it. The boot-owned shutdown kills the watch process. With modules resolved through the source link (not `node_modules`), Cordis HMR reloads host modules and `client-hmr` hot-reloads client bundles, so edits apply without a service restart or page refresh.
+`community/plugins/dev.mjs` discovers every community bundle plugin, mounts each into the web profile's `node_modules` from its source directory as a filesystem junction (a symlink off Windows), bypassing pnpm's `link:` resolution, appends an enabled `hmr` row to the profile `cordis.patch.yml` whose `root` points at the plugin sources, then starts each plugin's host/client `tsc --watch` and `tsdown --watch` stages. `profile-boot` spawns this script whenever the script exists while booting the `web` profile, so `dsh web` and the desktop shell start with the loop already running; a released environment without the source tree has no script and skips it. The boot-owned shutdown kills the watch process. With modules resolved through the source mount (not the installed copy), Cordis HMR reloads host modules and `client-hmr` hot-reloads client bundles, so edits apply without a service restart or page refresh.
 
 ## Alternatives considered
 
@@ -22,4 +22,4 @@ Community plugins (`dsh-codex-shell` and friends) install as tarball bundles int
 
 ## Consequences
 
-The dev loop runs beside a live `dsh web` / desktop shell. It rewrites the profile's `cordis.patch.yml` (the `hmr` row) and changes the plugin dependency from a tarball to a `link:` spec; the installed profile therefore differs from the released tarball layout until the operator removes the link and reinstalls the tarball.
+The dev loop runs beside a live `dsh web` / desktop shell. It rewrites the profile's `cordis.patch.yml` (the `hmr` row) and replaces the installed plugin directory under `node_modules` with a junction to the source directory while the `file:` tarball dependency spec stays intact; the installed profile therefore differs from the released tarball layout until the operator removes the junction and reinstalls the tarball.

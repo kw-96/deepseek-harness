@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`community/plugins/dev.mjs` 发现全部社区 bundle 插件，把每个从源码目录 link 挂载进 web profile，在 profile `cordis.patch.yml` 追加启用 `hmr` 行并把 `root` 指向插件源码，再启动每个插件的 host/client `tsc --watch` 与 `tsdown --watch` 阶段。`profile-boot` 在启动 `web` profile 时只要脚本存在就 spawn 它，因此 `dsh web` 与桌面壳启动即已带热替换循环；没有源码树的发布环境没有该脚本，自然跳过。boot 拥有的 shutdown 会 kill 该 watch 进程。模块经源码 link 解析（不在 `node_modules`）后，Cordis HMR 热替换 host 模块，`client-hmr` 热重载 client bundle，改代码即可生效，无需重启服务或刷新页面。
+`community/plugins/dev.mjs` 发现全部社区 bundle 插件，把每个以文件系统 junction 挂载进 web profile 的 `node_modules`（非 Windows 为 symlink），绕开 pnpm 的 `link:` 解析，在 profile `cordis.patch.yml` 追加启用 `hmr` 行并把 `root` 指向插件源码，再启动每个插件的 host/client `tsc --watch` 与 `tsdown --watch` 阶段。`profile-boot` 在启动 `web` profile 时只要脚本存在就 spawn 它，因此 `dsh web` 与桌面壳启动即已带热替换循环；没有源码树的发布环境没有该脚本，自然跳过。boot 拥有的 shutdown 会 kill 该 watch 进程。模块经源码挂载解析（不走安装副本）后，Cordis HMR 热替换 host 模块，`client-hmr` 热重载 client bundle，改代码即可生效，无需重启服务或刷新页面。
 
 ## 备选方案
 
@@ -22,4 +22,4 @@ Status: implemented
 
 ## 后果
 
-开发循环与运行中的 `dsh web` / 桌面壳并存。它会改写 profile 的 `cordis.patch.yml`（`hmr` 行），并把插件依赖从 tarball 改为 `link:` spec；因此安装后的 profile 与发布 tarball 布局不同，直到操作者移除 link 并重装 tarball 才会恢复。
+开发循环与运行中的 `dsh web` / 桌面壳并存。它会改写 profile 的 `cordis.patch.yml`（`hmr` 行），并在保留 `file:` tarball 依赖 spec 的同时，把 `node_modules` 下的插件目录替换为指向源码目录的 junction；因此安装后的 profile 与发布 tarball 布局不同，直到操作者移除 junction 并重装 tarball 才会恢复。

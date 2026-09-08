@@ -192,7 +192,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     )
   }
 
-  const renderProject = (project: ProjectView, workspaces: React.ReactNode[]): React.ReactNode => {
+  const renderProject = (project: ProjectView, sessionRows: React.ReactNode[]): React.ReactNode => {
     const key = `project:${project.projectId}`
     const isCollapsed = collapsed.has(key)
     return (
@@ -202,29 +202,28 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
           <Folder size={13} className={css.workspaceIcon} />
           <span className={css.workspaceLabel}>{project.name}</span>
         </button>
-        {!isCollapsed && workspaces}
+        {!isCollapsed && sessionRows}
       </div>
     )
   }
 
   const renderByProject = (): React.ReactNode => {
-    const byProject = new Map<string, React.ReactNode[]>()
-    const ungrouped: React.ReactNode[] = []
+    const byProject = new Map<string, SessionId[]>()
+    const ungrouped: SessionId[] = []
     for (const { workspace, sessions } of groups.grouped) {
       const project = projectForPath(workspace.path, projects)
-      const node = renderWorkspace(workspace, sessions)
       if (project === undefined) {
-        ungrouped.push(node)
-      } else {
-        const list = byProject.get(project.projectId) ?? []
-        list.push(node)
-        byProject.set(project.projectId, list)
+        ungrouped.push(...sessions)
+        continue
       }
+      const list = byProject.get(project.projectId)
+      if (list === undefined) byProject.set(project.projectId, [...sessions])
+      else list.push(...sessions)
     }
     return (
       <>
-        {projects.map(project => renderProject(project, byProject.get(project.projectId) ?? []))}
-        {ungrouped}
+        {projects.map(project => renderProject(project, (byProject.get(project.projectId) ?? []).map(id => sessionRow(id))))}
+        {ungrouped.map(id => sessionRow(id))}
       </>
     )
   }

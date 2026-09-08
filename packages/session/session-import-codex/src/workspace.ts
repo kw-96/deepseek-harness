@@ -59,14 +59,19 @@ export class CodexImportReconciler {
     if (this.ctx.get('agents')?.get(snapshot.id) !== undefined) return 'deferred-active'
 
     await this.ctx.sessionPersistence.replace(snapshot.header, snapshot.events)
-    this.ctx.sessions.replace(snapshot.id, {
-      seed: structuredClone(snapshot.events),
-      meta: {
-        ...(snapshot.header.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
-        createdAt: snapshot.header.createdAt,
-        isSeeded: false,
-      },
-    })
+    // 仅当该会话已在 live store 时同步内存快照；冷会话只写持久化，
+    // 避免把无 Agent 的导入会话塞进 store，进而让后续 resume 撞上
+    // `session already exists`。
+    if (this.ctx.sessions.get(snapshot.id) !== undefined) {
+      this.ctx.sessions.replace(snapshot.id, {
+        seed: structuredClone(snapshot.events),
+        meta: {
+          ...(snapshot.header.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
+          createdAt: snapshot.header.createdAt,
+          isSeeded: false,
+        },
+      })
+    }
     await this.reconcileWorkspace(snapshot.id, snapshot.header.cwd)
     return 'updated'
   }
@@ -79,14 +84,6 @@ export class CodexImportReconciler {
     } finally {
       await handle.close()
     }
-    this.ctx.sessions.replace(snapshot.id, {
-      seed: structuredClone(snapshot.events),
-      meta: {
-        ...(snapshot.header.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
-        createdAt: snapshot.header.createdAt,
-        isSeeded: false,
-      },
-    })
   }
 
   private async reconcileWorkspace(sessionId: SessionId, cwd: string | undefined): Promise<void> {

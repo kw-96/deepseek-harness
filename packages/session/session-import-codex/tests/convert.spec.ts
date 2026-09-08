@@ -60,6 +60,20 @@ describe('convertCodexThread', () => {
     }
   })
 
+  it('floors fractional Codex timestamps to integer millisecond time', () => {
+    const base = fixture()
+    const record: CodexThreadRecord = {
+      ...base,
+      items: [{ ...base.items[0]!, createdAtMs: 1000.5 }, ...base.items.slice(1)],
+      turns: [
+        base.turns[0]!,
+        { ...base.turns[1]!, startedAtMs: 1000.25, completedAtMs: 5000.75 },
+      ],
+    }
+    const { events } = convertCodexThread(record, 'C:\\fallback', BOUNDS)
+    expect(events.every(event => Number.isSafeInteger(event.time))).toBe(true)
+  })
+
   it('emits the normalized title after the first user message', () => {
     const { events } = convertCodexThread(fixture(), 'C:\\fallback', BOUNDS)
     const user = events.find(event => event.type === 'user/message')

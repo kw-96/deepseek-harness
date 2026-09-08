@@ -13,8 +13,8 @@
  * 前置：dsh web（或桌面壳）已运行，且各插件源码已构建过一次。
  */
 
-import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -49,19 +49,6 @@ function discoverPlugins() {
 const plugins = discoverPlugins()
 const watchOnly = process.argv.includes('--watch-only')
 
-/** 同步执行 dsh plugin 命令。 */
-function dshPlugin(args, allowFailure = false) {
-  const result = spawnSync('dsh.cmd', ['plugin', '--profile', 'web', ...args], {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  })
-  if (result.status !== 0 && !allowFailure) {
-    console.error(`dev: dsh plugin ${args.join(' ')} 失败`)
-    process.exit(1)
-  }
-}
-
 /** 在 profile patch 顶层数组末尾追加 hmr 行（幂等）。 */
 function enableHmr(root) {
   const before = existsSync(patchFile) ? readFileSync(patchFile, 'utf8') : '[]\n'
@@ -81,15 +68,37 @@ function enableHmr(root) {
   writeFileSync(patchFile, next)
 }
 
+/** 确保 profile 的 bundle 列表包含该插件名（幂等）。 */
+function ensureBundle(name) {
+  const manifestPath = join(profileDir, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const bundles = manifest.dsh?.profile?.bundles ?? []
+  if (bundles.includes(name)) return
+  bundles.push(name)
+  manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles } }
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+}
+
 if (!watchOnly) {
   enableHmr(packagesDir)
   console.log(`[dev] 已启用 Cordis HMR，root=${packagesDir}`)
 
-  // 解除 tarball 安装并改为源码 link 挂载。
+  // 用 junction 把每个自研插件从源码目录挂载进 profile。pnpm 的 `link:`
+  // 在 Windows 上会把盘符绝对路径误当相对路径，生成指向
+  // `profile\<盘符>\...` 的坏 junction；这里直接创建正确 junction，
+  // 不依赖 pnpm 的 link 解析，profile 依赖仍保持 file: tarball。
   for (const plugin of plugins) {
-    console.log(`[dev] link 挂载 ${plugin.name} → ${plugin.dir}`)
-    dshPlugin(['remove', plugin.name], true)
-    dshPlugin(['add', `link:${plugin.dir.replace(/\\/g, '/')}`])
+    const target = join(profileDir, 'node_modules', plugin.name)
+    console.log(`[dev] junction 挂载 ${plugin.name} → ${plugin.dir}`)
+    try {
+      const stat = lstatSync(target)
+      if (stat.isSymbolicLink()) unlinkSync(target)
+      else rmSync(target, { recursive: true, force: true })
+    } catch {
+      // 目标不存在则忽略。
+    }
+    symlinkSync(plugin.dir, target, 'junction')
+    ensureBundle(plugin.name)
   }
 }
 

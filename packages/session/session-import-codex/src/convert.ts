@@ -134,7 +134,9 @@ function push<K extends SessionEventType>(
   data: SessionEventMap[K],
   surface?: 'append',
 ): void {
-  const stamped = Math.max(state.prevTime, time)
+  // Codex 时间戳可能是浮点秒转换来的浮点毫秒；session 契约要求
+  // `time` 为整数毫秒，这里统一向下取整并保持单调不减。
+  const stamped = Math.floor(Math.max(state.prevTime, time))
   state.prevTime = stamped
   events.push({
     type,
