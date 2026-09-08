@@ -54,7 +54,7 @@ kind: "package-reference"
 
 ### 设置卡片与 Remote
 
-插件提供 `codex-import` 设置命名空间（一个字段 `autoSync`，默认 `false`）和带有 `run()`、`history()` 的 `codexImport` Remote 命名空间。配套客户端包 `@deepseek-ai/dsh-client-ui-codex-import` 在 Web **插件**配置标签中渲染同步开关、手动导入按钮以及带逐会话打开按钮的持久导入历史。该开关同时控制即时自动扫描和定时重扫（`syncIntervalMs`）；手动按钮始终可用。
+插件提供 `codex-import` 设置命名空间（一个字段 `autoSync`，默认 `false`）和带有 `run()`、`history()` 的 `codexImport` Remote 命名空间。配套客户端包 `@deepseek-ai/dsh-client-ui-codex-import` 在 Web **插件**配置标签中渲染同步开关、手动导入按钮以及高度受限、内部滚动、逐轮可折叠展开的持久导入历史（逐会话打开按钮）。该开关同时控制即时自动扫描和定时重扫（`syncIntervalMs`）；手动按钮始终可用。
 
 ### 条目映射
 

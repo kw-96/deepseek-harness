@@ -1,9 +1,10 @@
-/** 添加工作区入口（sidebar.footer.action）：页脚按钮 + 居中弹窗。
+/** 添加工作区居中弹窗（挂在侧栏页脚槽位，只渲染弹窗不渲染按钮；
+ * 打开入口为标题栏「+」与桌面标题栏 File → Open Workspace）。
  * 目录浏览基于 codexShell remote 的 fsList；原生 directoryFlow 槽声明
  * 始终由被遮蔽的原生浏览器持有，插件不能渲染它，故自带轻量选择流程。 */
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Folder, FolderPlus, FolderSearch, X } from 'lucide-react'
+import { ArrowLeft, Folder, FolderSearch, X } from 'lucide-react'
 import type { FsListEntry, FsListResponse } from 'dsh-codex-shell/types'
 import type { SelectorHook, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
 import { registerAddWorkspaceOpener } from './sidebar/add-workspace-bus.js'
@@ -15,7 +16,6 @@ export interface AddWorkspaceInjected {
 }
 
 export interface AddWorkspaceProps extends AddWorkspaceInjected {
-  wide: boolean
   useSessions: SelectorHook<SessionListStateLike>
   t: TFn
 }
@@ -32,8 +32,8 @@ function joinPath(parent: string, name: string): string {
   return `${parent}\\${name}`
 }
 
-/** 页脚“添加工作区”按钮与居中选择弹窗。 */
-export function AddWorkspaceAction({ wide, useSessions, fsList, createWorkspace, t }: AddWorkspaceProps) {
+/** 居中“添加工作区”弹窗（页脚槽位只承载弹窗，无可见按钮）。 */
+export function AddWorkspaceAction({ useSessions, fsList, createWorkspace, t }: AddWorkspaceProps) {
   const [open, setOpen] = useState(false)
   const [path, setPath] = useState('')
   const [listing, setListing] = useState<readonly FsListEntry[]>([])
@@ -119,20 +119,6 @@ export function AddWorkspaceAction({ wide, useSessions, fsList, createWorkspace,
 
   return (
     <>
-      {wide
-        ? (
-          <button type="button" className={css.footerButton} onClick={openModal}>
-            <FolderPlus size={15} />
-            <span>{t('addWorkspace')}</span>
-          </button>
-        )
-        : (
-          <button type="button" className={css.railButton} title={t('addWorkspace')}
-            aria-label={t('addWorkspace')}
-            onClick={openModal}>
-            <FolderPlus size={18} />
-          </button>
-        )}
       {open && (
         <div className={css.backdrop} onClick={closeModal}>
           <div className={css.modal} role="dialog" aria-label={t('pickerTitle')}

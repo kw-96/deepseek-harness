@@ -1,0 +1,2 @@
+sessionCwd="C:\\Users\\N33384\\AppData\\Local\\Temp\\dsh-web-e2e-ws-6sSYSD\\workspace"
+expectedCwd="C:\\Users\\N33384\\AppData\\Local\\Temp\\dsh-web-e2e-ws-Yud0Im\\workspace"

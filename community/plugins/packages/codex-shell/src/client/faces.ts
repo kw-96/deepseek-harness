@@ -188,6 +188,7 @@ export type RenderSlotFn = (
 
 /** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动 details 第三列开合。 */
 export interface LayoutFace {
+  toggleSidebar(): void
   openDetails(): void
   closeDetails(): void
   openBottom(): void

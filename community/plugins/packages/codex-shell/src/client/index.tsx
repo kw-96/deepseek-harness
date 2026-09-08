@@ -210,6 +210,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     canExportMarkdown: (connection as ConnectionProbeLike).api?.sessions?.history !== undefined,
     meta,
     prefs,
+    toggleSidebar: () => { layout?.toggleSidebar() },
   })
 
   const addWorkspaceInject = (): AddWorkspaceInjected => ({
@@ -275,6 +276,16 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeBrandName = slots.inject('sidebar.brand.name', () => slots.register({
     name: 'sidebar.brand.name', id: 'codex-hide-brand-name', locale: 'codex-shell',
   }, () => null))
+  // 隐藏侧栏顶部品牌行（DeepSeek 图标 + 文字）：mark 槽渲染一条全局样式，
+  // 只隐藏「同时包含 mark 与 name 槽」的品牌按钮所在行；折叠轨道态的
+  // 展开按钮不含 name 槽，不受影响。折叠入口改由项目标题栏提供。
+  const BRAND_ROW_HIDE_CSS = `
+    div:has(> button:has([data-slot="sidebar.brand.mark"]):has([data-slot="sidebar.brand.name"])) { display: none; }
+  `
+  const HideBrandMark = () => <style>{BRAND_ROW_HIDE_CSS}</style>
+  const disposeBrandMark = slots.inject('sidebar.brand.mark', () => slots.register({
+    name: 'sidebar.brand.mark', id: 'codex-hide-brand-mark', locale: 'codex-shell',
+  }, HideBrandMark))
   // 添加工作区弹窗挂在侧栏页脚槽位（只承载弹窗与打开器，页脚无可见按钮；
   // 打开入口为标题栏「+」与桌面标题栏 File → Open Workspace）。
   const disposeAddWorkspace = slots.inject('sidebar.footer.action', () => slots.register({
@@ -304,6 +315,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     disposeBottom()
     disposePanel()
     disposeAddWorkspace()
+    disposeBrandMark()
     disposeBrandName()
     disposeBrowser()
     disposeLocale()

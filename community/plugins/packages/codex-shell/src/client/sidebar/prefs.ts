@@ -15,6 +15,10 @@ interface PrefsFile {
   organize: OrganizeMode
   sort: SortMode
   workspacePinned: Record<string, boolean>
+  /** 项目置顶（按项目分组视图的 ProjectView）。 */
+  projectPinned?: Record<string, boolean>
+  /** 收起的组键集合（项目/工作区/归档桶），数组序列化以兼容 JSON。 */
+  collapsedGroups?: string[]
 }
 
 const PREFS_KEY = 'dsh-codex-shell.browser-prefs.v1'
@@ -23,6 +27,8 @@ const DEFAULTS: PrefsFile = {
   organize: 'byProject',
   sort: 'pinnedFirst',
   workspacePinned: {},
+  projectPinned: {},
+  collapsedGroups: [],
 }
 
 /**
@@ -35,6 +41,7 @@ export class BrowserPrefsStore {
   constructor() {
     this.data = { ...DEFAULTS, ...readPersisted<Partial<PrefsFile>>(PREFS_KEY, {}) }
     this.data.workspacePinned = this.data.workspacePinned ?? {}
+    this.data.projectPinned = this.data.projectPinned ?? {}
   }
 
   /** 当前整理模式。 */
@@ -50,6 +57,31 @@ export class BrowserPrefsStore {
   /** 某工作区是否本地置顶。 */
   workspacePinned(workspaceId: string): boolean {
     return this.data.workspacePinned[workspaceId] === true
+  }
+
+  /** 某项目是否本地置顶。 */
+  projectPinned(projectId: string): boolean {
+    return this.data.projectPinned?.[projectId] === true
+  }
+
+  /** 切换项目本地置顶。 */
+  setProjectPinned(projectId: string, pinned: boolean): void {
+    const next = { ...(this.data.projectPinned ?? {}) }
+    if (pinned) next[projectId] = true
+    else delete next[projectId]
+    this.data = { ...this.data, projectPinned: next }
+    this.persist()
+  }
+
+  /** 当前收起的组键集合。 */
+  collapsedGroups(): ReadonlySet<string> {
+    return new Set(this.data.collapsedGroups ?? [])
+  }
+
+  /** 覆盖写入收起组键集合（项目/工作区/归档桶），供刷新后恢复。 */
+  setCollapsedGroups(keys: readonly string[]): void {
+    this.data = { ...this.data, collapsedGroups: [...keys] }
+    this.persist()
   }
 
   /** 写入整理模式。 */

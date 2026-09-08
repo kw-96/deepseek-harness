@@ -1,5 +1,8 @@
 /** The Codex import settings card: sync toggle, manual import, and history. */
 
+import { useEffect, useRef, useState } from 'react'
+import clsx from 'clsx'
+import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from './codex-import-card-controller.ts'
 import type { CodexImportCardFace } from './codex-import-card-controller.ts'
@@ -17,6 +20,30 @@ function formatTime(at: number): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(at)
 }
 
+/** Stable disclosure key for one history run entry. */
+function runKey(at: number, index: number): string {
+  return `${at}-${index}`
+}
+
+/** Run fields the count pills read. */
+interface RunCountsProps {
+  run: { at: number; imported: number; updated: number; deferredActive: number }
+  t: CodexImportCardProps['t']
+}
+
+/** The per-run count pills: timestamp plus the sweep's outcome counters. */
+function RunCounts(props: RunCountsProps) {
+  const { run, t } = props
+  return (
+    <>
+      <span className={css.runTime}>{formatTime(run.at)}</span>
+      <span className={css.runCount}>{t('importedCount', { count: run.imported })}</span>
+      {run.updated > 0 && <span className={css.runCount}>{t('updatedCount', { count: run.updated })}</span>}
+      {run.deferredActive > 0 && <span className={css.runCount}>{t('deferredActiveCount', { count: run.deferredActive })}</span>}
+    </>
+  )
+}
+
 /**
  * Render the Codex import card.
  * @param props - locale copy, the card snapshot, and its actions.
@@ -25,6 +52,32 @@ function formatTime(at: number): string {
 export function CodexImportCard(props: CodexImportCardProps) {
   const { t, toggleSync, runImport, openSession } = props
   const state = props.useCodexImportCard(snapshot => snapshot)
+  // Per-run disclosure is card-local reading state: which runs the user has
+  // opened is a viewing gesture nobody outside the card has a stake in. The
+  // newest run starts open; an import prepending a newer run opens it too.
+  const newest = state.runs[0]
+  const firstRunKey = newest === undefined ? undefined : runKey(newest.at, 0)
+  const [openRuns, setOpenRuns] = useState<ReadonlySet<string>>(() => {
+    return firstRunKey === undefined ? new Set<string>() : new Set([firstRunKey])
+  })
+  const previousFirstRunKey = useRef(firstRunKey)
+  useEffect(() => {
+    if (firstRunKey !== undefined && previousFirstRunKey.current !== firstRunKey) {
+      setOpenRuns(previous => new Set([firstRunKey, ...previous]))
+    }
+    previousFirstRunKey.current = firstRunKey
+  }, [firstRunKey])
+  const toggleRun = (key: string): void => {
+    setOpenRuns((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
   return (
     <section className={css.card}>
       <header className={css.header}>
@@ -57,36 +110,54 @@ export function CodexImportCard(props: CodexImportCardProps) {
           ? <p className={css.empty}>{t('empty')}</p>
           : (
             <ul className={css.runs}>
-              {state.runs.map((run, index) => (
-                <li key={`${run.at}-${index}`} className={css.run}>
-                  <div className={css.runHead}>
-                    <span className={css.runTime}>{formatTime(run.at)}</span>
-                    <span className={css.runCount}>{t('importedCount', { count: run.imported })}</span>
-                    {run.updated > 0 && <span className={css.runCount}>{t('updatedCount', { count: run.updated })}</span>}
-                    {run.deferredActive > 0 && <span className={css.runCount}>{t('deferredActiveCount', { count: run.deferredActive })}</span>}
-                  </div>
-                  {run.sessions.length === 0
-                    ? <p className={css.none}>{t('noSessions')}</p>
-                    : (
-                      <ul className={css.sessions}>
-                        {run.sessions.map(session => (
-                          <li key={session.id} className={css.session}>
-                            <span className={css.sessionTitle}>
-                              {session.title === '' ? session.id : session.title}
-                            </span>
-                            <button
-                              type="button"
-                              className={css.open}
-                              onClick={() => { openSession(session.id) }}
-                            >
-                              {t('open')}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                </li>
-              ))}
+              {state.runs.map((run, index) => {
+                const key = runKey(run.at, index)
+                const open = openRuns.has(key)
+                return (
+                  <li key={key} className={css.run}>
+                    {run.sessions.length === 0
+                      ? (
+                        <>
+                          <div className={css.runHead}>
+                            <RunCounts run={run} t={t} />
+                          </div>
+                          <p className={css.none}>{t('noSessions')}</p>
+                        </>
+                      )
+                      : (
+                        <>
+                          <button
+                            type="button"
+                            className={css.runHead}
+                            aria-expanded={open}
+                            onClick={() => { toggleRun(key) }}
+                          >
+                            <RunCounts run={run} t={t} />
+                            <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+                          </button>
+                          {open && (
+                            <ul className={css.sessions}>
+                              {run.sessions.map(session => (
+                                <li key={session.id} className={css.session}>
+                                  <span className={css.sessionTitle}>
+                                    {session.title === '' ? session.id : session.title}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className={css.open}
+                                    onClick={() => { openSession(session.id) }}
+                                  >
+                                    {t('open')}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      )}
+                  </li>
+                )
+              })}
             </ul>
           )}
       </div>

@@ -115,7 +115,13 @@ function cwdSpellings(ctx: NormalizeContext): string[] {
   const macAliases = spellings
     .filter(spelling => spelling.startsWith('/') && !spelling.startsWith('/private/'))
     .map(spelling => `/private${spelling}`)
-  return [...new Set([...spellings, ...macAliases])]
+  // The sandbox-policy snapshot text renders the workspace path through
+  // JSON.stringify, so its backslashes appear doubled inside the emitted
+  // string; recognize that spelling too.
+  const jsonQuoted = spellings
+    .filter(spelling => spelling.includes('\\'))
+    .map(spelling => spelling.replaceAll('\\', '\\\\'))
+  return [...new Set([...spellings, ...jsonQuoted, ...macAliases])]
     .sort((left, right) => right.length - left.length)
 }
 

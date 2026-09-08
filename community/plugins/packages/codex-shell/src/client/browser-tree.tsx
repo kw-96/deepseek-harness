@@ -3,27 +3,22 @@
  * 状态与动作来自 WorkspaceBrowser。
  */
 
-import { Archive, Folder, Inbox } from 'lucide-react'
+import { Archive, Folder, FolderOpen, Inbox, Pin } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import type { BrowserPrefsStore, OrganizeMode, SortMode } from './sidebar/prefs.js'
+import { orderProjects, sortSessionIds, type GroupsModel } from './sidebar/groups.js'
 import type { ProjectView, SearchResultLike, SessionId, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
 import { SessionRow } from './session-rows.js'
 import { WorkspaceHead } from './workspace-head.js'
 import css from './styles.module.css'
 
 /** 分组投影结果。 */
-export interface GroupsModel {
-  grouped: { workspace: WorkspaceViewLike; sessions: SessionId[] }[]
-  ungrouped: SessionId[]
-  archived: SessionId[]
-  flat: SessionId[]
-}
+export type { GroupsModel } from './sidebar/groups.js'
 
 export interface BrowserTreeProps {
   groups: GroupsModel
   list: SessionListStateLike
   collapsed: ReadonlySet<string>
-  collapsedSubagents: ReadonlySet<string>
   searching: boolean
   searchItems: readonly SearchResultLike[]
   searchLoading: boolean
@@ -39,8 +34,8 @@ export interface BrowserTreeProps {
   onSessionMenu: (event: React.MouseEvent, sessionId: SessionId) => void
   onArchiveSession: (sessionId: SessionId) => void
   onToggleWorkspacePin: (workspaceId: string) => void
+  onToggleProjectPin: (projectId: string) => void
   onBeginWorkspaceRename: (workspaceId: string, title: string) => void
-  onToggleSubagents: (key: string) => void
   setRenameDraft: (value: string) => void
   commitRename: (sessionId: SessionId) => void
   commitWorkspaceRename: (workspaceId: string) => void
@@ -80,48 +75,26 @@ function projectForPath(path: string, projects: readonly ProjectView[]): Project
 /** 渲染树体。 */
 export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const {
-    groups, list, collapsed, collapsedSubagents, searching, searchItems, searchLoading,
+    groups, list, collapsed, searching, searchItems, searchLoading,
     renaming, renameDraft, organize, sort, prefs, projects, onToggleGroup, onOpen, onWorkspaceMenu,
-    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onBeginWorkspaceRename,
-    onToggleSubagents, setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
+    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onToggleProjectPin, onBeginWorkspaceRename,
+    setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
     sessionWorkspaceId, meta, t,
   } = props
-  const now = Date.now()
   const manual = sort === 'manual'
-
-  const timeLabelFor = (updatedAt: number): string => {
-    const seconds = Math.max(0, Math.floor((now - updatedAt) / 1000))
-    if (seconds < 60) return t('timeNow')
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return t('timeMinAgo', { n: minutes })
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return t('timeHourAgo', { n: hours })
-    const days = Math.floor(hours / 24)
-    if (days < 7) return t('timeDayAgo', { n: days })
-    return new Date(updatedAt).toLocaleDateString()
-  }
 
   const sessionRow = (sessionId: SessionId, archived = false, workspaceId?: string) => {
     const summary = list.byId[sessionId]
     if (summary === undefined) return null
-    const subagents = list.ids.flatMap(id => {
-      const child = list.byId[id]
-      if (child === undefined || child.parentId !== sessionId || child.origin !== 'subagent' || child.blank) return []
-      return [{ id, title: child.displayTitle, current: list.current === id, running: child.running }]
-    })
     const wsId = workspaceId ?? sessionWorkspaceId(sessionId)
     return <SessionRow
       key={sessionId}
       sessionId={sessionId}
       title={summary.displayTitle}
-      timeLabel={timeLabelFor(summary.updatedAt)}
       cwd={summary.cwd}
       current={list.current === sessionId}
       running={summary.running}
       archived={archived}
-      subagents={subagents}
-      expanded={!collapsedSubagents.has(`sub:${sessionId}`)}
-      onToggleSubagents={() => { onToggleSubagents(`sub:${sessionId}`) }}
       renaming={renaming === sessionId}
       renameDraft={renaming === sessionId ? renameDraft : ''}
       setRenameDraft={setRenameDraft}
@@ -147,7 +120,6 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
         onSessionDrop(dragged, sessionId, wsId, fromWorkspaceId === '' ? undefined : fromWorkspaceId)
       }}
       meta={meta}
-      open={onOpen}
       t={t}
     />
   }
@@ -195,13 +167,59 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const renderProject = (project: ProjectView, sessionRows: React.ReactNode[]): React.ReactNode => {
     const key = `project:${project.projectId}`
     const isCollapsed = collapsed.has(key)
+    const pinned = prefs.projectPinned(project.projectId)
     return (
       <div key={key} className={css.workspaceGroup}>
-        <button type="button" className={css.workspaceHead} role="treeitem" aria-expanded={!isCollapsed}
-          onClick={() => { onToggleGroup(key) }}>
-          <Folder size={13} className={css.workspaceIcon} />
+        <div
+          className={css.workspaceHead}
+          role="treeitem"
+          tabIndex={0}
+          aria-expanded={!isCollapsed}
+          onClick={() => { onToggleGroup(key) }}
+          onKeyDown={event => {
+            if (event.target !== event.currentTarget) return
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onToggleGroup(key)
+            }
+          }}
+        >
+          {isCollapsed
+            ? <Folder size={13} className={css.workspaceIcon} />
+            : <FolderOpen size={13} className={css.workspaceIcon} />}
           <span className={css.workspaceLabel}>{project.name}</span>
-        </button>
+          {pinned
+            ? (
+              <button
+                type="button"
+                className={css.iconButton}
+                title={t('unpin')}
+                aria-label={t('unpin')}
+                onClick={event => {
+                  event.stopPropagation()
+                  onToggleProjectPin(project.projectId)
+                }}
+              >
+                <Pin size={12} fill="currentColor" />
+              </button>
+            )
+            : (
+              <span className={css.workspaceActions}>
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  title={t('pin')}
+                  aria-label={t('pin')}
+                  onClick={event => {
+                    event.stopPropagation()
+                    onToggleProjectPin(project.projectId)
+                  }}
+                >
+                  <Pin size={12} />
+                </button>
+              </span>
+            )}
+        </div>
         {!isCollapsed && sessionRows}
       </div>
     )
@@ -220,10 +238,16 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
       if (list === undefined) byProject.set(project.projectId, [...sessions])
       else list.push(...sessions)
     }
+    // 项目内会话可能来自多个工作区，合并后按当前排序模式整体重排：
+    // 置顶优先时置顶先于其余（置顶之间按最近更新），余下按最近更新。
+    const sortList = (ids: readonly SessionId[]): SessionId[] =>
+      sortSessionIds(ids, list, meta, sort)
+    // 项目组本身按同一套逻辑排列：置顶 → 最近更新 → 其余（注册表顺序兜底）。
+    const ordered = orderProjects(projects, prefs, sort)
     return (
       <>
-        {projects.map(project => renderProject(project, (byProject.get(project.projectId) ?? []).map(id => sessionRow(id))))}
-        {ungrouped.map(id => sessionRow(id))}
+        {ordered.map(project => renderProject(project, sortList(byProject.get(project.projectId) ?? []).map(id => sessionRow(id))))}
+        {sortList(ungrouped).map(id => sessionRow(id))}
       </>
     )
   }

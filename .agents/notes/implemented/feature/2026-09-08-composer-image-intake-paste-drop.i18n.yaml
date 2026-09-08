@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-08-composer-image-intake-paste-drop.md
+2026-09-08-composer-image-intake-paste-drop.md: 3e4b262a94bf420bfe183d1e39f0f1b08bd64024
+2026-09-08-composer-image-intake-paste-drop.zh.md: a7884d1fa147852c96232ab7b37082b0aff951ca

@@ -1,8 +1,8 @@
 /**
- * 侧栏「项目」标题栏：标题 + 整理/排序菜单（…）+ 添加工作区（+）。
+ * 侧栏「项目」标题栏：标题 + 折叠侧栏 + 整理/排序菜单（…）+ 添加工作区（+）。
  */
 
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal, PanelLeftClose, Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { TFn } from '../faces.js'
 import type { OrganizeMode, SortMode } from './prefs.js'
@@ -16,6 +16,7 @@ export interface SectionHeaderProps {
   onSort: (mode: SortMode) => void
   onAddWorkspace: () => void
   onAddProject: () => void
+  onCollapseSidebar: () => void
   t: TFn
 }
 
@@ -26,6 +27,18 @@ export function SectionHeader(props: SectionHeaderProps): React.ReactNode {
     <div className={css.sectionHeader}>
       <span className={css.sectionTitle}>{props.t('projectsSection')}</span>
       <span className={css.sectionActions}>
+        <button
+          type="button"
+          className={css.iconButton}
+          title={props.t('collapseSidebar')}
+          aria-label={props.t('collapseSidebar')}
+          onClick={event => {
+            event.stopPropagation()
+            props.onCollapseSidebar()
+          }}
+        >
+          <PanelLeftClose size={14} />
+        </button>
         <button
           type="button"
           className={css.iconButton}

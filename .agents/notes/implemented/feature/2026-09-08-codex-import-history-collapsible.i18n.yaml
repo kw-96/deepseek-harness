@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-08-codex-import-history-collapsible.md
+2026-09-08-codex-import-history-collapsible.md: 95cf7166dd234cb8b1ed09827e178a30dcb3b50f
+2026-09-08-codex-import-history-collapsible.zh.md: 38c8a96ab7b04e13893efa7de1f4d1237b05efa1

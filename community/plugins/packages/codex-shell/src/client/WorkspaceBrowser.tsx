@@ -48,6 +48,7 @@ export interface CodexBrowserInjected {
   canExportMarkdown: boolean
   meta: SessionMetaStore
   prefs: BrowserPrefsStore
+  toggleSidebar: () => void
 }
 
 export interface CodexBrowserProps extends CodexBrowserInjected {
@@ -82,8 +83,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
   const { search, setQuery, clear: clearSearch } = useSessionSearch(searchSessions)
   const [searchOnExpand, setSearchOnExpand] = useState(false)
   const searchInput = useRef<HTMLInputElement | null>(null)
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
-  const [collapsedSubagents, setCollapsedSubagents] = useState<ReadonlySet<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => prefs.collapsedGroups())
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [prefsSnap, setPrefs] = useBrowserPrefs(prefs)
@@ -271,6 +271,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
           onSort={mode => { setPrefs({ sort: mode }); bump(n => n + 1) }}
           onAddWorkspace={requestAddWorkspaceOpen}
           onAddProject={() => { void addProject() }}
+          onCollapseSidebar={props.toggleSidebar}
           t={t}
         />
       )}
@@ -279,7 +280,6 @@ export function CodexBrowser(props: CodexBrowserProps) {
           groups={groups}
           list={list}
           collapsed={collapsed}
-          collapsedSubagents={collapsedSubagents}
           searching={search.query !== ''}
           searchItems={search.items}
           searchLoading={search.loading}
@@ -289,7 +289,11 @@ export function CodexBrowser(props: CodexBrowserProps) {
           sort={prefsSnap.sort}
           prefs={prefs}
           projects={projects}
-          onToggleGroup={key => { setCollapsed(prev => toggleSet(prev, key)) }}
+          onToggleGroup={key => {
+            const next = toggleSet(collapsed, key)
+            setCollapsed(next)
+            prefs.setCollapsedGroups([...next])
+          }}
           onOpen={open}
           onWorkspaceMenu={(event, workspaceId) => { openMenu(event, { workspaceId, isWorkspace: true }) }}
           onSessionMenu={(event, sessionId) => { openMenu(event, { sessionId, isWorkspace: false }) }}
@@ -298,8 +302,11 @@ export function CodexBrowser(props: CodexBrowserProps) {
             prefs.setWorkspacePinned(workspaceId, !prefs.workspacePinned(workspaceId))
             bump(n => n + 1)
           }}
+          onToggleProjectPin={projectId => {
+            prefs.setProjectPinned(projectId, !prefs.projectPinned(projectId))
+            bump(n => n + 1)
+          }}
           onBeginWorkspaceRename={beginWorkspaceRename}
-          onToggleSubagents={key => { setCollapsedSubagents(prev => toggleSet(prev, key)) }}
           setRenameDraft={setRenameDraft}
           commitRename={sessionId => { void commitRename(sessionId) }}
           commitWorkspaceRename={workspaceId => { void commitWorkspaceRename(workspaceId) }}

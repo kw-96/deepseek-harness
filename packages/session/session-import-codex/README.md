@@ -54,7 +54,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Settings card and Remote
 
-The plugin serves a `codex-import` settings namespace (one field, `autoSync`, default `false`) and a `codexImport` Remote namespace with `run()` and `history()`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and durable import history with per-session open buttons. The toggle gates both the immediate automatic sweep and periodic re-scans (`syncIntervalMs`); the manual button always runs.
+The plugin serves a `codex-import` settings namespace (one field, `autoSync`, default `false`) and a `codexImport` Remote namespace with `run()` and `history()`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and durable import history in a height-bounded, internally scrolling column whose runs fold to reveal per-session open buttons. The toggle gates both the immediate automatic sweep and periodic re-scans (`syncIntervalMs`); the manual button always runs.
 
 ### Item mapping
 

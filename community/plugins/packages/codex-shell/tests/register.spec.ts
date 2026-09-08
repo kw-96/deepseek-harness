@@ -137,8 +137,12 @@ describe('codex-shell registration against the real SlotCore', () => {
     expect(detailsWinners[0]?.options.priority).toBe(-1)
     expect(core.entries('shell.overlay').some(entry => entry.options.id === 'codex-panel')).toBe(false)
     expect(core.entries('conversation.session.header.utilities').some(entry => entry.options.id === 'codex-panel-toggle')).toBe(true)
-    // 添加工作区入口停靠在侧栏页脚（root 作用域）。
+    // 添加工作区弹窗挂在侧栏页脚槽位（承载弹窗与打开器，页脚无可见按钮）。
     expect(core.entries('sidebar.footer.action').some(entry => entry.options.id === 'codex-add-workspace')).toBe(true)
+    // 隐藏侧栏顶部品牌文字：占用 brand.name 槽位。
+    expect(core.entries('sidebar.brand.name').some(entry => entry.options.id === 'codex-hide-brand-name')).toBe(true)
+    // 隐藏侧栏顶部品牌图标：占用 brand.mark 槽位（渲染隐藏品牌行的全局样式）。
+    expect(core.entries('sidebar.brand.mark').some(entry => entry.options.id === 'codex-hide-brand-mark')).toBe(true)
 
     disposer()
   })

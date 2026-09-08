@@ -12,7 +12,7 @@ function renderCard(state: CodexImportCardState) {
   const toggleSync = vi.fn()
   const runImport = vi.fn()
   const openSession = vi.fn()
-  const props = {
+  const makeProps = (s: CodexImportCardState) => ({
     t: ((key: string, params?: { count?: number }) => {
       if (key === 'importedCount') return `Imported ${params?.count ?? 0}`
       if (key === 'updatedCount') return `Updated ${params?.count ?? 0}`
@@ -22,13 +22,19 @@ function renderCard(state: CodexImportCardState) {
       if (key === 'open') return 'Open'
       return key
     }),
-    useCodexImportCard: (selector: (snapshot: CodexImportCardState) => CodexImportCardState) => selector(state),
+    useCodexImportCard: (selector: (snapshot: CodexImportCardState) => CodexImportCardState) => selector(s),
     toggleSync,
     runImport,
     openSession,
-  } as unknown as Parameters<typeof CodexImportCard>[0]
-  const view = render(<CodexImportCard {...props} />)
-  return { view, toggleSync, runImport, openSession }
+  } as unknown as Parameters<typeof CodexImportCard>[0])
+  const view = render(<CodexImportCard {...makeProps(state)} />)
+  return {
+    view,
+    rerender: (next: CodexImportCardState) => { view.rerender(<CodexImportCard {...makeProps(next)} />) },
+    toggleSync,
+    runImport,
+    openSession,
+  }
 }
 
 describe('CodexImportCard', () => {
@@ -86,7 +92,50 @@ describe('CodexImportCard', () => {
   })
 
   it('shows the no-sessions hint for a run that imported nothing', () => {
-    renderCard({ autoSync: true, running: false, runs: [{ at: 100, imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 0, deferredActive: 0, sessions: [] }] })
+    renderCard({
+      autoSync: true,
+      running: false,
+      runs: [{ at: 100, imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 0, deferredActive: 0, sessions: [] }],
+    })
     expect(screen.getByText('noSessions')).toBeDefined()
+  })
+
+  it('starts the newest run open and discloses older runs on demand', () => {
+    renderCard({
+      autoSync: true,
+      running: false,
+      runs: [
+        { at: 200, imported: 2, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-new'), title: '最新会话' }] },
+        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-old'), title: '较早会话' }] },
+      ],
+    })
+    expect(screen.getByText('最新会话')).toBeDefined()
+    expect(screen.queryByText('较早会话')).toBeNull()
+    const olderHead = screen.getByRole('button', { name: /Imported 1/ })
+    expect(olderHead.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(olderHead)
+    expect(olderHead.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('较早会话')).toBeDefined()
+    fireEvent.click(olderHead)
+    expect(olderHead.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('较早会话')).toBeNull()
+  })
+
+  it('opens a newly prepended run when a manual import returns', () => {
+    const { rerender } = renderCard({
+      autoSync: true,
+      running: false,
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] }],
+    })
+    expect(screen.getByText('第一轮会话')).toBeDefined()
+    rerender({
+      autoSync: true,
+      running: false,
+      runs: [
+        { at: 300, imported: 3, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-latest'), title: '新导入会话' }] },
+        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] },
+      ],
+    })
+    expect(screen.getByText('新导入会话')).toBeDefined()
   })
 })

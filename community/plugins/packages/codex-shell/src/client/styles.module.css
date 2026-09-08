@@ -277,8 +277,8 @@
   align-items: center;
   gap: 6px;
   height: 26px;
+  box-sizing: border-box;
   border: 0;
-  border-radius: 6px;
   padding: 0 8px;
   background: transparent;
   color: var(--cx-text-low);
@@ -324,7 +324,7 @@
   display: inline-flex;
 }
 
-/* ── 单行会话行（Codex 式：固定行高 + 悬停显露时间与操作） ── */
+/* ── 单行会话行（Codex 式：固定行高 + 悬停/选中显露操作） ── */
 
 .row,
 .fileRow {
@@ -332,10 +332,14 @@
   align-items: center;
   gap: 8px;
   min-height: 32px;
-  border-radius: 8px;
   padding: 0 8px;
   color: var(--cx-text-mid);
   transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+/* 文件行保留圆角（右侧文件面板），侧栏会话行高亮为直角。 */
+.fileRow {
+  border-radius: 8px;
 }
 
 .row {
@@ -389,24 +393,6 @@
   flex: none;
 }
 
-.rowTime {
-  display: block;
-  width: 42px;
-  flex: none;
-  color: var(--cx-text-low);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  line-height: 16px;
-  text-align: right;
-  visibility: hidden;
-}
-
-.row:hover .rowTime,
-.row:focus-within .rowTime,
-.rowCurrent .rowTime {
-  visibility: visible;
-}
-
 .reveal {
   opacity: 0;
   transition: opacity 120ms var(--ds-ease-in-out, ease);
@@ -435,24 +421,6 @@
 
 .pinMark:hover {
   background: var(--cx-hover);
-  color: var(--cx-text-hi);
-}
-
-.subRow {
-  composes: row;
-  height: 26px;
-  margin-left: 24px;
-  padding-left: 8px;
-  color: var(--cx-text-low);
-}
-
-/* 子代理行与顶层会话形成第二个字体层级。 */
-.subRow .rowLabel {
-  font-size: 12.5px;
-  font-weight: 400;
-}
-
-.subRow:hover {
   color: var(--cx-text-hi);
 }
 
@@ -501,7 +469,6 @@
   gap: 1px;
   min-height: 44px;
   border: 0;
-  border-radius: 8px;
   padding: 5px 8px;
   background: transparent;
   font: inherit;
@@ -650,11 +617,19 @@
   letter-spacing: 0.02em;
 }
 
+/* 悬停操作默认不占布局：仅悬浮、键盘聚焦或选中行显示，
+   标题在常态占满可用宽度，只在真正溢出时省略。 */
 .rowHoverActions {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 1px;
   flex: none;
+}
+
+.row:hover .rowHoverActions,
+.row:focus-within .rowHoverActions,
+.rowCurrent .rowHoverActions {
+  display: inline-flex;
 }
 
 .sectionHeader {
@@ -791,29 +766,7 @@
   font-weight: 600;
 }
 
-/* ── 添加工作区弹窗（居中模态，页脚按钮触发） ───────────── */
-
-.footerButton {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 32px;
-  border: none;
-  border-radius: 8px;
-  padding: 0 10px;
-  background: transparent;
-  color: var(--cx-text-mid);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
-}
-
-.footerButton:hover {
-  background: var(--cx-hover);
-  color: var(--cx-text-hi);
-}
+/* ── 添加工作区弹窗（居中模态，标题栏 + 触发） ───────────── */
 
 .backdrop {
   position: fixed;

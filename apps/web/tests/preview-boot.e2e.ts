@@ -244,6 +244,8 @@ async function within<T>(work: Promise<T>, ms: number, stalled: string): Promise
 it('boots the packed worker deployment to an interactive page', async () => {
   requirePreviewPages()
   const assets = requireVfsAssets()
+  // TEMP diagnostic: inspect override keys.
+  console.log('TEMP overrides keys:', JSON.stringify([...assets.overrides.keys()]))
   try {
     const site = await serveDist(assets.overrides)
     try {
@@ -444,7 +446,10 @@ async function bootEmptyPreview(origin: string, browser: Browser): Promise<void>
       treeActive,
       BOOT_TIMEOUT_MS,
       `empty preview boot: the worker never reported "${TREE_ACTIVE}"`,
-    )
+    ).catch((error: unknown) => {
+      // TEMP diagnostic: surface what the worker said before the milestone gave up.
+      throw new Error(`${String(error)}\nconsoleErrors=${JSON.stringify(consoleErrors, null, 2)}\npageErrors=${JSON.stringify(pageErrors.map(item => String(item)), null, 2)}\nfailedResponses=${JSON.stringify(failedResponses, null, 2)}`)
+    })
     expect(bootLine).toContain(`image lowering=${WRAPPER_CONTRACT}`)
     expect(bootLine).toContain('data overlays=0')
     await page.getByRole('textbox', { name: 'Choose workspace' }).waitFor({ timeout: HERO_TIMEOUT_MS })

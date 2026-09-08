@@ -26,13 +26,9 @@ describe('session hover actions', () => {
       <SessionRow
         sessionId="s1"
         title="Demo"
-        timeLabel="刚刚"
         current={false}
         running={false}
         archived={false}
-        subagents={[]}
-        expanded={false}
-        onToggleSubagents={() => {}}
         renaming={false}
         renameDraft=""
         setRenameDraft={() => {}}
@@ -42,7 +38,6 @@ describe('session hover actions', () => {
         onArchive={onArchive}
         draggable={false}
         meta={meta}
-        open={() => {}}
         t={t}
       />,
     )
@@ -52,21 +47,16 @@ describe('session hover actions', () => {
     expect(onMenu).toHaveBeenCalledTimes(1)
   })
 
-  it('opens and expands a session row from the keyboard', () => {
+  it('opens a session row from the keyboard', () => {
     const meta = new SessionMetaStore()
     const onOpen = vi.fn()
-    const onToggleSubagents = vi.fn()
     render(
       <SessionRow
         sessionId="s1"
         title="Demo"
-        timeLabel="刚刚"
         current={false}
         running={false}
         archived={false}
-        subagents={[{ id: 'child', title: 'Child', current: false, running: false }]}
-        expanded={false}
-        onToggleSubagents={onToggleSubagents}
         renaming={false}
         renameDraft=""
         setRenameDraft={() => {}}
@@ -76,13 +66,10 @@ describe('session hover actions', () => {
         onArchive={() => {}}
         draggable={false}
         meta={meta}
-        open={() => {}}
         t={t}
       />,
     )
-    const row = screen.getAllByRole('treeitem')[0]!
-    fireEvent.keyDown(row, { key: 'ArrowRight' })
-    expect(onToggleSubagents).toHaveBeenCalledTimes(1)
+    const row = screen.getByRole('treeitem')
     fireEvent.keyDown(row, { key: 'Enter' })
     expect(onOpen).toHaveBeenCalledTimes(1)
   })
@@ -166,6 +153,7 @@ describe('section header', () => {
         onSort={onSort}
         onAddWorkspace={vi.fn()}
         onAddProject={vi.fn()}
+        onCollapseSidebar={vi.fn()}
         t={t}
       />,
     )

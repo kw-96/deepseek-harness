@@ -27,6 +27,9 @@
       "path": "../ui-settings"
     },
     {
+      "path": "../ui-primitives"
+    },
+    {
       "path": "../ui-settings-plugins"
     },
     {

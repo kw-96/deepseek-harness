@@ -14,10 +14,10 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconPaperclipOutline16, IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
+  IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -299,15 +299,6 @@ export const InputBar = memo(function InputBar({
     if (keyboard !== undefined) toggleCommandMenu?.(keyboard.caretSpan())
   }
 
-  // 图片附件文件选择器：回形针按钮触发，与拖拽/粘贴共用同一 intake 路径
-  // （模型不支持图片时由提交拒绝并提示）；清空 value 以便重复选择同一文件。
-  const attachInput = useRef<HTMLInputElement | null>(null)
-  const onAttachFiles = (event: ChangeEvent<HTMLInputElement>): void => {
-    const files = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    if (files.length > 0) intakeImages(files)
-  }
-
   // The no-session Workspace trigger: the resident editable div acts as the
   // picker trigger for keyboard users (no editor is bound in this state).
   const onWorkspaceKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -447,26 +438,6 @@ export const InputBar = memo(function InputBar({
         </div>
         <div className={css.row}>
           <div className={css.tools}>
-            <input
-              ref={attachInput}
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              hidden
-              onChange={onAttachFiles}
-            />
-            <Tooltip label={t('input.attachImage')} side="top" delayMs={500}>
-              <button
-                type="button"
-                className={css.add}
-                aria-label={t('input.attachImage')}
-                disabled={locked || addImages === undefined}
-                onMouseDown={keepFocus}
-                onClick={() => { attachInput.current?.click() }}
-              >
-                <IconPaperclipOutline16 size={14} />
-              </button>
-            </Tooltip>
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"

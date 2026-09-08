@@ -11,6 +11,7 @@ import type { Fiber } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { readClientBuildRecord } from '../../../scripts/client-build-environment.ts'
+import { pnpmInvocation } from '../../../scripts/pnpm-invocation.ts'
 import { REPO_ROOT } from './support.ts'
 
 function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, string>): SubprocessSpawnSpec {
@@ -21,6 +22,25 @@ function spawnSpec(argv: readonly string[], cwd: string, env?: Record<string, st
     graceMs: 5_000,
     ...env === undefined ? {} : { env },
   }
+}
+
+/**
+ * Resolve a shell-free invocation for the pnpm dev:web watcher. Under a pnpm
+ * script the lifecycle `npm_execpath` names the pnpm entrypoint; vitest
+ * launched any other way (e.g. `pnpm exec vitest`) has none, so Windows drives
+ * the pnpm shim through cmd and POSIX calls the pnpm binary directly.
+ * @param environment - child build environment merged over the parent.
+ * @returns command and args suitable for the shell-free subprocess runtime.
+ */
+function pnpmWatcherInvocation(environment: Record<string, string>): { command: string; args: string[] } {
+  const merged = { ...process.env, ...environment }
+  if (merged.npm_execpath !== undefined && merged.npm_execpath !== '') {
+    return pnpmInvocation(['run', 'dev:web'], merged)
+  }
+  if (process.platform === 'win32') {
+    return { command: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', 'pnpm run dev:web'] }
+  }
+  return { command: 'pnpm', args: ['run', 'dev:web'] }
 }
 
 function waitForOutput(child: SubprocessHandle, pattern: RegExp, label: string): Promise<string> {
@@ -92,8 +112,9 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const failures: unknown[] = []
   try {
     subprocessFiber = await subprocessCtx.plugin(LocalSubprocessRuntime)
+    const pnpm = pnpmWatcherInvocation(clientBuildEnvironment)
     watcher = subprocessCtx.subprocess.spawn(spawnSpec(
-      ['pnpm', 'run', 'dev:web'],
+      [pnpm.command, ...pnpm.args],
       REPO_ROOT,
       { ...clientBuildEnvironment },
     ))
