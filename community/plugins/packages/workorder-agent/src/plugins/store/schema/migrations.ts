@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 
 interface ColumnRow { name: string }
 
-export const LATEST_SCHEMA_VERSION = 3
+export const LATEST_SCHEMA_VERSION = 5
 
 function addColumn(db: Database.Database, table: string, definition: string): void {
   const name = definition.split(' ')[0] ?? ''
@@ -33,8 +33,7 @@ export function migrateSchema(db: Database.Database): void {
         ON webhook_events(status, next_attempt_at, lease_expires_at, created_at);
       CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_events(created_at);
     `)
-    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(1, ?)')
-      .run(new Date().toISOString())
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(1, ?)').run(new Date().toISOString())
     db.exec(`
       CREATE TABLE IF NOT EXISTS message_tasks (
         id TEXT PRIMARY KEY, delivery_key TEXT NOT NULL UNIQUE, source_type TEXT NOT NULL,
@@ -52,14 +51,11 @@ export function migrateSchema(db: Database.Database): void {
         sent_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
         PRIMARY KEY(task_id,sequence), FOREIGN KEY(task_id) REFERENCES message_tasks(id) ON DELETE CASCADE
       );
-      CREATE INDEX IF NOT EXISTS idx_message_task_claim
-        ON message_tasks(status,lease_expires_at,created_at);
-      CREATE INDEX IF NOT EXISTS idx_message_task_source
-        ON message_tasks(source_type,source_id,created_at);
+      CREATE INDEX IF NOT EXISTS idx_message_task_claim ON message_tasks(status,lease_expires_at,created_at);
+      CREATE INDEX IF NOT EXISTS idx_message_task_source ON message_tasks(source_type,source_id,created_at);
       CREATE INDEX IF NOT EXISTS idx_message_task_created ON message_tasks(created_at);
     `)
-    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?)')
-      .run(new Date().toISOString())
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(2, ?)').run(new Date().toISOString())
     db.exec(`
       CREATE TABLE IF NOT EXISTS issues (
         id INTEGER PRIMARY KEY, project_name TEXT NOT NULL, subject TEXT NOT NULL,
@@ -73,8 +69,21 @@ export function migrateSchema(db: Database.Database): void {
       );
       CREATE INDEX IF NOT EXISTS idx_issues_updated ON issues(updated_on);
     `)
-    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(3, ?)')
-      .run(new Date().toISOString())
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(3, ?)').run(new Date().toISOString())
+    addColumn(db, 'issues', "submitter_name TEXT NOT NULL DEFAULT ''")
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(4, ?)').run(new Date().toISOString())
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS issue_reviews (
+        id TEXT PRIMARY KEY, trace_id TEXT, issue_id INTEGER NOT NULL, project_name TEXT NOT NULL,
+        submitter_name TEXT NOT NULL, trigger_type TEXT NOT NULL, violations_json TEXT NOT NULL,
+        model_status TEXT NOT NULL, model_output TEXT NOT NULL, notification_status TEXT NOT NULL,
+        notification_task_id TEXT, notification_error TEXT, created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_issue_reviews_created ON issue_reviews(created_at);
+      CREATE INDEX IF NOT EXISTS idx_issue_reviews_issue ON issue_reviews(issue_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_issue_reviews_trace ON issue_reviews(trace_id);
+    `)
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(5, ?)').run(new Date().toISOString())
   })
   migrate()
 }

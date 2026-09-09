@@ -1,6 +1,15 @@
 import { join } from 'node:path'
 import type { ProjectMap } from './plugins/gcp/service.js'
 
+/** 默认提单规范，作为模型审核的可编辑知识库初始内容。 */
+export const DEFAULT_REVIEW_KNOWLEDGE_BASE = [
+  '仅核验状态为“美术完成”且期望交付时间不早于 2026-07-26 的设计工单。',
+  '子单必须填写所属项目对应的投放渠道、AI管线耗时、总工时和设计数量。',
+  'AI管线耗时只能填写“是”或“否”，总工时和设计数量必须是大于 0 的数值。',
+  '总单不填写设计数量；已填写时仅提示提单人确认工单类型。',
+  '审核结论必须基于工单快照和本知识库，不得猜测、修改工单或编造字段。',
+].join('\n')
+
 function required(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`缺少环境变量：${name}`)
@@ -26,6 +35,12 @@ export interface AppConfigInput {
   projectIdChannelArt?: number
   projectIdReturnBusiness?: number
   projectIdAiOperations?: number
+  reviewEnabled?: boolean
+  reviewProvider?: string
+  reviewModel?: string
+  reviewMaxTokens?: number
+  reviewKnowledgeBase?: string
+  reviewNotificationEnabled?: boolean
 }
 
 export interface AppConfig {
@@ -37,6 +52,14 @@ export interface AppConfig {
   completedStatusId: number
   gcp: { url: string; host: string; userKey: string }
   popo: { url: string; secret?: string }
+  review: {
+    enabled: boolean
+    provider?: string
+    model?: string
+    maxTokens: number
+    knowledgeBase: string
+    notificationEnabled: boolean
+  }
 }
 
 /**
@@ -53,6 +76,10 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
   if (!webhookToken) throw new Error('缺少配置：WEBHOOK_TOKEN')
   if (!gcpUserKey) throw new Error('缺少配置：GCP_USER_KEY')
   if (!popoWebhookUrl) throw new Error('缺少配置：POPO_WEBHOOK_URL')
+  const provider = input.reviewProvider?.trim() || undefined
+  const model = input.reviewModel?.trim() || undefined
+  if (Boolean(provider) !== Boolean(model)) throw new Error('审核模型服务商与模型 ID 必须同时填写')
+  const knowledgeBase = input.reviewKnowledgeBase?.trim() || DEFAULT_REVIEW_KNOWLEDGE_BASE
   return {
     port: input.port ?? 3081,
     dataDir: input.dataDir?.trim() || join(process.cwd(), '.data'),
@@ -70,6 +97,13 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
       userKey: gcpUserKey,
     },
     popo: { url: popoWebhookUrl, secret: input.popoWebhookSecret?.trim() || undefined },
+    review: {
+      enabled: input.reviewEnabled ?? true,
+      ...provider && model ? { provider, model } : {},
+      maxTokens: positiveInt('REVIEW_MAX_TOKENS', input.reviewMaxTokens ?? 800),
+      knowledgeBase,
+      notificationEnabled: input.reviewNotificationEnabled ?? true,
+    },
   }
 }
 
@@ -97,5 +131,11 @@ export function loadConfig(): AppConfig {
     projectIdAiOperations: process.env.PROJECT_ID_AI_OPERATIONS
       ? Number(process.env.PROJECT_ID_AI_OPERATIONS)
       : 2004,
+    reviewEnabled: process.env.REVIEW_ENABLED !== 'false',
+    reviewProvider: process.env.REVIEW_MODEL_PROVIDER?.trim(),
+    reviewModel: process.env.REVIEW_MODEL?.trim(),
+    reviewMaxTokens: process.env.REVIEW_MAX_TOKENS ? Number(process.env.REVIEW_MAX_TOKENS) : 800,
+    reviewKnowledgeBase: process.env.REVIEW_KNOWLEDGE_BASE?.trim(),
+    reviewNotificationEnabled: process.env.REVIEW_NOTIFICATION_ENABLED !== 'false',
   })
 }

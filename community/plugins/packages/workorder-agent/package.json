@@ -1,6 +1,6 @@
 {
   "name": "workorder-agent",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "自研工单巡检插件：易协作工单查询、字段复核、POPO 通知与控制面面板",
   "license": "UNLICENSED",
   "type": "module",
@@ -28,7 +28,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "pnpm run clean && tsc -p tsconfig.json",
     "test": "vitest run",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.3.tgz workorder-agent"
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.4.tgz workorder-agent"
   },
   "dependencies": {
     "@deepseek-ai/dsh-llm": "0.1.2-rc.1",

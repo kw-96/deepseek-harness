@@ -20,3 +20,9 @@
         projectIdChannelArt: !!js Number(process.env.PROJECT_ID_CHANNEL_ART) || 7
         projectIdReturnBusiness: !!js Number(process.env.PROJECT_ID_RETURN_BUSINESS) || 2001
         projectIdAiOperations: !!js Number(process.env.PROJECT_ID_AI_OPERATIONS) || 2004
+        reviewEnabled: !!js process.env.REVIEW_ENABLED !== 'false'
+        reviewProvider: !!js process.env.REVIEW_MODEL_PROVIDER?.trim() || ''
+        reviewModel: !!js process.env.REVIEW_MODEL?.trim() || ''
+        reviewMaxTokens: !!js Number(process.env.REVIEW_MAX_TOKENS) || 800
+        reviewKnowledgeBase: ''
+        reviewNotificationEnabled: !!js process.env.REVIEW_NOTIFICATION_ENABLED !== 'false'

@@ -2,29 +2,50 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-skill'
 import { createUserMessage } from '@deepseek-ai/dsh-llm/message'
+import type { AppConfig } from '../config.js'
+import type { IssueSnapshot } from '../domain/types.js'
 import { mountWorkorderSkill, WORKORDER_SKILL_NAME } from './skill.js'
 
 export const WORKORDER_AGENT_ID = 'workorder-agent-background'
 
 export interface WorkorderAgentRouter {
-  routeWebhook(traceId: string, issueId: number, projectName: string): Promise<void>
+  reviewIssue(traceId: string, issue: IssueSnapshot): Promise<string>
 }
 
 /** 基于 Harness ctx.agents 的后台单实例工单 Agent 路由器。 */
 export class HarnessWorkorderAgent implements WorkorderAgentRouter {
   private handle?: AgentHandle
   private creating?: Promise<Agent>
+  private reviewQueue: Promise<void> = Promise.resolve()
 
-  constructor(private readonly ctx: Context) {}
+  constructor(private readonly ctx: Context, private readonly review: AppConfig['review']) {}
 
-  /** 创建或复用唯一后台 Agent，并把 Webhook 事件路由为后续回合。 */
-  async routeWebhook(traceId: string, issueId: number, projectName: string): Promise<void> {
+  /** 创建或复用唯一后台 Agent，并返回本次工单的模型审核文字。 */
+  reviewIssue(traceId: string, issue: IssueSnapshot): Promise<string> {
+    const result = this.reviewQueue.then(
+      () => this.reviewOne(traceId, issue),
+      () => this.reviewOne(traceId, issue),
+    )
+    this.reviewQueue = result.then(() => undefined, () => undefined)
+    return result
+  }
+
+  private async reviewOne(traceId: string, issue: IssueSnapshot): Promise<string> {
     const agent = await this.getOrCreate()
+    const previousMessages = agent.session.deriveMessages().length
     agent.followup(createUserMessage({
-      content: [{ type: 'text', text: this.buildPrompt(traceId, issueId, projectName) }],
+      content: [{ type: 'text', text: this.buildPrompt(traceId, issue) }],
       source: { kind: 'plugin', plugin: 'workorder-agent', form: 'instructions' },
     }))
     await agent.whenIdle()
+    const response = agent.session.deriveMessages().slice(previousMessages)
+      .filter((message) => message.role === 'assistant')
+      .flatMap((message) => message.content)
+      .flatMap((part) => part.type === 'text' ? [part.text] : [])
+      .join('\n')
+      .trim()
+    if (!response) throw new Error('审核模型未返回文字结论')
+    return response
   }
 
   /** 停止由该路由器创建的后台 Agent。 */
@@ -42,7 +63,13 @@ export class HarnessWorkorderAgent implements WorkorderAgentRouter {
       this.creating = this.ctx.agents.create({
         sessionId: WORKORDER_AGENT_ID as never,
         meta: { cwd: process.cwd() },
-        setup: (agentCtx) => mountWorkorderSkill(agentCtx),
+        agentOptions: {
+          ...(this.review.provider && this.review.model
+            ? { provider: this.review.provider, model: this.review.model }
+            : {}),
+          maxTokens: this.review.maxTokens,
+        },
+        setup: (agentCtx) => mountWorkorderSkill(agentCtx, this.review.knowledgeBase),
       }).then((handle) => {
         this.handle = handle
         return handle.agent
@@ -53,13 +80,13 @@ export class HarnessWorkorderAgent implements WorkorderAgentRouter {
     return this.creating
   }
 
-  private buildPrompt(traceId: string, issueId: number, projectName: string): string {
+  private buildPrompt(traceId: string, issue: IssueSnapshot): string {
     return [
       `请使用 Skill「${WORKORDER_SKILL_NAME}」复核新建工单。`,
       `trace_id：${traceId}`,
-      `项目：${projectName}`,
-      `工单 ID：${issueId}`,
-      '使用 mcp__gcp__get_issue_base 查询详情，只输出检查结论。',
+      '以下是已从易协作读取的不可变工单快照：',
+      JSON.stringify(issue),
+      '只输出审核结论，不输出思考过程。',
     ].join('\n')
   }
 }

@@ -25,6 +25,12 @@ const valid: PluginConfig = {
   projectIdChannelArt: 7,
   projectIdReturnBusiness: 2001,
   projectIdAiOperations: 2004,
+  reviewEnabled: true,
+  reviewProvider: '',
+  reviewModel: '',
+  reviewMaxTokens: 800,
+  reviewKnowledgeBase: '提单规范',
+  reviewNotificationEnabled: true,
 }
 
 function createCtx(): Context {
@@ -48,6 +54,7 @@ describe('工单插件配置', () => {
     expect(config.projects).toEqual({ 渠道美术: 7, 回流业务: 2001, AI运营活动: 2004 })
     expect(config.gcp.userKey).toBe('user-key')
     expect(config.popo.url).toBe('https://example.invalid/webhook')
+    expect(config.review.knowledgeBase).toBe('提单规范')
   })
 
   it('缺少令牌时拒绝组装运行配置', () => {

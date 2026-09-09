@@ -83,3 +83,26 @@ export interface StoreHealth {
   migrations: boolean
   writable: boolean
 }
+
+export type ReviewModelStatus = 'completed' | 'failed' | 'skipped'
+export type ReviewNotificationStatus = 'not-required' | 'disabled' | 'blocked' | 'sent' | 'in-progress' | 'failed'
+
+export interface IssueReviewRecord {
+  id: string
+  traceId?: string
+  issueId: number
+  projectName: string
+  submitterName: string
+  triggerType: 'webhook' | 'manual'
+  violations: Array<{ ruleId: string; message: string }>
+  modelStatus: ReviewModelStatus
+  modelOutput: string
+  notificationStatus: ReviewNotificationStatus
+  notificationTaskId?: string
+  notificationError?: string
+  createdAt?: string
+}
+
+export interface IssueReviewView extends IssueReviewRecord {
+  createdAt: string
+}

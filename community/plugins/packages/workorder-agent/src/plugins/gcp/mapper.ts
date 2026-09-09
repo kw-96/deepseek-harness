@@ -55,6 +55,7 @@ export function mapIssueDetail(payload: unknown, fallbackProjectName: string): I
   if (!Number.isFinite(id)) throw new Error('易协作详情响应缺少有效工单 ID')
   return snapshot(id, display(base.project) || display(base.project_name) || fallbackProjectName.trim(), {
     subject: display(base.subject),
+    submitterName: display(base.author ?? base.created_by ?? base.creator),
     assigneeName: display(base.assigned_to ?? coreValue(core, 'assigned_to')),
     statusName: display(base.status ?? coreValue(core, 'status_id')),
     gameProduct: display(fieldValue(custom, 'cf_127')),
@@ -81,6 +82,7 @@ export function mapListIssue(payload: unknown, fallbackProjectName: string): Iss
   if (!Number.isFinite(id)) throw new Error('易协作列表响应缺少有效工单 ID')
   return snapshot(id, display(row.project) || fallbackProjectName.trim(), {
     subject: display(row.subject),
+    submitterName: display(row.author ?? row.created_by ?? row.creator),
     assigneeName: display(row.assigned_to),
     statusName: display(row.status),
     gameProduct: display(row.cf_127),

@@ -4,7 +4,7 @@ import type { PreviewRecord } from '../../src/plugins/store/store.js'
 import { InspectionWorkflow } from '../../src/plugins/workflow/service.js'
 
 const issue: IssueSnapshot = {
-  id: 1, projectName: '渠道美术', subject: '测试', assigneeName: '用户', statusName: '美术完成',
+  id: 1, projectName: '渠道美术', subject: '测试', submitterName: '提单人', assigneeName: '用户', statusName: '美术完成',
   expectedDeliveryDate: '2026-08-01', artCategory: '子单', deliveryChannel: '', returnDeliveryChannel: null,
   aiDeliveryChannel: null, aiPipelineTime: '是', totalHours: 1, designQuantity: 1,
   gameProduct: '', startDate: '', dueDate: '', createdOn: '', updatedOn: '', closedOn: '',

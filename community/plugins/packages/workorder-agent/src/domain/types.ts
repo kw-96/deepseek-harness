@@ -6,6 +6,7 @@ export interface IssueSnapshot {
   id: number
   projectName: string
   subject: string
+  submitterName: string
   assigneeName: string
   statusName: string
   gameProduct: string

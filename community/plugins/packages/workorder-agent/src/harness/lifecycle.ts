@@ -65,10 +65,10 @@ export class WorkorderPluginLifecycle {
       await this.mountGateway(bootstrapRoute(config, (patch) => this.writeSettings(patch)))
       return
     }
-    const agentRouter = new HarnessWorkorderAgent(this.ctx)
+    const agentRouter = new HarnessWorkorderAgent(this.ctx, appConfig.review)
     let runtime: AppRuntime | undefined
     try {
-      runtime = await createApp(appConfig, agentRouter)
+      runtime = await createApp(appConfig, agentRouter, (patch) => this.writeSettings(patch))
       await this.mountGateway(runtime.app)
       this.runtime = runtime
       this.agentRouter = agentRouter

@@ -87,7 +87,7 @@ describe('工单数据统计口径', () => {
   it('服务按期望交付时间（含端点）筛选并返回工单条数', () => {
     const store = new WorkorderStore(databasePath())
     const snapshot: IssueSnapshot = {
-      id: 1, projectName: '渠道美术', subject: '主题', assigneeName: '邵灵玉', statusName: '美术完成',
+      id: 1, projectName: '渠道美术', subject: '主题', submitterName: '提单人', assigneeName: '邵灵玉', statusName: '美术完成',
       gameProduct: '蛋仔派对', expectedDeliveryDate: '2026-08-27', artCategory: '资源位',
       deliveryChannel: 'VIVO', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '是',
       totalHours: 2, designQuantity: 12, startDate: '2026-08-26', dueDate: '2026-08-28',

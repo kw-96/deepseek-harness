@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateRangeSchema, issueIdSchema, sendPreviewSchema } from '../../src/plugins/admin/validation.js'
+import { dateRangeSchema, issueIdSchema, reviewSettingsSchema, sendPreviewSchema } from '../../src/plugins/admin/validation.js'
 
 describe('管理 API 参数校验', () => {
   it('拒绝非法日期、倒序和超长范围', () => {
@@ -17,5 +17,12 @@ describe('管理 API 参数校验', () => {
   it('发送只接受预览 ID 和固定确认文本', () => {
     expect(sendPreviewSchema.safeParse({ previewId: crypto.randomUUID(), confirmation: '确认发送正式巡检结果' }).success).toBe(true)
     expect(sendPreviewSchema.safeParse({ startDate: '2026-08-01', confirmation: '确认' }).success).toBe(false)
+  })
+
+  it('审核模型服务商与模型 ID 必须同时填写', () => {
+    const base = { reviewEnabled: true, reviewProvider: '', reviewModel: '', reviewMaxTokens: 800, reviewKnowledgeBase: '规范', reviewNotificationEnabled: true }
+    expect(reviewSettingsSchema.safeParse(base).success).toBe(true)
+    expect(reviewSettingsSchema.safeParse({ ...base, reviewProvider: 'provider' }).success).toBe(false)
+    expect(reviewSettingsSchema.safeParse({ ...base, reviewProvider: 'provider', reviewModel: 'model' }).success).toBe(true)
   })
 })

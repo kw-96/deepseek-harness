@@ -25,7 +25,9 @@ describe('DeepSeek Harness 自研 Bundle', () => {
     const configKeys = Object.keys(host?.config ?? {})
     for (const key of ['dataDir', 'adminToken', 'webhookToken', 'gcpUserKey', 'gcpUrl', 'gcpHost',
       'popoWebhookUrl', 'popoWebhookSecret', 'completedStatusId',
-      'projectIdChannelArt', 'projectIdReturnBusiness', 'projectIdAiOperations']) {
+      'projectIdChannelArt', 'projectIdReturnBusiness', 'projectIdAiOperations',
+      'reviewEnabled', 'reviewProvider', 'reviewModel', 'reviewMaxTokens',
+      'reviewKnowledgeBase', 'reviewNotificationEnabled']) {
       expect(configKeys).toContain(key)
     }
     const patch = readFileSync(resolve(root, 'cordis.patch.yml'), 'utf8')

@@ -20,6 +20,7 @@ export interface AdminIssueView {
   url: string
   projectName: string
   subject: string
+  submitterName: string
   assigneeName: string
   statusName: string
   gameProduct: string
@@ -45,6 +46,7 @@ export function toAdminIssue(issue: IssueSnapshot, host: string): AdminIssueView
     url: issueUrl(host, issue.id),
     projectName: issue.projectName,
     subject: issue.subject,
+    submitterName: issue.submitterName,
     assigneeName: issue.assigneeName,
     statusName: issue.statusName,
     gameProduct: issue.gameProduct,

@@ -101,7 +101,7 @@ describe('存储迁移与租约恢复', () => {
   it('按工单 ID 覆盖写入快照并读回字段', () => {
     const store = new WorkorderStore(databasePath())
     const issue = {
-      id: 81001, projectName: '渠道美术', subject: '主题', assigneeName: '用户', statusName: '美术完成',
+      id: 81001, projectName: '渠道美术', subject: '主题', submitterName: '提单人', assigneeName: '用户', statusName: '美术完成',
       gameProduct: '游戏', expectedDeliveryDate: '2026-08-14', artCategory: '子单',
       deliveryChannel: '渠道', returnDeliveryChannel: '', aiDeliveryChannel: '',
       aiPipelineTime: '是', totalHours: 2.5, designQuantity: 3,
@@ -109,9 +109,11 @@ describe('存储迁移与租约恢复', () => {
       updatedOn: '2026-08-10T00:00:00.000Z', closedOn: '2026-08-10T12:00:00.000Z',
     }
     store.issues.upsert(issue)
-    expect(store.issues.get(81001)).toMatchObject({ subject: '主题', totalHours: '2.5', updatedOn: issue.updatedOn })
+    expect(store.issues.get(81001)).toMatchObject({ subject: '主题', submitterName: '提单人', totalHours: '2.5', updatedOn: issue.updatedOn })
     store.issues.upsert({ ...issue, subject: '新主题', updatedOn: '2026-08-11T00:00:00.000Z' })
     expect(store.issues.get(81001)).toMatchObject({ subject: '新主题', updatedOn: '2026-08-11T00:00:00.000Z' })
+    store.issues.upsert({ ...issue, submitterName: '', updatedOn: '2026-08-12T00:00:00.000Z' })
+    expect(store.issues.get(81001)).toMatchObject({ submitterName: '提单人' })
     store.issues.upsert({ ...issue, id: 81002, updatedOn: '2026-08-12T00:00:00.000Z' })
     expect(store.issues.count()).toBe(2)
     expect(store.issues.list(1).map((item) => item.id)).toEqual([81002])

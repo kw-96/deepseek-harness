@@ -6,6 +6,7 @@ const base: IssueSnapshot = {
   id: 1,
   projectName: '渠道美术',
   subject: '测试工单',
+  submitterName: '提单人',
   assigneeName: '测试用户',
   statusName: '美术完成',
   gameProduct: '',

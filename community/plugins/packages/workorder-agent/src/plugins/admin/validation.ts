@@ -44,6 +44,20 @@ export const runtimeSettingsSchema = z.object({
   webhookProcessingEnabled: z.boolean().optional(),
 }).refine((value) => Object.values(value).some((item) => item !== undefined), '至少提供一项设置')
 
+/** 模型审核与提单规范配置，服务商和模型 ID 必须成对提供。 */
+export const reviewSettingsSchema = z.object({
+  reviewEnabled: z.boolean(),
+  reviewProvider: z.string().max(120),
+  reviewModel: z.string().max(240),
+  reviewMaxTokens: z.number().int().min(64).max(8_192),
+  reviewKnowledgeBase: z.string().trim().min(1).max(20_000),
+  reviewNotificationEnabled: z.boolean(),
+}).superRefine((value, context) => {
+  if (Boolean(value.reviewProvider.trim()) !== Boolean(value.reviewModel.trim())) {
+    context.addIssue({ code: 'custom', message: '审核模型服务商与模型 ID 必须同时填写' })
+  }
+})
+
 const DATE_QUERY = z.string().regex(DATE_PATTERN).refine(validDate, '日期无效').optional()
 
 /** 数据统计查询参数：日期可缺省，同时提供时校验先后顺序。 */

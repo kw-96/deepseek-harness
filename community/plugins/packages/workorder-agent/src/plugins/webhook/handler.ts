@@ -1,14 +1,31 @@
-import { inspectIssue } from '../../domain/rules.js'
 import type { ProjectMap } from '../gcp/service.js'
 import type { GcpClient } from '../gcp/client.js'
 import { mapIssueDetail } from '../gcp/mapper.js'
 import type { WorkorderStore } from '../store/store.js'
-import type { WorkorderAgentRouter } from '../../harness/agent.js'
+import type { IssueReviewWorkflow } from '../workflow/review.js'
 
 type UnknownRecord = Record<string, unknown>
 
 function record(value: unknown): UnknownRecord {
   return value && typeof value === 'object' ? value as UnknownRecord : {}
+}
+
+function displayPerson(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  const person = record(value)
+  return String(person.name ?? person.login ?? person.display_name ?? '').trim()
+}
+
+function submitterFromWebhook(payloadJson: string, fallback: string): string {
+  try {
+    const body = record(JSON.parse(payloadJson))
+    const issue = record(body.issue)
+    return [issue.author, issue.created_by, issue.creator, body.author, body.created_by]
+      .map(displayPerson)
+      .find(Boolean) ?? fallback
+  } catch {
+    return fallback
+  }
 }
 
 export interface WebhookResult {
@@ -28,7 +45,7 @@ export class GcpWebhookHandler {
     private readonly gcp: GcpClient,
     projects: ProjectMap,
     private readonly instanceHost: string,
-    private readonly agentRouter?: WorkorderAgentRouter,
+    private readonly reviews: IssueReviewWorkflow,
   ) {
     this.projectsById = new Map(Object.entries(projects).map(([name, id]) => [id, name]))
   }
@@ -79,12 +96,17 @@ export class GcpWebhookHandler {
       const projectName = this.projectsById.get(task.projectId)
       if (!projectName) throw new Error('Webhook 项目不在白名单')
       const detail = await this.gcp.call('get_issue_base', { id: task.issueId })
-      const snapshot = mapIssueDetail(detail, projectName)
+      const mapped = mapIssueDetail(detail, projectName)
+      const snapshot = {
+        ...mapped,
+        submitterName: submitterFromWebhook(task.payloadJson, mapped.submitterName || mapped.assigneeName),
+      }
       this.store.issues.upsert(snapshot)
-      const violations = inspectIssue(snapshot).map((item) => ({ ruleId: item.ruleId, message: item.message }))
-      await this.agentRouter?.routeWebhook(task.traceId, snapshot.id, projectName)
+      const reviewId = await this.reviews.reviewIssue({ traceId: task.traceId, triggerType: 'webhook', issue: snapshot })
+      const review = this.store.reviews.get(reviewId)
       this.store.completeWebhook(task, {
-        mode: this.agentRouter ? 'agent-routed' : 'dry-run', issueId: snapshot.id, violations,
+        mode: 'reviewed', issueId: snapshot.id, reviewId,
+        notificationStatus: review?.notificationStatus,
       })
     } catch (error) {
       this.store.failWebhook(task, error instanceof Error ? error.message : String(error))

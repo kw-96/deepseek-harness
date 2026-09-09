@@ -20,6 +20,10 @@ function bootstrapPage(config: PluginConfig): string {
       <span>${label}${required ? '（必填）' : ''}</span>
       <input id="${id}" type="${type}" ${required ? 'required' : ''} autocomplete="off" value="${escape(value)}">
     </label>`
+  const textarea = (label: string, id: string, value: string): string => `
+    <label class="field"><span>${label}</span><textarea id="${id}" autocomplete="off">${escape(value)}</textarea></label>`
+  const checkbox = (label: string, id: string, checked: boolean): string => `
+    <label class="check"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''}><span>${label}</span></label>`
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>工单插件配置</title>
@@ -32,8 +36,9 @@ p.sub{margin:0 0 24px;color:#5f6672}
 form{display:grid;gap:14px;background:#fff;border:1px solid #e3e8ef;border-radius:12px;padding:20px}
 .field{display:grid;gap:6px}
 .field span{font-size:12px;color:#5f6672}
-input{box-sizing:border-box;width:100%;height:36px;border:1px solid #d6dde6;border-radius:7px;padding:0 10px;font:inherit;background:#fff;color:#1f2329}
-input:focus{outline:2px solid #2f6fed;outline-offset:1px}
+input,textarea{box-sizing:border-box;width:100%;height:36px;border:1px solid #d6dde6;border-radius:7px;padding:0 10px;font:inherit;background:#fff;color:#1f2329}
+textarea{height:140px;padding:8px 10px;resize:vertical;line-height:1.6}.check{display:flex;gap:8px;align-items:center;color:#1f2329}.check input{width:18px}
+input:focus,textarea:focus{outline:2px solid #2f6fed;outline-offset:1px}
 .actions{display:flex;align-items:center;gap:12px;margin-top:4px}
 button{height:36px;padding:0 18px;border:0;border-radius:7px;background:#2f6fed;color:#fff;font:inherit;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
@@ -56,21 +61,28 @@ button:disabled{opacity:.5;cursor:default}
   ${field('渠道美术项目 ID', 'projectIdChannelArt', String(config.projectIdChannelArt))}
   ${field('回流业务项目 ID', 'projectIdReturnBusiness', String(config.projectIdReturnBusiness))}
   ${field('AI 运营活动项目 ID', 'projectIdAiOperations', String(config.projectIdAiOperations))}
+  ${field('审核模型服务商', 'reviewProvider', config.reviewProvider)}
+  ${field('审核模型 ID', 'reviewModel', config.reviewModel)}
+  ${field('审核模型最大输出 token', 'reviewMaxTokens', String(config.reviewMaxTokens), 'number')}
+  ${textarea('提单规范知识库', 'reviewKnowledgeBase', config.reviewKnowledgeBase)}
+  ${checkbox('启用模型提单审核', 'reviewEnabled', config.reviewEnabled)}
+  ${checkbox('审核发现缺项时发送 POPO 提醒', 'reviewNotificationEnabled', config.reviewNotificationEnabled)}
   <div class="actions"><button id="save" type="submit">保存并加载</button><span id="msg"></span></div>
 </form>
 </div><script>
-const numbers=['completedStatusId','projectIdChannelArt','projectIdReturnBusiness','projectIdAiOperations'];
-const secrets=['adminToken','webhookToken','gcpUserKey','popoWebhookSecret'];
+const numbers=['completedStatusId','projectIdChannelArt','projectIdReturnBusiness','projectIdAiOperations','reviewMaxTokens'];
+const checks=['reviewEnabled','reviewNotificationEnabled'];
 document.getElementById('form').addEventListener('submit',async(event)=>{
   event.preventDefault();
   const button=document.getElementById('save');
   const msg=document.getElementById('msg');
   button.disabled=true;msg.className='';msg.textContent='正在保存…';
   const patch={};
-  for(const id of ['adminToken','webhookToken','gcpUserKey','popoWebhookUrl','gcpUrl','gcpHost','popoWebhookSecret','dataDir',...numbers]){
+  for(const id of ['adminToken','webhookToken','gcpUserKey','popoWebhookUrl','gcpUrl','gcpHost','popoWebhookSecret','dataDir','reviewProvider','reviewModel','reviewKnowledgeBase',...numbers]){
     const value=document.getElementById(id).value;
     patch[id]=numbers.includes(id)?Number(value):value.trim();
   }
+  checks.forEach(id=>{patch[id]=document.getElementById(id).checked;});
   try{
     const response=await fetch('/workorder-agent/bootstrap',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(patch)});
     const data=await response.json();
