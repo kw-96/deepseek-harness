@@ -158,6 +158,36 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
+   * Attach a Session and merge the returned Workspace row.
+   * @param workspaceId - target Workspace.
+   * @param sessionId - Session whose cwd must match the Workspace path.
+   * @returns generated Remote result.
+   */
+  async attachSession(
+    workspaceId: WorkspaceId,
+    sessionId: WorkspaceInsertSessionBeforeRequest['sessionId'],
+  ): Promise<RemoteResult<WorkspaceValue>> {
+    const result = await this.remote.attachSession({ workspaceId, sessionId })
+    if (result.ok) this.upsert(result.value.workspace)
+    return result
+  }
+
+  /**
+   * Detach a Session and merge the returned Workspace row.
+   * @param workspaceId - owning Workspace.
+   * @param sessionId - Session to remove from the account.
+   * @returns generated Remote result.
+   */
+  async detachSession(
+    workspaceId: WorkspaceId,
+    sessionId: WorkspaceInsertSessionBeforeRequest['sessionId'],
+  ): Promise<RemoteResult<WorkspaceValue>> {
+    const result = await this.remote.detachSession({ workspaceId, sessionId })
+    if (result.ok) this.upsert(result.value.workspace)
+    return result
+  }
+
+  /**
    * Archive one Session and install the returned complete archive set.
    * @param sessionId - Session to archive.
    * @returns generated Remote result.

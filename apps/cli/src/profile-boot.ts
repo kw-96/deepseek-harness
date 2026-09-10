@@ -11,8 +11,9 @@
  * @module @deepseek-ai/dsh/profile-boot
  */
 
-import { writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { spawn } from 'node:child_process'
+import { existsSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -30,6 +31,7 @@ import {
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { provideCmdline, type AppReady } from '@deepseek-ai/dsh-cmdline'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
@@ -207,10 +209,25 @@ function suppressShutdownError(ctx: Context, signal: AbortSignal, error: unknown
  * @returns the settled root context and the shutdown controller.
  */
 export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
+  // Before the first plugin mounts and before anything can issue a request: Node's fetch ignores the
+  // proxy environment on its own, so every profile would otherwise connect directly. Resolving from
+  // the launcher's snapshot — not `process.env` — is what lets a proxy declared in a `.env` layer
+  // work, which the NODE_USE_ENV_PROXY flag cannot do because Node samples the environment at start.
+  const disposeProxy = await installProxyFromEnvironment(
+    options.environment,
+    (message) => { process.stderr.write(`${NAME}: ${message}\n`) },
+  )
+
   const composed = await composeProfile(options.profile, options.patchFiles)
   const app: { current?: Context } = {}
   const appReady = createAppReady()
-  const shutdown = createProcessShutdown(async () => { await app.current?.fiber.dispose() })
+  const communityDevScript = resolve(dirname(INSTALL_ANCHOR), '..', '..', 'community', 'plugins', 'dev.mjs')
+  let communityDev: ReturnType<typeof spawn> | undefined
+  const shutdown = createProcessShutdown(async () => {
+    communityDev?.kill()
+    await app.current?.fiber.dispose()
+    await disposeProxy()
+  })
   const signalShutdown = new AbortController()
   const interrupt = (code: number): void => {
     signalShutdown.abort()
@@ -240,12 +257,18 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // objects in place. Reusing one parsed patch object across applications
   // would bake a user override into the bundle's in-memory insert row, so
   // removing the override could never revert the row to the bundle default.
-  const composeLive = (): PatchOptions[] => structuredClone([
-    ...composed.bundlePatches,
-    ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
-    ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
-    ...composed.overlays,
-  ])
+  // 每次 live 组合都重新解析 bundle 列表，使 `dsh plugin add/remove`
+  // 写回的 package.json bundles 变化在运行中生效（加载或卸载 bundle）。
+  const composeLive = async (_userPatches: PatchOptions[]): Promise<PatchOptions[]> => {
+    const liveProfile = loadProfile(NAME, options.profile, INSTALL_ANCHOR, undefined, { userLayer: false })
+    await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, profile: liveProfile })
+    return structuredClone([
+      ...liveProfile.layers.flatMap(layer => layer.patches),
+      ...loadOptionalPatches(NAME, liveProfile.patchPath) ?? [],
+      ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
+      ...composed.overlays,
+    ])
+  }
   // Cloned for the same insert-aliasing reason as composeLive: the boot
   // application must not mutate the objects later reloads recompose from.
   const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
@@ -287,11 +310,19 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       await watchUserPatches(ctx, {
         binName: NAME,
         filename: composed.profile.patchPath,
+        load: () => [],
         compose: composeLive,
       })
       await watchUserPatches(ctx, {
         binName: NAME,
         filename: homePatchPath(),
+        load: () => [],
+        compose: composeLive,
+      })
+      await watchUserPatches(ctx, {
+        binName: NAME,
+        filename: join(composed.profile.dir, 'package.json'),
+        load: () => [],
         compose: composeLive,
       })
     } catch (error) {
@@ -302,6 +333,16 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     appReady.commit()
+  }
+  // 源码 checkout 且 web profile：自动把社区自研插件 link 进 profile、
+  // 启用 Cordis HMR 并启动 watch 构建，使 `dsh web` / 桌面壳启动即热替换。
+  if (options.profile === 'web'
+    && existsSync(communityDevScript)
+    && !signalShutdown.signal.aborted) {
+    communityDev = spawn(process.execPath, [communityDevScript], {
+      cwd: dirname(dirname(communityDevScript)),
+      stdio: 'inherit',
+    })
   }
   return { ctx, shutdown }
 }

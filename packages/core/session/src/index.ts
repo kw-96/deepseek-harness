@@ -850,8 +850,9 @@ export class SessionForkError extends Error {
 /**
  * In-memory session store (`ctx.sessions`).
  *
- * Persistence is intentionally not implemented here — persistence plugins
- * subscribe to `session/event` and flush on `session/flush` / dispose.
+ * Persistence is intentionally not implemented here — the agent lifecycle
+ * attaches a session-log writer to each published session's write handle;
+ * a session published outside that lifecycle persists nothing.
  */
 export class SessionStore extends Service {
   private store = new Map<SessionId, SessionEntry>()
@@ -902,6 +903,26 @@ export class SessionStore extends Service {
       this.announce(session)
     }.bind(this), 'sessions.create()')
     return session
+  }
+
+  /**
+   * Replace one non-appending live session with a new seeded snapshot under
+   * the same id. External importers call this only after their durable source
+   * replacement succeeds and after excluding Agent-owned sessions.
+   * @param id - existing or new session id.
+   * @param options - replacement seed and immutable header metadata.
+   * @returns the newly announced live session.
+   * @throws when the existing session is publishing an event.
+   */
+  replace(id: SessionId, options: CreateSessionOptions): Session {
+    const entry = this.store.get(id)
+    if (entry !== undefined) {
+      if (entry.announcing || entry.appending) {
+        throw new Error(`session "${id}" cannot be replaced while it is publishing`)
+      }
+      entry.detach()
+    }
+    return this.create(id, options)
   }
 
   /**

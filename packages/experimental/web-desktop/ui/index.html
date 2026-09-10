@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeepSeek Harness</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --fg: #e8eaed;
+        --muted: rgba(232, 234, 237, 0.72);
+        --accent: #4d6bfe;
+        --bar: #16181d;
+        --bar-hover: rgba(255, 255, 255, 0.08);
+        --close-hover: #e81123;
+      }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        overflow: hidden;
+      }
+      .titlebar {
+        height: 36px;
+        display: flex;
+        align-items: stretch;
+        background: var(--bar);
+        user-select: none;
+        flex: none;
+      }
+      .titlebar-drag {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .titlebar-controls {
+        display: flex;
+        flex: none;
+      }
+      .titlebar-controls button {
+        appearance: none;
+        margin: 0;
+        padding: 0;
+        border: none;
+        width: 46px;
+        background: transparent;
+        color: var(--fg);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: default;
+      }
+      .titlebar-controls button:hover {
+        background: var(--bar-hover);
+      }
+      .titlebar-controls button.close:hover {
+        background: var(--close-hover);
+        color: #fff;
+      }
+      .titlebar-controls svg {
+        width: 10px;
+        height: 10px;
+        fill: currentColor;
+      }
+      main {
+        height: calc(100% - 36px);
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+      }
+      .center {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        max-width: 420px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .spinner {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 3px solid rgba(232, 234, 237, 0.16);
+        border-top-color: var(--accent);
+        animation: spin 0.85s linear infinite;
+      }
+      .pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.35; transform: scale(0.85); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      .boot-log {
+        flex: none;
+        height: 168px;
+        margin: 0;
+        padding: 10px 14px;
+        box-sizing: border-box;
+        background: rgba(0, 0, 0, 0.35);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+        font-size: 11px;
+        line-height: 1.55;
+        color: rgba(232, 234, 237, 0.72);
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        text-align: left;
+        user-select: text;
+      }
+      .boot-log:empty::before {
+        content: "等待启动输出…";
+        color: rgba(232, 234, 237, 0.4);
+      }
+      .boot-log {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(232, 234, 237, 0.28) transparent;
+      }
+      .boot-log::-webkit-scrollbar {
+        width: 8px;
+      }
+      .boot-log::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .boot-log::-webkit-scrollbar-thumb {
+        background: rgba(232, 234, 237, 0.18);
+        border-radius: 4px;
+      }
+      .boot-log::-webkit-scrollbar-thumb:hover {
+        background: rgba(232, 234, 237, 0.34);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="titlebar">
+      <div class="titlebar-drag" data-tauri-drag-region>DeepSeek Harness</div>
+      <div class="titlebar-controls">
+        <button type="button" id="titlebar-minimize" aria-label="最小化" title="最小化">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><rect y="4.5" width="10" height="1" /></svg>
+        </button>
+        <button type="button" id="titlebar-maximize" aria-label="最大化" title="最大化">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1" /></svg>
+        </button>
+        <button type="button" id="titlebar-close" class="close" aria-label="关闭" title="关闭">
+          <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
+        </button>
+      </div>
+    </header>
+    <main>
+      <div class="center">
+        <div class="card">
+          <div class="spinner" aria-hidden="true"></div>
+          <h1>DeepSeek Harness</h1>
+          <div class="row">
+            <span class="pulse" aria-hidden="true"></span>
+            <p>正在安装依赖、构建前端并启动本地 Web 服务…</p>
+          </div>
+          <p>首次启动可能需要几分钟；就绪后将自动进入对话窗口。</p>
+        </div>
+      </div>
+      <pre id="boot-log" class="boot-log" aria-live="polite"></pre>
+    </main>
+    <script>
+      (function () {
+        function appendLog(text) {
+          var box = document.getElementById('boot-log');
+          if (!box) return;
+          var line = String(text);
+          if (box.textContent.length > 0) box.textContent += '\n';
+          box.textContent += line;
+          box.scrollTop = box.scrollHeight;
+        }
+
+        function bindLog(api) {
+          // 先拉取 WebView 加载前已经产生的安装/构建日志，再监听增量。
+          if (api.core && typeof api.core.invoke === 'function') {
+            api.core.invoke('get_boot_logs').then(function (lines) {
+              if (Array.isArray(lines)) {
+                for (var i = 0; i < lines.length; i++) appendLog(lines[i]);
+              }
+            }).catch(function () {});
+          }
+          if (api.event && typeof api.event.listen === 'function') {
+            api.event.listen('boot-log', function (event) {
+              appendLog(event.payload);
+            });
+          }
+        }
+
+        function bind() {
+          var api = window.__TAURI__;
+          if (!api || !api.window || typeof api.window.getCurrentWindow !== 'function') {
+            window.setTimeout(bind, 50);
+            return;
+          }
+          bindLog(api);
+          var appWindow = api.window.getCurrentWindow();
+          var minimize = document.getElementById('titlebar-minimize');
+          var maximize = document.getElementById('titlebar-maximize');
+          var closeBtn = document.getElementById('titlebar-close');
+          if (minimize) minimize.addEventListener('click', function () { void appWindow.minimize(); });
+          if (maximize) maximize.addEventListener('click', function () { void appWindow.toggleMaximize(); });
+          if (closeBtn) closeBtn.addEventListener('click', function () { void appWindow.close(); });
+        }
+        bind();
+      })();
+    </script>
+  </body>
+</html>

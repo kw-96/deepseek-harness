@@ -71,6 +71,7 @@ function terminalHandle(): SubprocessTerminalHandle {
     output,
     done: Promise.resolve({ exitCode: 0, signal: null }),
     write: async () => {},
+    resize: async () => {},
     inspectForeground: async () => ({ processGroupId: 123, inputWaiting: true }),
     signalForeground: async () => 123,
     terminate: async () => { output.end() },
@@ -230,6 +231,76 @@ describe('BashTerminalBackend startup rollback', () => {
     }])
   })
 
+  it('spawns interactive UI sessions with xterm TERM and skips prompt startup', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EmptySandbox)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: '/workspace' })
+    let spawned: SubprocessTerminalSpawnSpec | undefined
+    const session = { motd: 'stale' } as unknown as LocalPtySession
+    const backend = new BashTerminalBackend(
+      ctx,
+      { ...config(), shellArgs: ['-i'] },
+      async (request) => {
+        spawned = request
+        return terminalHandle()
+      },
+      () => session,
+    )
+    expect(await backend.spawn({
+      ...spec(agent(ctx)),
+      interaction: 'interactive',
+      cols: 100,
+      rows: 30,
+    })).toBe(session)
+    expect(session.motd).toBe('')
+    expect(spawned).toMatchObject({
+      name: 'xterm-256color',
+      cols: 100,
+      rows: 30,
+      env: {
+        TERM: 'xterm-256color',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        DSH_SHELL: '1',
+        DSH_SESSION_ID: 'agent',
+        DSH_PTY_SESSION_ID: 'pty-1',
+      },
+    })
+    expect(spawned?.env?.PS1).toBeUndefined()
+    expect(spawned?.env?.NO_COLOR).toBeUndefined()
+  })
+
+  it('overrides the plugin dialect for one spawn when shellDialect is set', async () => {
+    const ctx = new Context()
+    await ctx.plugin(EmptySandbox)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: '/workspace' })
+    let spawned: SubprocessTerminalSpawnSpec | undefined
+    const session = { motd: '' } as unknown as LocalPtySession
+    const backend = new BashTerminalBackend(
+      ctx,
+      { ...config(), shellDialect: 'bash', shellArgs: ['-i'] },
+      async (request) => {
+        spawned = request
+        return terminalHandle()
+      },
+      () => session,
+    )
+    expect(await backend.spawn({
+      ...spec(agent(ctx)),
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })).toBe(session)
+    expect(spawned?.argv[0]).not.toBe('/bin/bash')
+    expect(spawned?.argv.slice(1)).toEqual(['-NoLogo', '-NoProfile'])
+    expect(spawned?.env).toMatchObject({
+      TERM: 'xterm-256color',
+      DSH_SHELL: '1',
+    })
+    expect(spawned?.env?.PS1).toBeUndefined()
+  })
+
   it('resolves session mode and root together before wrapping the shell', async () => {
     const ctx = new Context()
     await ctx.plugin(RecordingSandbox)
@@ -335,6 +406,7 @@ describe('BashTerminalBackend startup rollback', () => {
       output,
       done: outcome.promise,
       write: async () => {},
+      resize: async () => {},
       inspectForeground: async () => ({ processGroupId: 123, inputWaiting: true }),
       signalForeground: async () => 123,
       async terminate() {

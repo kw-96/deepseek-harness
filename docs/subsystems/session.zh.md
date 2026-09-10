@@ -611,8 +611,10 @@ interface TurnEndReasonMap {
   /** At least one step reached its output-token ceiling, even if a plugin continued the turn. */
   'max-tokens': { kind: 'max-tokens' }
   /**
-   * A persistence backend closed a crash-orphaned turn on reload. The loop never
-   * emits this marker, and the events recorded before the crash remain intact.
+   * A crash-orphaned turn was closed after the fact: agent-loop resume appends
+   * this closer for a stored log whose last turn never ended, and session-query
+   * synthesizes it on cold reads. The loop never emits this marker live, and
+   * the events recorded before the crash remain intact.
    */
   interrupted: { kind: 'interrupted' }
 }
@@ -646,7 +648,7 @@ interface TurnEndReasonMap {
 
 ## 持久性约定
 
-持久化后端依赖的约定如下：持久日志无损保存每个事件，**包括** `assistant/chunk`；`seq` 必须连续，因此不能从规范日志中过滤分片。后端可以为事件批次选择自己的存储编码，只要 `load` 返回与追加时完全一致的事件即可（JSONL 后端默认启用的打包分片行就是此类编码；见 [persistence.md](persistence.zh.md)）。所有 `event.data` 都必须可序列化为 JSON；`Session.append` 会从源头强制这一要求（遇到不可序列化数据时抛出），因此错误事件绝不会进入日志，`session.snapshotEvents()` 始终与后端可持久化的内容一致。新增会携带不可序列化数据、破坏核心执行嵌套或违反事件所有方声明关系的事件类型，都会构成磁盘格式的破坏性变更。
+持久化后端依赖的约定如下：持久日志无损保存每个事件，**包括** `assistant/chunk`；`seq` 必须连续，因此不能从规范日志中过滤分片。后端可以为事件批次选择自己的存储编码，只要 handle 的 `read()` 返回与追加时完全一致的事件即可（JSONL 后端默认启用的打包分片行就是此类编码；见 [persistence.md](persistence.zh.md)）。所有 `event.data` 都必须可序列化为 JSON；`Session.append` 会从源头强制这一要求（遇到不可序列化数据时抛出），因此错误事件绝不会进入日志，`session.snapshotEvents()` 始终与后端可持久化的内容一致。新增会携带不可序列化数据、破坏核心执行嵌套或违反事件所有方声明关系的事件类型，都会构成磁盘格式的破坏性变更。
 
 消费此约定的后端见 [persistence.md](persistence.zh.md)。
 
@@ -663,6 +665,28 @@ interface TurnEndReasonMap {
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxcodeximport--codeximportcontroller"></a>
+
+### `ctx.codexImport` — `CodexImportController`
+
+Remote business surface for the card: trigger a run and read history. The controller owns the durable `codex_import` domain and never touches the session log beyond what the sweep already wrote.
+
+```ts cordis-catalog
+/**
+ * Run one import sweep now and record its outcome as the newest history run.
+ * @returns the recorded run.
+ */
+@Remote('run') async run(): Promise<CodexImportRun>
+
+/**
+ * Read recorded import runs, newest first.
+ * @returns the complete history list.
+ */
+@Remote('history') async history(): Promise<CodexImportHistoryValue>
+```
+
+Source: [`packages/session/session-import-codex/src/remote.ts`](../../packages/session/session-import-codex/src/remote.ts)
 
 <a id="ctxsessioncontroller--sessioncontroller"></a>
 
@@ -814,7 +838,7 @@ Source: [`packages/api/session-controller/src/index.ts`](../../packages/api/sess
 
 In-memory session store (`ctx.sessions`).
 
-Persistence is intentionally not implemented here — persistence plugins subscribe to `session/event` and flush on `session/flush` / dispose.
+Persistence is intentionally not implemented here — the agent lifecycle attaches a session-log writer to each published session's write handle; a session published outside that lifecycle persists nothing.
 
 ```ts cordis-catalog
 /**
@@ -839,6 +863,17 @@ Persistence is intentionally not implemented here — persistence plugins subscr
  *   non-absolute path (storage backends key directories off it).
  */
 create(id?: SessionId, options?: CreateSessionOptions): Session
+
+/**
+ * Replace one non-appending live session with a new seeded snapshot under
+ * the same id. External importers call this only after their durable source
+ * replacement succeeds and after excluding Agent-owned sessions.
+ * @param id - existing or new session id.
+ * @param options - replacement seed and immutable header metadata.
+ * @returns the newly announced live session.
+ * @throws when the existing session is publishing an event.
+ */
+replace(id: SessionId, options: CreateSessionOptions): Session
 
 /**
  * Build a session WITHOUT entering it into the store — validate the id/cwd and

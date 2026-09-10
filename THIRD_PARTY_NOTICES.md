@@ -112,6 +112,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 
 pnpm applies local patches to the following packages at install time, so shipped artifacts carry modified copies; each patch file is the complete record of the modification:
 
+- `@yao-pkg/pkg@6.21.0` — [`patches/@yao-pkg__pkg@6.21.0.patch`](patches/@yao-pkg__pkg@6.21.0.patch)
 - `node-pty@1.2.0-beta.15` — [`patches/node-pty@1.2.0-beta.15.patch`](patches/node-pty@1.2.0-beta.15.patch)
 
 ## Official Claude Code platform payloads
@@ -142,7 +143,9 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`@lexical/headless`](https://github.com/facebook/lexical) | MIT |
 | [`@modelcontextprotocol/server-everything`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
+| [`@resvg/resvg-js`](https://github.com/git@github.com:yisibl/resvg-js) | MPL-2.0 |
 | [`@stylistic/eslint-plugin`](https://github.com/eslint-stylistic/eslint-stylistic) | MIT |
+| [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | Apache-2.0 OR MIT |
 | [`@testing-library/dom`](https://github.com/testing-library/dom-testing-library) | MIT |
 | [`@testing-library/react`](https://github.com/testing-library/react-testing-library) | MIT |
 | [`@types/babel__code-frame`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
@@ -161,6 +164,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`@types/ws`](https://github.com/DefinitelyTyped/DefinitelyTyped) | MIT |
 | [`@vitejs/plugin-react`](https://github.com/vitejs/vite-plugin-react) | MIT |
 | [`@vitest/coverage-v8`](https://github.com/vitest-dev/vitest) | MIT |
+| [`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) | MIT |
 | [`@yarnpkg/cli-dist`](https://github.com/yarnpkg/berry) | BSD-2-Clause |
 | [`cytoscape`](https://github.com/cytoscape/cytoscape.js) | MIT |
 | [`cytoscape-cose-bilkent`](https://github.com/cytoscape/cytoscape.js-cose-bilkent) | MIT |
@@ -185,13 +189,14 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`spdx-expression-parse`](https://github.com/jslicense/spdx-expression-parse.js) | MIT |
 | [`tsdown`](https://github.com/rolldown/tsdown) | MIT |
 | [`typescript-language-server`](https://github.com/typescript-language-server/typescript-language-server) | Apache-2.0 |
+| [`unrun`](https://github.com/Gugustinette/unrun) | MIT |
 | [`vite`](https://github.com/vitejs/vite) | MIT |
 | [`vite-tsconfig-paths`](https://github.com/aleclarson/vite-tsconfig-paths) | MIT |
 | [`vitepress`](https://github.com/vuejs/vitepress) | MIT |
 | [`vitepress-plugin-mermaid`](https://github.com/emersonbottero/vitepress-plugin-mermaid) | MIT |
 | [`vitest`](https://github.com/vitest-dev/vitest) | MIT |
 
-`eslint-plugin-sonarjs` (LGPL-3.0-only) and `lightningcss` (MPL-2.0) run only as development tooling; their code is not linked into or distributed with any DeepSeek Harness artifact.
+`@resvg/resvg-js` (MPL-2.0), `eslint-plugin-sonarjs` (LGPL-3.0-only) and `lightningcss` (MPL-2.0) run only as development tooling; their code is not linked into or distributed with any DeepSeek Harness artifact.
 
 ## Python SDK dependencies (`python/`)
 
@@ -203,12 +208,6 @@ Direct dependencies of the `pyproject.toml` manifests, plus `uv` as the developm
 | [`pydantic`](https://github.com/pydantic/pydantic) | MIT | runtime dependency of `deepseek-harness-sdk` |
 | [`pytest`](https://github.com/pytest-dev/pytest) | MIT | test-only |
 | [`uv`](https://github.com/astral-sh/uv) | MIT / Apache-2.0 | development workflow tool |
-
-## Fetched at build time
-
-| Package | License | Role |
-| --- | --- | --- |
-| [`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) | MIT | invoked by `scripts/build-exe-for-python-sdk.ts` to assemble the single-file SDK runtime executable |
 
 ## First-party native packages
 

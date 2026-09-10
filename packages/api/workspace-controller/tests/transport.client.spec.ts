@@ -136,6 +136,14 @@ class ScriptedWorkspaceRemote implements WorkspaceRemote {
     throw new Error('unused')
   }
 
+  attachSession(_request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
+    throw new Error('unused')
+  }
+
+  detachSession(_request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
+    throw new Error('unused')
+  }
+
   archiveSession(_request: WorkspaceArchiveSessionRequest): Promise<RemoteResult<WorkspaceArchiveValue>> {
     throw new Error('unused')
   }
@@ -174,6 +182,14 @@ class CommandWorkspaceRemote implements WorkspaceRemote {
 
   readonly insertSessionBefore = vi.fn<WorkspaceRemote['insertSessionBefore']>(request => Promise.resolve(remoteOk({
     workspace: workspace(String(request.workspaceId), { sessionIds: [request.sessionId] }),
+  })))
+
+  readonly attachSession = vi.fn<WorkspaceRemote['attachSession']>(request => Promise.resolve(remoteOk({
+    workspace: workspace(String(request.workspaceId), { sessionIds: [request.sessionId] }),
+  })))
+
+  readonly detachSession = vi.fn<WorkspaceRemote['detachSession']>(request => Promise.resolve(remoteOk({
+    workspace: workspace(String(request.workspaceId), { sessionIds: [] }),
   })))
 
   readonly archiveSession = vi.fn<WorkspaceRemote['archiveSession']>(request => Promise.resolve(remoteOk({

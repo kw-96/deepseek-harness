@@ -1,0 +1,387 @@
+/**
+ * dsh-codex-shell 浏览器入口：挂载 codexShell Remote 并注册界面 ——
+ * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、隐藏侧栏顶部品牌
+ * 文字（DSH 本地构建）、挂在侧栏页脚槽位的添加工作区弹窗（页脚无
+ * 可见按钮）、停靠进宿主 details 第三列的右侧工作台面板（文件/Git/
+ * 项目/命令/摘要/浏览器）、以及会话头的面板开合按钮。插件/MCP/Skills
+ * 统一走宿主「设置 → 插件」，本插件不再注册对应面板。
+ * 面板开合通过 ctx.layout 与宿主第三列双向同步。
+ *
+ * 对宿主编译采用本地结构面（faces.ts）而非宿主编排类型线；运行时的
+ * 槽位核心仍会对每个名字做加载期强校验。
+ */
+import type { Context } from '@deepseek-ai/cordis'
+import { useEffect, useRef } from 'react'
+import { PanelLeftOpen } from 'lucide-react'
+import remoteContribution from 'dsh-codex-shell/remote'
+import { SessionMetaStore } from './session-meta.js'
+import { BrowserPrefsStore } from './sidebar/prefs.js'
+import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
+import { CodexRightPanel, type CodexPanelInjected, type CommandPrompt } from './RightPanel.js'
+import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
+import { BottomTerminalPanel } from './bottom/BottomTerminalPanel.js'
+import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
+import { PanelController } from './panel-controller.js'
+import { en, zh } from './locales.js'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {
+  CodexShellRemoteFace, LayoutFace, LocaleFace, RemoteFace, SessionsFace, SlotsFace, TFn, WorkspacesFace,
+} from './faces.js'
+
+export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces', 'connection']
+
+function unwrap<T>(result: { ok: true; value: T } | { ok: false; error: { code: string; message: string } }): T {
+  if (result.ok) return result.value
+  throw new Error(`${result.error.code}: ${result.error.message}`)
+}
+
+/** 是否运行在 Tauri 桌面壳（与 ui-layout 的探测一致）。 */
+function isDesktopShell(): boolean {
+  if (typeof window === 'undefined') return false
+  const candidate = window as Window & { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
+  return candidate.__TAURI_INTERNALS__ !== undefined || candidate.__TAURI__ !== undefined
+}
+
+/**
+ * 侧栏顶部品牌区控制（占用 sidebar.brand.mark 槽）：
+ * - 宽态 Web：隐藏品牌按钮本身，保留壳层行与行内折叠按钮（位于
+ *   新会话按钮上方），并压缩行高避免大片空白；
+ * - 宽态桌面壳：整行隐藏（标题栏已提供开合）；
+ * - 轨道态 Web：渲染常显的「打开侧栏」图标（壳层展开按钮即本槽内容，
+ *   不再需要悬浮才出现）；
+ * - 轨道态桌面壳：隐藏展开按钮（标题栏已提供开合）。
+ */
+function SidebarBrandControls(): React.ReactNode {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const anchor = ref.current
+    if (anchor === null) return
+    const button = anchor.closest('button')
+    if (button === null) return
+    const desktop = isDesktopShell()
+    const row = button.parentElement
+    const wide = button.querySelector('[data-slot="sidebar.brand.name"]') !== null
+    if (wide) {
+      // 宽态：品牌按钮隐藏；桌面壳连整行一起隐藏（行内无其它控件）。
+      button.style.display = 'none'
+      if (desktop) {
+        if (row !== null) row.style.display = 'none'
+        return () => {
+          button.style.display = ''
+          if (row !== null) row.style.display = ''
+        }
+      }
+      // Web：压缩空品牌行，让壳层折叠按钮贴住新会话按钮上方。
+      const priorHeight = row?.style.height ?? ''
+      const priorPadding = row?.style.padding ?? ''
+      if (row !== null) {
+        row.style.height = '28px'
+        row.style.padding = '0 4px'
+      }
+      return () => {
+        button.style.display = ''
+        if (row !== null) {
+          row.style.height = priorHeight
+          row.style.padding = priorPadding
+        }
+      }
+    }
+    // 轨道态：桌面壳隐藏展开按钮，Web 保留（本组件渲染常显打开图标）。
+    if (desktop && row !== null) {
+      row.style.display = 'none'
+      return () => { row.style.display = '' }
+    }
+    return undefined
+  }, [])
+  return (
+    <>
+      <div ref={ref} style={{ display: 'none' }} />
+      <PanelLeftOpen size={18} aria-hidden="true" />
+    </>
+  )
+}
+
+interface SessionHistoryValueLike {
+  records?: readonly unknown[]
+}
+
+interface ConnectionProbeLike {
+  api?: {
+    sessions?: {
+      history?: (request: {
+        sessionId: string
+        maxMessages?: number
+        beforeSeq?: number
+      }) => Promise<{ ok: true; value: SessionHistoryValueLike } | { ok: false }>
+    }
+  }
+}
+
+/** 尽力导出会话用户/助手文本为 Markdown；失败返回 null。 */
+async function exportSessionMarkdown(connection: unknown, sessionId: string): Promise<string | null> {
+  const probe = connection as ConnectionProbeLike
+  const history = probe.api?.sessions?.history
+  if (history === undefined) return null
+  try {
+    const result = await history({ sessionId, maxMessages: 400 })
+    if (!result.ok) return null
+    const lines: string[] = []
+    for (const record of result.value.records ?? []) {
+      const event = record as {
+        type?: string
+        data?: { content?: readonly { type?: string; text?: string }[]; source?: { kind?: string } }
+      }
+      const text = (event.data?.content ?? [])
+        .filter(block => block.type === 'text')
+        .map(block => block.text ?? '')
+        .join('')
+        .trim()
+      if (text === '') continue
+      if (event.type === 'user/message') lines.push(`## User\n\n${text}`)
+      else if (event.type === 'assistant/message' || event.type === 'model/message') {
+        lines.push(`## Assistant\n\n${text}`)
+      }
+    }
+    return lines.length === 0 ? null : lines.join('\n\n')
+  } catch {
+    return null
+  }
+}
+
+/** 某会话的持久用户指令；传输缺失或失败时返回空列表。 */
+async function readPrompts(connection: unknown, sessionId: string): Promise<readonly CommandPrompt[]> {
+  const probe = connection as ConnectionProbeLike
+  const history = probe.api?.sessions?.history
+  if (history === undefined) return []
+  try {
+    const result = await history({ sessionId, maxMessages: 400 })
+    if (!result.ok) return []
+    const prompts: CommandPrompt[] = []
+    for (const record of result.value.records ?? []) {
+      const event = record as {
+        type?: string
+        seq?: number
+        data?: { content?: readonly { type?: string; text?: string }[]; source?: { kind?: string } }
+      }
+      if (event.type !== 'user/message') continue
+      if (event.data?.source?.kind !== 'user') continue
+      const text = (event.data.content ?? [])
+        .filter(block => block.type === 'text')
+        .map(block => block.text ?? '')
+        .join('')
+      if (text.trim() !== '') prompts.push({ seq: event.seq ?? 0, text })
+    }
+    return prompts.reverse()
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 挂载 Remote 并注册全部 codex-shell 界面。
+ * @param ctx - 客户端根上下文。
+ */
+export async function apply(ctx: Context): Promise<() => Promise<void>> {
+  const remote = ctx.get('remote') as RemoteFace
+  const locale = ctx.get('locale') as LocaleFace
+  const slots = ctx.get('slots') as SlotsFace
+  const sessions = ctx.get('sessions') as SessionsFace
+  const workspaces = ctx.get('workspaces') as WorkspacesFace
+  const connection = ctx.get('connection')
+  const layout = ctx.get('layout') as LayoutFace | undefined
+
+  const disposeRemote = await remote.$mount(remoteContribution)
+  const disposeLocale = locale.register('codex-shell', { zh, en } as Record<string, Record<string, string>>)
+  const t: TFn = locale.bind('codex-shell')
+
+  const panel = new PanelController()
+  const meta = new SessionMetaStore()
+  const prefs = new BrowserPrefsStore()
+
+  ctx.effect(() => () => { panel.dispose() }, 'codex-shell: panel controller')
+
+  const codexRemote = ctx.get('remote.codexShell') as CodexShellRemoteFace
+  const sessionRemote = ctx.get('remote.session') as {
+    openWorkspacePath?: (request: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>
+  } | undefined
+
+  /** 面板开合与宿主 details 列同步；布局服务缺失时降级为纯本地状态。 */
+  const setColumnOpen = (open: boolean): void => {
+    if (layout === undefined) return
+    if (open) layout.openDetails()
+    else layout.closeDetails()
+  }
+  const setBottomOpen = (open: boolean): void => {
+    if (layout === undefined) return
+    if (open) layout.openBottom()
+    else layout.closeBottom()
+  }
+
+  const browserInject = (): CodexBrowserInjected => ({
+    startSession: (workspaceId?: string) => {
+      sessions.create(workspaceId === undefined ? {} : { workspaceId })
+        .then(sessionId => { sessions.open(sessionId) })
+        .catch(() => { /* 创建失败保持当前选择 */ })
+    },
+    open: sessionId => { sessions.open(sessionId) },
+    searchSessions: async (query, signal) => {
+      const result = await sessions.search(query, signal)
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value
+    },
+    searchResultLimit: sessions.searchResultLimit,
+    renameSession: async (sessionId, title) => {
+      const session = sessions.binding(sessionId)?.session
+      if (session === undefined) throw new Error(`unknown session "${sessionId}"`)
+      const result = await session.rename(title)
+      if (!result.ok) throw new Error(result.error.message)
+    },
+    forkSession: (sessionId) => {
+      sessions.fork({ sessionId, increaseTitle: true })
+        .then(childId => { sessions.open(childId) })
+        .catch(() => { /* 派生失败保持当前选择 */ })
+    },
+    renameWorkspace: async (workspaceId, title) => { await workspaces.rename(workspaceId, title) },
+    deleteWorkspace: async (workspaceId) => { await workspaces.delete(workspaceId) },
+    insertWorkspaceBefore: async (workspaceId, beforeWorkspaceId) => {
+      await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
+    },
+    archiveSession: async (sessionId) => { await workspaces.archiveSession(sessionId) },
+    insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
+      await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
+    },
+    attachSession: async (workspaceId, sessionId) => {
+      await workspaces.attachSession(workspaceId, sessionId)
+    },
+    moveSession: async (workspaceId, sessionId) => {
+      await workspaces.moveSession(workspaceId, sessionId)
+    },
+    detachSession: async (workspaceId, sessionId) => {
+      await workspaces.detachSession(workspaceId, sessionId)
+    },
+    listProjects: async () => unwrap(await codexRemote.projectList()),
+    createProject: async (name, roots) => unwrap(await codexRemote.projectCreate({ name, ...(roots === undefined ? {} : { roots }) })),
+    renameProject: async (projectId, name) => unwrap(await codexRemote.projectRename({ projectId, name })),
+    setProjectRoots: async (projectId, roots) => unwrap(await codexRemote.projectSetRoots({ projectId, roots })),
+    deleteProject: async projectId => unwrap(await codexRemote.projectDelete({ projectId })),
+    openWorkspacePath: async (path) => {
+      const openPath = sessionRemote?.openWorkspacePath
+      if (openPath === undefined) throw new Error('session.openWorkspacePath unavailable')
+      const result = await openPath({ path })
+      if (!result.ok) throw new Error(result.error?.message ?? 'openWorkspacePath failed')
+    },
+    openTerminalForSession: async (sessionId, cwd) => {
+      setBottomOpen(true)
+      await unwrap(await codexRemote.terminalOpen(sessionId, cwd === undefined || cwd === '' ? {} : { cwd }))
+    },
+    exportSessionMarkdown: (sessionId) => exportSessionMarkdown(connection, sessionId),
+    canExportMarkdown: (connection as ConnectionProbeLike).api?.sessions?.history !== undefined,
+    meta,
+    prefs,
+  })
+
+  const addWorkspaceInject = (): AddWorkspaceInjected => ({
+    fsList: async path => unwrap(await codexRemote.fsList(path)),
+    createWorkspace: input => workspaces.create(input),
+  })
+
+  const panelInject = (): CodexPanelInjected => ({
+    panel,
+    meta,
+    api: {
+      fsList: async path => unwrap(await codexRemote.fsList(path)),
+      fsRead: async (path, maxBytes) => unwrap(await codexRemote.fsRead(path, maxBytes)),
+      fsWrite: async (path, content) => unwrap(await codexRemote.fsWrite(path, content)),
+      fsSearchName: async (root, query, options) => unwrap(await codexRemote.fsSearchName(root, query, options)),
+      fsSearchContent: async (root, query, options) => unwrap(await codexRemote.fsSearchContent(root, query, options)),
+      gitStatus: async cwd => unwrap(await codexRemote.gitStatus(cwd)),
+      gitLog: async (cwd, count) => unwrap(await codexRemote.gitLog(cwd, count)),
+      gitDiff: async (cwd, path, staged) => unwrap(await codexRemote.gitDiff(cwd, path, staged)),
+      gitStage: async (cwd, path) => unwrap(await codexRemote.gitStage(cwd, path)),
+      gitUnstage: async (cwd, path) => unwrap(await codexRemote.gitUnstage(cwd, path)),
+      gitDiscard: async (cwd, path) => unwrap(await codexRemote.gitDiscard(cwd, path)),
+      gitCommit: async (cwd, message) => unwrap(await codexRemote.gitCommit(cwd, message)),
+      gitBranches: async cwd => unwrap(await codexRemote.gitBranches(cwd)),
+      gitCheckout: async (cwd, branch) => unwrap(await codexRemote.gitCheckout(cwd, branch)),
+      gitFetch: async cwd => unwrap(await codexRemote.gitFetch(cwd)),
+      gitPull: async cwd => unwrap(await codexRemote.gitPull(cwd)),
+      gitPush: async cwd => unwrap(await codexRemote.gitPush(cwd)),
+      gitStageAll: async cwd => unwrap(await codexRemote.gitStageAll(cwd)),
+      gitUnstageAll: async cwd => unwrap(await codexRemote.gitUnstageAll(cwd)),
+      terminalOpen: async (sessionId, options) => unwrap(await codexRemote.terminalOpen(sessionId, options)),
+      terminalList: async sessionId => unwrap(await codexRemote.terminalList(sessionId)),
+      terminalSend: async (sessionId, terminalId, text) => unwrap(await codexRemote.terminalSend(sessionId, terminalId, text)),
+      terminalFollow: (sessionId, terminalId, signal) => codexRemote.terminalFollow(sessionId, terminalId, signal),
+      terminalWrite: async (sessionId, terminalId, data) => unwrap(await codexRemote.terminalWrite(sessionId, terminalId, data)),
+      terminalResize: async (sessionId, terminalId, cols, rows) => unwrap(await codexRemote.terminalResize(sessionId, terminalId, cols, rows)),
+      terminalRead: async (sessionId, terminalId) => unwrap(await codexRemote.terminalRead(sessionId, terminalId)),
+      terminalClose: async (sessionId, terminalId) => unwrap(await codexRemote.terminalClose(sessionId, terminalId)),
+      projectDirs: async workspaceId => unwrap(await codexRemote.projectDirs(workspaceId)),
+      projectSetDirs: async (workspaceId, dirs) => unwrap(await codexRemote.projectSetDirs(workspaceId, dirs)),
+      projectAddDir: async (workspaceId, path) => unwrap(await codexRemote.projectAddDir(workspaceId, path)),
+      projectList: async () => unwrap(await codexRemote.projectList()),
+      projectCreate: async request => unwrap(await codexRemote.projectCreate(request)),
+      projectRename: async request => unwrap(await codexRemote.projectRename(request)),
+      projectSetRoots: async request => unwrap(await codexRemote.projectSetRoots(request)),
+      projectDelete: async request => unwrap(await codexRemote.projectDelete(request)),
+    },
+    history: sessionId => readPrompts(connection, sessionId),
+    setColumnOpen,
+  })
+
+  const toggleInject = (): PanelToggleInjected => ({ panel, meta, setColumnOpen, setBottomOpen })
+
+  // 每处注册都通过 slots.inject 等待宿主声明（apply 顺序不受约束）。
+  const disposeBrowser = slots.inject('sidebar.workspaces', () => slots.register({
+    name: 'sidebar.workspaces',
+    priority: -1,
+    locale: 'codex-shell',
+    inject: browserInject,
+  }, CodexBrowser))
+  // 隐藏侧栏顶部品牌文字（宿主 fallback 显示「DSH 本地构建」+ 版本号）：
+  // 注册空渲染组件占用 single 槽位，品牌行只剩图标按钮。
+  const disposeBrandName = slots.inject('sidebar.brand.name', () => slots.register({
+    name: 'sidebar.brand.name', id: 'codex-hide-brand-name', locale: 'codex-shell',
+  }, () => null))
+  // 侧栏顶部品牌区控制：mark 槽挂载 SidebarBrandControls ——
+  // Web 宽态隐藏品牌按钮、保留壳层折叠按钮并压缩行高；轨道态常显
+  // 打开图标；桌面独立窗口两种状态都不显示开合控件（标题栏负责）。
+  const disposeBrandMark = slots.inject('sidebar.brand.mark', () => slots.register({
+    name: 'sidebar.brand.mark', id: 'codex-sidebar-brand-controls', locale: 'codex-shell',
+  }, SidebarBrandControls))
+  // 添加工作区弹窗挂在侧栏页脚槽位（只承载弹窗与打开器，页脚无可见按钮；
+  // 打开入口为标题栏「+」与桌面标题栏 File → Open Workspace）。
+  const disposeAddWorkspace = slots.inject('sidebar.footer.action', () => slots.register({
+    name: 'sidebar.footer.action', id: 'codex-add-workspace', order: 0,
+    locale: 'codex-shell',
+    inject: addWorkspaceInject,
+  }, AddWorkspaceAction))
+  // 停靠进宿主第三列：priority -1 遮蔽原生工具详情面板，列宽/拖拽/动画由宿主布局接管。
+  const disposePanel = slots.inject('details', () => slots.register({
+    name: 'details',
+    priority: -1,
+    locale: 'codex-shell',
+    inject: panelInject,
+  }, CodexRightPanel))
+  const disposeBottom = slots.inject('bottom', () => slots.register({
+    name: 'bottom', priority: -1, locale: 'codex-shell',
+    inject: () => ({ api: panelInject().api, close: () => { setBottomOpen(false) } }),
+  }, BottomTerminalPanel))
+  const disposeToggle = slots.inject('conversation.session.header.utilities', () => slots.register({
+    name: 'conversation.session.header.utilities', id: 'codex-panel-toggle', order: 20,
+    label: () => t('openRightPanel'), locale: 'codex-shell',
+    inject: toggleInject,
+  }, PanelToggle))
+
+  return async () => {
+    disposeToggle()
+    disposeBottom()
+    disposePanel()
+    disposeAddWorkspace()
+    disposeBrandMark()
+    disposeBrandName()
+    disposeBrowser()
+    disposeLocale()
+    await disposeRemote()
+  }
+}

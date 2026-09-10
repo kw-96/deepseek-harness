@@ -335,7 +335,9 @@ describe('built-in conversation node Definitions', () => {
       reason: { kind: 'aborted', reason: { kind: 'user' } },
     }))
     value.flush()
-    expect(process()).toMatchObject({ answerAnchorSeq: 14.1, answerStep: 2 })
+    // An aborted Turn has no final answer: it keeps the streaming fold rules,
+    // so the answer boundary stays unset.
+    expect(process()).toMatchObject({ answerAnchorSeq: null, answerStep: null })
 
     const recovered = assembler([
       at(20, 'turn/start', { turn: 2 }),
@@ -351,8 +353,9 @@ describe('built-in conversation node Definitions', () => {
       at(26, 'turn/end', { turn: 2, reason: { kind: 'interrupted' } }),
     ])
     const recoveredProcess = snapshot(recovered).timeline.turns.get(2)?.data.get('turn-process')
+    // Interrupted turns keep no answer boundary either — streaming fold rules.
     expect(recoveredProcess)
-      .toMatchObject({ answerStep: 2, answerAnchorSeq: 25.1 })
+      .toMatchObject({ answerStep: null, answerAnchorSeq: null })
 
     const partialWindow = assembler([
       at(30, 'assistant/chunk', {

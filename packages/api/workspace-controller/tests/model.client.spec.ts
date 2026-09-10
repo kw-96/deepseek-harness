@@ -80,6 +80,16 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
     workspace: workspace(String(request.workspaceId), [request.sessionId]),
   }))
+  onAttachSession: (
+    request: { workspaceId: WorkspaceId; sessionId: SessionId },
+  ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
+    workspace: workspace(String(request.workspaceId), [request.sessionId]),
+  }))
+  onDetachSession: (
+    request: { workspaceId: WorkspaceId; sessionId: SessionId },
+  ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
+    workspace: workspace(String(request.workspaceId), []),
+  }))
   onArchiveSession: (
     request: WorkspaceArchiveSessionRequest,
   ) => Promise<RemoteResult<WorkspaceArchiveValue>> = request =>
@@ -108,6 +118,16 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<RemoteResult<WorkspaceValue>> {
     this.record('insertSessionBefore', request)
     return this.onInsertSessionBefore(request)
+  }
+
+  attachSession(request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
+    this.record('attachSession', request)
+    return this.onAttachSession(request)
+  }
+
+  detachSession(request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
+    this.record('detachSession', request)
+    return this.onDetachSession(request)
   }
 
   archiveSession(request: WorkspaceArchiveSessionRequest): Promise<RemoteResult<WorkspaceArchiveValue>> {

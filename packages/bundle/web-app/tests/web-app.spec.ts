@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -110,6 +110,14 @@ interface BashContribution {
 }
 
 describe('web-app runtime glue', () => {
+  it('honors DSH_WEB_DIST_INDEX so a desktop shell can freeze the frontend dist', () => {
+    dist = mkdtempSync(join(tmpdir(), 'dsh-web-app-dist-override-'))
+    const index = join(dist, 'index.html')
+    writeFileSync(index, '<head></head><body>frozen</body>')
+    vi.stubEnv('DSH_WEB_DIST_INDEX', index)
+    expect(originalResolve()).toBe(resolve(index))
+  })
+
   it('mounts dist serving, prompt section, bash variables, and publishes the URL with the LAN snapshot', async () => {
     stageDist()
     const ctx = new Context()

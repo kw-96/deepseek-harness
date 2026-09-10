@@ -7,22 +7,24 @@ type ChatActions = {
   setTurnProcessOpen: (
     draft: ChatStoreState,
     turn: number,
-    answerStep: number,
+    answerStep: number | null,
     open: boolean,
   ) => void
 }
 
 /**
- * Resolve the manually expanded answer for one Turn.
+ * Resolve the manually expanded answer for one Turn generation.
  * @param state - Chat store snapshot.
  * @param turn - owning Turn.
- * @returns the Turn's stored entry, when present.
+ * @param answerStep - the generation's answer step (null while streaming).
+ * @returns the Turn's stored entry, when it matches the same generation.
  */
 export function storedTurnProcessEntry(
   state: Readonly<ChatStoreState>,
   turn: number,
+  answerStep: number | null,
 ): Readonly<TurnProcessViewEntry> | undefined {
-  return state.turnProcesses.find(entry => entry.turn === turn)
+  return state.turnProcesses.find(entry => entry.turn === turn && entry.answerStep === answerStep)
 }
 
 /**

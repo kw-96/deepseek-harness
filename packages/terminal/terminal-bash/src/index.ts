@@ -61,9 +61,23 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
   }, { global: true })
 }
 
-function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect): Record<string, string> {
+function childEnvironment(
+  spec: TerminalBackendSpawnSpec,
+  dialect: ShellDialect,
+  interactive: boolean,
+): Record<string, string> {
   // The subprocess provider supplies its own scrubbed ambient base; these are
   // deliberate terminal-specific overrides layered after it.
+  if (interactive) {
+    return {
+      TERM: 'xterm-256color',
+      PAGER: 'cat',
+      GIT_PAGER: 'cat',
+      DSH_SHELL: '1',
+      DSH_SESSION_ID: spec.owner.id,
+      DSH_PTY_SESSION_ID: spec.sessionId,
+    }
+  }
   const common = {
     TERM: 'dumb',
     PAGER: 'cat',
@@ -106,6 +120,32 @@ function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxExecutio
   }
   // Re-state the discriminant because object spread does not preserve its narrowed type.
   return sandbox.confine(argv, { ...policy, mode: policy.mode }).argv
+}
+
+/**
+ * Resolve the effective config for one spawn. A per-session `shellDialect`
+ * overrides the plugin dialect and resets path/args to that dialect's defaults.
+ * @param base - plugin-resolved configuration.
+ * @param dialectOverride - optional spawn-local dialect.
+ * @returns configuration used for argv, env, and startup.
+ */
+function configForSpawn(base: ResolvedConfig, dialectOverride: ShellDialect | undefined): ResolvedConfig {
+  if (dialectOverride === undefined || dialectOverride === base.shellDialect) return base
+  return resolveConfig({
+    backendType: base.backendType,
+    shellDialect: dialectOverride,
+    rows: base.rows,
+    cols: base.cols,
+    scrollbackLines: base.scrollbackLines,
+    scrollbackMaxBytes: base.scrollbackMaxBytes,
+    maxReadBytes: base.maxReadBytes,
+    pollIntervalMs: base.pollIntervalMs,
+    exactProbeAfterMs: base.exactProbeAfterMs,
+    idleSilenceMs: base.idleSilenceMs,
+    handoffGraceMs: base.handoffGraceMs,
+    timeoutMs: base.timeoutMs,
+    disposeGraceMs: base.disposeGraceMs,
+  })
 }
 
 // TODO(pty-initialize-race-home): Fold this outer abort race into
@@ -192,20 +232,33 @@ export class BashTerminalBackend implements TerminalBackend {
     spec.signal?.throwIfAborted()
     ensureSandboxModeFence(this.ctx, spec.owner)
     const policy = this.ctx.sandboxPolicy.resolve({ session: spec.owner.session })
-    const argv = spawnArgv(this.ctx, this.config, policy)
+    const effective = configForSpawn(this.config, spec.shellDialect)
+    const argv = spawnArgv(this.ctx, effective, policy)
     if (argv[0] === undefined) throw new Error('terminal-bash: sandbox returned empty argv')
+    const interactive = spec.interaction === 'interactive'
+    const cols = spec.cols ?? effective.cols
+    const rows = spec.rows ?? effective.rows
     const terminal = await this.spawnTerminal({
       argv,
       cwd: spec.cwd ?? policy.workspaceRoot,
-      env: childEnvironment(spec, this.config.shellDialect),
-      rows: this.config.rows,
-      cols: this.config.cols,
-      graceMs: this.config.disposeGraceMs,
+      env: childEnvironment(spec, effective.shellDialect, interactive),
+      ...interactive ? { name: 'xterm-256color' } : {},
+      rows,
+      cols,
+      graceMs: effective.disposeGraceMs,
       signal: spec.signal,
     })
-    const session = this.createSession(terminal, this.config)
+    const session = this.createSession(terminal, {
+      ...effective,
+      cols,
+      rows,
+    })
     try {
-      await startupSession(session, this.config.shellDialect, this.config.timeoutMs, spec.signal)
+      if (interactive) {
+        session.motd = ''
+        return session
+      }
+      await startupSession(session, effective.shellDialect, effective.timeoutMs, spec.signal)
       return session
     } catch (error) {
       try {

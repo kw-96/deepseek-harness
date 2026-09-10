@@ -1,8 +1,18 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+}
+
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
-  grid-template-rows: 100%;
+  grid-template-rows: minmax(0, 1fr) 0;
   height: 100%;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve
@@ -23,6 +33,8 @@
 }
 
 .sidebarCol {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
@@ -30,6 +42,8 @@
 }
 
 .centerCol {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -37,9 +51,39 @@
 }
 
 .detailsCol {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
   min-width: 0;
+  min-height: 0;
+  flex-direction: column;
   overflow: hidden;
   border-left: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.bottomCol {
+  position: relative;
+  grid-column: 2 / 4;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.frame[data-bottom-collapsed] .bottomCol {
+  border-top: none;
+}
+
+.bottomHandle {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  z-index: 3;
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint

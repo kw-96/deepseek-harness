@@ -778,7 +778,6 @@ export function ChatView({
             order={order}
             useChatNode={useChatNode}
             useChatNodeProcess={useChatNodeProcess}
-            historyIncomplete={hasMore}
             compactTranscript={compactTranscript}
             useStore={useStore}
             actions={actions}
@@ -787,6 +786,7 @@ export function ChatView({
             openFile={requestOpenFile}
             inspectCall={inspectCall}
             forkAt={forkAt}
+            loadImage={loadImage}
             renderMessageImages={renderMessageImages}
             fileMentions={fileMentions}
             renderSlot={renderSlot}

@@ -38,6 +38,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       readonly sessionId: SessionId
       readonly beforeSessionId?: SessionId
     }
+    /** Attach rejected: missing cwd, path mismatch, or unreadable session cwd. */
+    'workspace/attach-invalid': {
+      readonly workspaceId: WorkspaceId
+      readonly sessionId: SessionId
+    }
     /** The verb needs an interaction the composed backend does not serve. */
     'directory-picker/unavailable': { readonly capability: string }
     /** The target is not fully qualified, or the backend cannot list it. */
@@ -97,6 +102,18 @@ export interface WorkspaceInsertSessionBeforeRequest {
   readonly workspaceId: WorkspaceId
   readonly sessionId: SessionId
   readonly beforeSessionId?: SessionId
+}
+
+/** Attach one known Session to a Workspace account. */
+export interface WorkspaceAttachSessionRequest {
+  readonly workspaceId: WorkspaceId
+  readonly sessionId: SessionId
+}
+
+/** Detach one Session from a Workspace account (becomes Ungrouped). */
+export interface WorkspaceDetachSessionRequest {
+  readonly workspaceId: WorkspaceId
+  readonly sessionId: SessionId
 }
 
 /** Session requested for archival from Workspace grouping surfaces. */

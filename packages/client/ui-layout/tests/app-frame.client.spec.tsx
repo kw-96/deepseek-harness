@@ -100,6 +100,7 @@ function mountFrame() {
       useSessionPendingInteraction={useSessionPendingInteraction}
       useWorkspaces={((sel: (s: WorkspaceSnapshot) => unknown) => sel(workspaceState)) as never}
       SessionProvider={SessionProviderStub}
+      openSession={vi.fn()}
       t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
     />
   )
@@ -287,6 +288,14 @@ describe('AppFrame', () => {
     expect(tracks(frame)).toEqual([280, 0])
     expect(getByTestId('details-content')).toBeTruthy()
     expect(frame.hasAttribute('data-details-collapsed')).toBe(true)
+  })
+
+  it('opens the bottom slot in a second grid row', () => {
+    const { frame, instance, slotCalls } = mountFrame()
+    act(() => { instance.actions.openBottom() })
+    expect(frame.style.gridTemplateRows).toBe('minmax(0, 1fr) 280px')
+    expect(frame.hasAttribute('data-bottom-collapsed')).toBe(false)
+    expect(slotCalls.map(call => call.key)).toContain('bottom')
   })
 
   it('closed sidebar keeps its compact rail with mounted slot content and collapsed owner props', () => {

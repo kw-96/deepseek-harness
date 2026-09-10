@@ -120,8 +120,18 @@ const BOOTSTRAP_NAMES = new Set([
 const BOOTSTRAP_PREFIXES = ['DSH_', 'XDG_', 'DYLD_', 'BASH_FUNC_']
 
 /**
+ * The bootstrap names the Harness-home `.env` alone may set. A proxy chooses the route every
+ * request takes, so the invoking directory's file — which arrives with a clone — keeps refusing
+ * them; the home file is the user's own, and `DSH_HOME` is itself bootstrap-only, so no `.env` can
+ * relocate this exemption. The CA and TLS names in the same group stay refused everywhere: they
+ * change what is trusted, not where traffic goes.
+ */
+const HOME_LAYER_PROXY_NAMES = new Set(['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY'])
+
+/**
  * Whether a variable may come only from the inherited process environment
- * because it changes process, runtime, VCS, or network bootstrap.
+ * because it changes process, runtime, VCS, or network bootstrap. The Harness-home
+ * file is additionally allowed {@link HOME_LAYER_PROXY_NAMES}.
  * @param name - the variable name.
  * @returns true when only the inherited environment may supply it.
  */
@@ -136,13 +146,15 @@ function isBootstrapOnly(name: string): boolean {
  * @param binName - the diagnostic prefix on the thrown error.
  * @param dir - the directory whose `.env` to read.
  * @param warn - sink for the one-line unreadable-file diagnostic.
+ * @param home - the resolved Harness home; when `dir` is it, {@link HOME_LAYER_PROXY_NAMES} are accepted.
  * @returns the parsed entries, or `undefined` when the file is absent or unreadable.
- * @throws when the file declares a name {@link isBootstrapOnly} rejects.
+ * @throws when the file declares a name {@link isBootstrapOnly} rejects and this layer may not set.
  */
 function readEnvLayer(
-  binName: string, dir: string, warn: (line: string) => void,
+  binName: string, dir: string, warn: (line: string) => void, home: string,
 ): { path: string; values: Record<string, string> } | undefined {
   const path = resolve(dir, '.env')
+  const isHome = resolve(dir) === home
   let content: string
   try {
     content = readFileSync(path, 'utf8')
@@ -157,10 +169,16 @@ function readEnvLayer(
   const values = parseEnv(content) as Record<string, string>
   for (const name of Object.keys(values)) {
     if (!isBootstrapOnly(name)) continue
+    const proxyName = HOME_LAYER_PROXY_NAMES.has(name.toUpperCase())
+    if (isHome && proxyName) continue
+    // A proxy name has a second way out that the other bootstrap names do not, so its message says so.
+    const remedy = proxyName
+      ? `export ${name}, or put it in ${resolve(home, '.env')}, which does not travel with a repository`
+      : `export ${name} instead of putting it in a .env file`
     throw new Error(
       `${binName}: ${path} sets "${name}", which only the launching environment may set`
       + ' (it decides how this process starts, where its code and instructions load from, or how it'
-      + ` reaches the network); export ${name} instead of putting it in a .env file`,
+      + ` reaches the network); ${remedy}`,
     )
   }
   return { path, values }
@@ -175,7 +193,7 @@ function readEnvLayer(
  * @param cwd - the invoking directory whose `.env` is the project layer.
  * @param warn - sink for the one-line misconfiguration diagnostics.
  * @returns this run's frozen environment snapshot.
- * @throws when either file declares a bootstrap-only variable.
+ * @throws when either file declares a bootstrap-only variable, except {@link HOME_LAYER_PROXY_NAMES} in the Harness-home file.
  */
 export function loadLayeredEnv(
   binName: string, cwd: string = process.cwd(),
@@ -184,8 +202,8 @@ export function loadLayeredEnv(
   const home = resolveDshHome()
   const inherited = { ...process.env } as Record<string, string>
   // Parse both layers first: a rejection must not leave one file applied.
-  const project = readEnvLayer(binName, cwd, warn)
-  const user = home === resolve(cwd) ? undefined : readEnvLayer(binName, home, warn)
+  const project = readEnvLayer(binName, cwd, warn, home)
+  const user = home === resolve(cwd) ? undefined : readEnvLayer(binName, home, warn, home)
   // Apply the checked values without replacing a higher-ranked name.
   for (const layer of [project, user]) {
     if (layer === undefined) continue
@@ -216,13 +234,18 @@ export interface UserPatchWatchOptions {
   /** Absolute path of the watched patch file (a profile's `cordis.patch.yml`). */
   filename: string
   /**
+   * Read the watched file's patch list. Defaults to {@link loadOptionalPatches};
+   * a non-patch manifest (a profile `package.json`) supplies its own reader.
+   */
+  load?: (filename: string) => PatchOptions[] | undefined
+  /**
    * Compose the full patch list for a fresh user-layer generation —
    * the same composition the app booted with, so a reload can interleave the
    * new user patches between app-owned layers (bundle layers below,
    * overlays above). Identity when omitted: the user layer
    * is the whole patch list.
    */
-  compose?: (userPatches: PatchOptions[]) => PatchOptions[]
+  compose?: (userPatches: PatchOptions[]) => PatchOptions[] | Promise<PatchOptions[]>
 }
 
 /**
@@ -236,7 +259,12 @@ export async function watchUserPatches(
   ctx: Context,
   options: UserPatchWatchOptions,
 ): Promise<() => Promise<void>> {
-  const { binName, filename, compose = (patches: PatchOptions[]) => patches } = options
+  const {
+    binName,
+    filename,
+    compose = (patches: PatchOptions[]) => patches,
+    load = file => loadOptionalPatches(binName, file),
+  } = options
   const hmr = ctx.get('hmr')
   if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
   const entry = bootstrapIncludes.get(ctx)
@@ -245,8 +273,8 @@ export async function watchUserPatches(
     // Re-read the include's non-patch options per refresh so a writer that
     // updates another option between refreshes is not silently reverted.
     const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
-    const userPatches = loadOptionalPatches(binName, filename) ?? []
-    const patches = compose(userPatches)
+    const userPatches = load(filename) ?? []
+    const patches = await compose(userPatches)
     await entry.update({
       config: {
         ...includeConfig,

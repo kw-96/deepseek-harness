@@ -14,6 +14,7 @@ class FakePty {
   pid = 123
   readonly writes: string[] = []
   readonly kills: string[] = []
+  readonly resizes: Array<[number, number]> = []
   autoExitOnKill = true
   throwKill = false
   onKill?: () => void
@@ -39,6 +40,8 @@ class FakePty {
   }
 
   write(data: string): void { this.writes.push(data) }
+
+  resize(cols: number, rows: number): void { this.resizes.push([cols, rows]) }
 
   kill(signal?: string): void {
     if (this.throwKill) throw new Error('process raced')
@@ -203,6 +206,8 @@ describe('LocalTerminalHandle', () => {
     pty.emitData('hello €')
     await handle.write('input\r')
     expect(pty.writes).toEqual(['input\r'])
+    await handle.resize(120, 40)
+    expect(pty.resizes).toEqual([[120, 40]])
     expect(await handle.inspectForeground()).toEqual({ processGroupId: 456, inputWaiting: true })
     expect(inspector.stdinChecks).toEqual([[456, 123]])
     expect(await handle.signalForeground('SIGINT')).toBe(456)
@@ -229,6 +234,8 @@ describe('LocalTerminalHandle', () => {
     expect(await handle.done).toEqual({ exitCode: 3, signal: null })
     await handle.terminate()
     await expect(handle.write('late')).rejects.toThrow('has exited')
+    await expect(handle.resize(80, 24)).rejects.toThrow('has exited')
+    await expect(handle.resize(0, 24)).rejects.toThrow('positive integer')
   })
 
   it('keeps the shell alive until forced descendants leave', async () => {

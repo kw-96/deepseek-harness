@@ -140,7 +140,10 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     await recordFixture(scaffold!, sessionId, FIXTURE)
   }, 380_000)
 
-  it.skipIf(MODE === 'record')('keeps actions on both completed Goal turn tails', async () => {
+  // The recorded fixture drives the bash tool, which the standard preset
+  // replaces with pwsh on Windows; the golden and persisted replay stay on the
+  // recording platform.
+  it.skipIf(MODE === 'record' || process.platform === 'win32')('keeps actions on both completed Goal turn tails', async () => {
     const fixtureEvents = parseSessionLog(await readFile(FIXTURE, 'utf8'))
     expect(createdObjectives(fixtureEvents)).toEqual([PROMPT])
     expect(goalRounds(fixtureEvents)).toEqual([1, 2])

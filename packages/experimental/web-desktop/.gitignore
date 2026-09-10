@@ -1,0 +1,4 @@
+# Cargo / Tauri build outputs
+src-tauri/target/
+src-tauri/gen/
+node_modules/

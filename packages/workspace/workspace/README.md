@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-workspace` gives a host a persistent set of workspaces: named user directories, each with the sessions that ran in it, kept in a stable order across restarts. With it, a UI can show a sidebar of projects, attach sessions to the right project, hide a session from the grouping without losing it, and remove a project — removal never deletes the folder or the session histories, which become ungrouped. Use it in GUI or host compositions that need durable project grouping; headless and minimal runs can omit it entirely. The package is host-side only: the model, tools, and agent loop never see it, so it adds no tokens, prompts, or request context. It needs a session store and a persistence backend mounted alongside it; setup is a few composition rows.
+`dsh-workspace` gives a host a persistent set of workspaces: named user directories, each with the sessions that ran in it, kept in a stable order across restarts. A durable `projects` tier groups those workspaces under named, multi-root projects, so a sidebar can mirror a Codex-style project / workspace / session hierarchy. A UI can show that hierarchy, attach sessions to the right workspace, hide a session from the grouping without losing it, and remove a project or workspace — removal never deletes the folders or the session histories, which become ungrouped. Use it in GUI or host compositions that need durable grouping; headless and minimal runs can omit it entirely. The package is host-side only: the model, tools, and agent loop never see it, so it adds no tokens, prompts, or request context. It needs a session store and a persistence backend mounted alongside it; setup is a few composition rows.
 
 ## Table of Contents
 
@@ -59,6 +59,21 @@ await project.setTitle('Renamed')
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
 
+### Grouping workspaces under a project
+
+Create a project tier from a display name and an ordered list of directory roots. A workspace belongs to the project whose longest root prefixes its canonical path, so one logical project can own several checkout directories. Projects have their own stable order; rename, re-root, reorder, and delete them without touching the workspaces or sessions underneath:
+
+```text
+// Host consumer code:
+const project = await ctx.workspaceRegistry.createProject('deepseek-harness', ['E:\\KW\\qtGit\\deepseek-harness'])
+await project.setName('deepseek-harness')
+await project.setRoots(['E:\\KW\\qtGit\\deepseek-harness', 'E:\\KW\\qtGit\\97a7\\deepseek-harness'])
+ctx.workspaceRegistry.listProjects() // shows projects in their own durable order
+ctx.workspaceRegistry.projectForPath('E:\\KW\\qtGit\\deepseek-harness') // the owning project
+```
+
+An empty root never matches, and longer roots win ties. Workspaces whose path no root prefixes stay ungrouped.
+
 ### Grouping sessions under a project
 
 A session joins the project of the directory it runs in: create a session in a project's directory and it appears under that project, newest first. A session can only belong to one project. A session whose directory cannot be validated — no recorded directory, or a moved or deleted folder — cannot join and stays ungrouped.
@@ -80,7 +95,7 @@ This section explains the design decisions behind the feature and points at the 
 ### Design philosophy
 
 - **One record per canonical path.** `fs.realpath` is the single uniqueness canon: paths are stored canonicalized, so a symlink to an owned directory collides, and uniqueness is string equality of canonical paths.
-- **Membership is ownership plus a live cwd fact.** The record's ordered `sessionIds` is the ownership truth; the startup header index validates it, and `sessionIds` filters on read while the next mutation prunes durably.
+- **Membership is an explicit account.** The record's ordered `sessionIds` is the ownership truth; it is not filtered by cwd, so a session can be moved across projects. The startup header index still groups history by directory during first bootstrap.
 - **Header-only reads.** Bootstrap and attach validation read `SessionHeader` fields only; event bodies are never loaded.
 - **Two-write mutations with an explicit marker.** Create and delete persist a `pendingMutation` marker before the record/order pair can diverge, so startup completes exactly the interrupted operation and unmarked divergence fails loud as corruption.
 - **Serialized writes.** Registry operations run on one operation chain; entity mutations go through `table.update` on the domain write chain, stamping `updatedAt` and deciding membership at their chain slot.
@@ -95,14 +110,15 @@ The API is one small family with two owners: `WorkspaceRegistry` creates, orders
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `WorkspaceRegistry` service, header index, bootstrap, operation serialization |
 | [`src/entity.ts`](src/entity.ts) | Package-private `Workspace` implementation and its single `mutate` write path |
+| [`src/project.ts`](src/project.ts) | Package-private `Project` implementation and its single `mutate` write path |
 | [`src/spec.ts`](src/spec.ts) | Domain declaration: record schema, registry state, `defineDomain` spec |
-| [`src/types.ts`](src/types.ts) | Public `Workspace` interface and `WorkspaceId` brand |
+| [`src/types.ts`](src/types.ts) | Public `Workspace` and `Project` interfaces with their id brands |
 | [`src/paths.ts`](src/paths.ts) | The `realpath` uniqueness canon |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion: the entity cache mirrors the durable table |
 
 ### Durable shape
 
-The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, and the optional `pendingMutation` marker. Records written before `archivedSessionIds` existed parse with an empty set through the schema default.
+The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId`, a `projects` table keyed by `ProjectId`, plus one global state holding `workspaceIds` (the authoritative display order), `projectIds` (the project tier order), `archivedSessionIds`, and the optional `pendingMutation` marker. Records written before `archivedSessionIds` or `projectIds` existed parse with an empty set through their schema defaults.
 
 ### Lifecycle
 
@@ -158,7 +174,7 @@ Independent of live requests: the package never touches a request prefix, so it 
 These limits define when the project list is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
 - **Removal never deletes data** — removing a project leaves its folder, files, and session histories in place; those sessions become ungrouped, and session deletion or folder removal are separate, absent capabilities ([decision](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)).
-- **A session joins only with a recorded directory** — a session belongs to a project only when its record carries a directory that resolves to the project's path; sessions without one stay ungrouped, and a session from another directory cannot be moved in.
+- **A session joins only by explicit accounting** — moving a session across projects changes only the workspace account, never the session's own cwd; sessions not accounted stay ungrouped.
 - **External changes are seen late** — if another process deletes or damages a directory, the project reflects it only at the next refresh or restart.
 - **Archiving is one-way** — a hidden session keeps its history and its place, but no unarchive action exists yet; the archive set is a durable display filter.
 - **Re-adding a directory starts fresh** — after removal, adding the same directory again creates a new project with an empty session list; the old sessions do not come back automatically.

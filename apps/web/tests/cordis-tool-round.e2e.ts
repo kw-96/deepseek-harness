@@ -63,7 +63,10 @@ function assertCompleteCordisLifecycle(events: readonly SessionEvent[]): void {
   expect(results.every(event => !event.data.message.content[0].isError)).toBe(true)
 }
 
-describe('web e2e: Cordis tools use their owned cards', () => {
+// The system-prompt and tool-schema pins carry the platform-selected shell
+// tool guidance (bash on POSIX, pwsh on Windows), recorded on Linux; replay
+// them on the platform that produced the pin.
+describe.skipIf(process.platform === 'win32')('web e2e: Cordis tools use their owned cards', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page

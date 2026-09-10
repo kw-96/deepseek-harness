@@ -7,27 +7,34 @@
 
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { basename, resolve, sep } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { DomainGlobal, KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
+import { ProjectEntity } from './project.ts'
+import type { ProjectEntityHost } from './project.ts'
 
 export { WorkspaceMoveInvalidError } from './entity.ts'
 import { realpathNormalize } from './paths.ts'
 import { workspaceDomainSpec } from './spec.ts'
-import type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
-import type { Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
+import type { ProjectRecord, WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
+import type { Project, ProjectId as ProjectIdBrand, Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
 
 export type { Workspace } from './types.ts'
+export type { Project } from './types.ts'
 export { workspaceDomainState, workspaceRecord, workspaceDomainSpec } from './spec.ts'
-export type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
+export { projectRecord } from './spec.ts'
+export type { ProjectRecord, WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
 export { realpathNormalize } from './paths.ts'
 
 /** Identifies one workspace record (see `src/types.ts` for the brand rationale). */
 export type WorkspaceId = WorkspaceIdBrand
+
+/** Identifies one project record (see `src/types.ts` for the brand rationale). */
+export type ProjectId = ProjectIdBrand
 
 /**
  * Brand a string as a {@link WorkspaceId}.
@@ -36,6 +43,15 @@ export type WorkspaceId = WorkspaceIdBrand
  */
 export function WorkspaceId(id: string): WorkspaceId {
   return id as WorkspaceId
+}
+
+/**
+ * Brand a string as a {@link ProjectId}.
+ * @param id - Raw project id string.
+ * @returns the same string, branded at compile time.
+ */
+export function ProjectId(id: string): ProjectId {
+  return id as ProjectId
 }
 
 /**
@@ -63,6 +79,17 @@ export class WorkspaceOrderInvalidError extends Error {
   }
 }
 
+/** A project reorder named a source or anchor absent from the durable project order. */
+export class ProjectOrderInvalidError extends Error {
+  /**
+   * @param projectId - Missing source or anchor id.
+   */
+  constructor(readonly projectId: ProjectId) {
+    super(`cannot reorder unknown project '${projectId}'`)
+    this.name = 'ProjectOrderInvalidError'
+  }
+}
+
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -79,6 +106,15 @@ interface BootstrapGroup {
 const sameIds = (left: readonly WorkspaceId[], right: readonly WorkspaceId[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index])
 
+const sameProjectIds = (left: readonly ProjectId[], right: readonly ProjectId[]): boolean =>
+  left.length === right.length && left.every((id, index) => id === right[index])
+
+/** Normalize a directory path for prefix matching, case-folding on Windows. */
+function projectRootKey(path: string): string {
+  const resolved = resolve(path)
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}
+
 const compareHeaders = (left: SessionHeader, right: SessionHeader): number =>
   right.createdAt - left.createdAt || String(left.id).localeCompare(String(right.id))
 
@@ -93,9 +129,11 @@ export class WorkspaceRegistry extends Service {
   static inject = ['storageDomain', 'sessionPersistence']
 
   private table?: KvTable<WorkspaceId, WorkspaceRecord>
+  private projectsTable?: KvTable<ProjectId, ProjectRecord>
   private global?: DomainGlobal<WorkspaceDomainState>
   private state?: WorkspaceDomainState
   private readonly entities = new Map<WorkspaceId, WorkspaceEntity>()
+  private readonly projects = new Map<ProjectId, ProjectEntity>()
   private readonly headers = new Map<SessionId, SessionHeader>()
   private readonly sessionPaths = new Map<SessionId, string>()
   private readonly invalidSessionPaths = new Map<SessionId, string>()
@@ -103,12 +141,11 @@ export class WorkspaceRegistry extends Service {
 
   private readonly host: WorkspaceEntityHost = {
     table: () => this.requireTable(),
-    sessionPath: id => this.sessionPaths.get(id),
     readSessionHeader: id => this.readSessionHeader(id),
-    rememberSessionPath: (id, path) => {
-      this.sessionPaths.set(id, path)
-      this.invalidSessionPaths.delete(id)
-    },
+  }
+
+  private readonly projectHost: ProjectEntityHost = {
+    table: () => this.requireProjectsTable(),
   }
 
   constructor(ctx: Context) {
@@ -120,23 +157,24 @@ export class WorkspaceRegistry extends Service {
     const domain = await this.ctx.storageDomain.open(workspaceDomainSpec)
     this.ctx.effect(() => () => domain.close(), 'workspace.domainClose')
     this.table = domain.table('workspaces')
+    this.projectsTable = domain.table('projects')
     this.global = domain.global
     this.state = domain.global.get()
 
     await this.recoverPendingMutation()
     this.validateStoredState(this.state)
     if (!this.state.initialized) {
-      const headers = await this.ctx.sessionPersistence.list()
+      const headers = await this.listStoredHeaders()
       await this.replaceHeaderIndex(headers)
       await this.bootstrap(headers)
     } else if (this.table.size > 0) {
-      await this.replaceHeaderIndex(await this.ctx.sessionPersistence.list())
+      await this.replaceHeaderIndex(await this.listStoredHeaders())
     }
 
     await this.indexLiveSessions()
     this.validateStoredState(this.requireState())
     this.rebuildEntities()
-    this.reportFilteredCandidates()
+    await this.rebuildProjects()
   }
 
   /**
@@ -185,6 +223,125 @@ export class WorkspaceRegistry extends Service {
         throw new Error(`workspace registry order references missing workspace '${id}'`)
       }
       return entity
+    })
+  }
+
+  /**
+   * Create a project grouping over ordered directory roots.
+   * @param name - Display tier name.
+   * @param roots - Ordered directory roots whose prefix matches workspaces.
+   * @returns the newly durable project.
+   */
+  createProject(name: string, roots: readonly string[] = []): Promise<Project> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      const table = this.requireProjectsTable()
+      const id = ProjectId(randomUUID())
+      const now = new Date().toISOString()
+      const record: ProjectRecord = { name, roots: [...roots], createdAt: now, updatedAt: now }
+      await table.put(id, record)
+      try {
+        await this.setState({ ...state, projectIds: [id, ...state.projectIds] })
+      } catch (error) {
+        await table.delete(id)
+        throw error
+      }
+      const entity = new ProjectEntity(this.projectHost, id, record)
+      this.projects.set(id, entity)
+      return entity
+    })
+  }
+
+  /**
+   * Look up a project by id.
+   * @param id - Project id.
+   * @returns the project, or `undefined` when unknown.
+   */
+  getProject(id: ProjectId): Project | undefined {
+    return this.projects.get(id)
+  }
+
+  /**
+   * Synchronous project projection in durable registry order.
+   * @returns a fresh ordered array of project entities.
+   */
+  listProjects(): Project[] {
+    return this.requireState().projectIds.map((id) => {
+      const entity = this.projects.get(id)
+      if (entity === undefined) {
+        throw new Error(`workspace registry order references missing project '${id}'`)
+      }
+      return entity
+    })
+  }
+
+  /**
+   * Resolve the project owning one canonical directory path by longest root
+   * prefix; the empty root never matches, and longer roots win ties.
+   * @param path - Canonical directory path to classify.
+   * @returns the owning project, or `undefined` when no root prefixes it.
+   */
+  projectForPath(path: string): Project | undefined {
+    const key = projectRootKey(path)
+    let best: ProjectEntity | undefined
+    let bestLength = 0
+    for (const entity of this.projects.values()) {
+      for (const root of entity.roots) {
+        const rootKey = projectRootKey(root)
+        if (key !== rootKey && !key.startsWith(rootKey + sep)) continue
+        if (rootKey.length < bestLength) continue
+        best = entity
+        bestLength = rootKey.length
+      }
+    }
+    return best
+  }
+
+  /**
+   * Delete one project registration; its directory roots and workspaces are
+   * retained. The durable order is updated before the table deletion; a
+   * failed table write restores the prior order. Unknown ids are an idempotent
+   * no-op.
+   * @param id - Project to remove.
+   * @returns `true` when a record was deleted, `false` when it was unknown.
+   */
+  deleteProject(id: ProjectId): Promise<boolean> {
+    return this.enqueueOperation(async () => {
+      if (!this.projects.has(id)) return false
+      const state = this.requireState()
+      const nextIds = state.projectIds.filter(projectId => projectId !== id)
+      await this.setState({ ...state, projectIds: nextIds })
+      try {
+        await this.requireProjectsTable().delete(id)
+      } catch (error) {
+        await this.setState({ ...this.requireState(), projectIds: state.projectIds })
+        throw error
+      }
+      this.projects.delete(id)
+      return true
+    })
+  }
+
+  /**
+   * Move one project within the durable display order, DOM-insertBefore-like.
+   * @param id - The project to move.
+   * @param beforeId - Project to insert before; omitted appends.
+   * @returns the complete committed project order.
+   */
+  insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      if (!state.projectIds.includes(id)) throw new ProjectOrderInvalidError(id)
+      if (beforeId !== undefined && !state.projectIds.includes(beforeId)) {
+        throw new ProjectOrderInvalidError(beforeId)
+      }
+      if (beforeId === id) return state.projectIds
+      const without = state.projectIds.filter(projectId => projectId !== id)
+      const at = beforeId === undefined ? without.length : without.indexOf(beforeId)
+      const projectIds = [...without.slice(0, at), id, ...without.slice(at)]
+      if (sameProjectIds(projectIds, state.projectIds)) return state.projectIds
+      await this.setState({ ...state, projectIds })
+      return projectIds
     })
   }
 
@@ -263,7 +420,7 @@ export class WorkspaceRegistry extends Service {
   private async sessionKnown(id: SessionId): Promise<boolean> {
     if (this.ctx.get('sessions')?.get(id) !== undefined) return true
     if (this.headers.has(id)) return true
-    await this.indexHeaders(await this.ctx.sessionPersistence.list())
+    await this.indexHeaders(await this.listStoredHeaders())
     return this.headers.has(id)
   }
 
@@ -330,6 +487,7 @@ export class WorkspaceRegistry extends Service {
       await this.setState({
         initialized: true,
         workspaceIds: [id, ...state.workspaceIds],
+        projectIds: state.projectIds,
         archivedSessionIds: state.archivedSessionIds,
       })
     } catch (error) {
@@ -362,6 +520,7 @@ export class WorkspaceRegistry extends Service {
     const nextState = {
       initialized: true,
       workspaceIds: state.workspaceIds.filter(workspaceId => workspaceId !== id),
+      projectIds: state.projectIds,
       archivedSessionIds: state.archivedSessionIds,
     }
     await this.setState({
@@ -419,6 +578,7 @@ export class WorkspaceRegistry extends Service {
     await this.setState({
       initialized: state.initialized,
       workspaceIds: state.workspaceIds,
+      projectIds: state.projectIds,
       archivedSessionIds: state.archivedSessionIds,
     })
   }
@@ -502,9 +662,9 @@ export class WorkspaceRegistry extends Service {
       .map(([id]) => id)
 
     if (!sameIds(state.workspaceIds, workspaceIds)) {
-      await this.setState({ initialized: false, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+      await this.setState({ initialized: false, workspaceIds, projectIds: state.projectIds, archivedSessionIds: state.archivedSessionIds })
     }
-    await this.setState({ initialized: true, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+    await this.setState({ initialized: true, workspaceIds, projectIds: state.projectIds, archivedSessionIds: state.archivedSessionIds })
   }
 
   private validateStoredState(state: WorkspaceDomainState): void {
@@ -558,6 +718,21 @@ export class WorkspaceRegistry extends Service {
     }
   }
 
+  /** Rebuild project entities and prune any order entry whose record is missing. */
+  private async rebuildProjects(): Promise<void> {
+    this.projects.clear()
+    const state = this.requireState()
+    const table = this.requireProjectsTable()
+    const ids = state.projectIds.filter(id => table.get(id) !== undefined)
+    if (ids.length !== state.projectIds.length) {
+      await this.setState({ ...state, projectIds: ids })
+    }
+    for (const id of ids) {
+      const record = table.get(id) as ProjectRecord
+      this.projects.set(id, new ProjectEntity(this.projectHost, id, record))
+    }
+  }
+
   private async replaceHeaderIndex(headers: readonly SessionHeader[]): Promise<void> {
     this.headers.clear()
     this.sessionPaths.clear()
@@ -589,27 +764,16 @@ export class WorkspaceRegistry extends Service {
     }
   }
 
+  /** Every stored session's header, projected from the persistence snapshot listing. */
+  private async listStoredHeaders(): Promise<SessionHeader[]> {
+    const snapshots = await this.ctx.sessionPersistence.list()
+    return snapshots.map(snapshot => snapshot.header)
+  }
+
   private async indexLiveSessions(): Promise<void> {
     const sessions = this.ctx.get('sessions')
     if (sessions === undefined) return
     await this.indexHeaders(sessions.list().map(session => session.header))
-  }
-
-  private reportFilteredCandidates(): void {
-    for (const entity of this.entities.values()) {
-      const record = this.requireTable().get(entity.id) as WorkspaceRecord
-      for (const sessionId of record.sessionIds) {
-        const path = this.sessionPaths.get(sessionId)
-        if (path === record.path) continue
-        const reason = this.invalidSessionPaths.get(sessionId)
-          ?? (this.headers.has(sessionId)
-            ? `canonical cwd '${path}' differs from workspace path '${record.path}'`
-            : 'session header is missing')
-        this.ctx.logger.warn(
-          `workspace '${entity.id}' filtered session '${sessionId}' from membership: ${reason}`,
-        )
-      }
-    }
   }
 
   private async readSessionHeader(id: SessionId): Promise<SessionHeader> {
@@ -621,7 +785,7 @@ export class WorkspaceRegistry extends Service {
     const cached = this.headers.get(id)
     if (cached !== undefined) return cached
 
-    const headers = await this.ctx.sessionPersistence.list()
+    const headers = await this.listStoredHeaders()
     await this.indexHeaders(headers)
     const header = this.headers.get(id)
     if (header === undefined) {
@@ -633,6 +797,11 @@ export class WorkspaceRegistry extends Service {
   private requireTable(): KvTable<WorkspaceId, WorkspaceRecord> {
     if (this.table === undefined) throw new Error('workspace registry is not started yet')
     return this.table
+  }
+
+  private requireProjectsTable(): KvTable<ProjectId, ProjectRecord> {
+    if (this.projectsTable === undefined) throw new Error('workspace registry is not started yet')
+    return this.projectsTable
   }
 
   private requireState(): WorkspaceDomainState {

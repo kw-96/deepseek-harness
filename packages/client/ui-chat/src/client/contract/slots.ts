@@ -77,6 +77,13 @@ export interface ChatNodeOwnerProps {
   openFile: (path: string) => void
   inspectCall: (callId: ToolCallId) => void
   forkAt: (seq: number) => void
+  /**
+   * Session-authorized image loader, down-threaded from the Chat view so a
+   * chat-node renderer can render the attachment presentation slot directly
+   * with only the durable references plus this loader, instead of receiving a
+   * rendering closure.
+   */
+  loadImage: MessageImageLoader
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process state when this Node belongs to a projected Turn. */
@@ -89,6 +96,11 @@ export interface TurnProcessOwnerProps {
   readonly foldable: boolean
   readonly open: boolean
   setOpen(open: boolean): void
+  /** Whether the Turn still runs and this disclosure folds settled calls. */
+  readonly streamingFold?: boolean
+  /** Settled-call counts the disclosure shows while streaming. */
+  readonly foldedToolCalls?: number
+  readonly foldedSubagents?: number
 }
 
 /** Full props of one keyed Chat renderer. */

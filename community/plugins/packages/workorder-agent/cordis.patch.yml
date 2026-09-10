@@ -1,0 +1,28 @@
+# workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host。
+# 配置以前端为主：首次启动时 /workorder-agent 显示引导页，保存后写入
+# Harness 的 workorder-agent 设置命名空间并热加载控制面。
+# 环境变量仅在存在时作为首次默认值回退。
+- insert:
+    - id: workorder-agent-host
+      name: 'workorder-agent'
+      inject: [webServer, agents, skills]
+      config:
+        enabled: true
+        dataDir: !!js process.env.DATA_DIR?.trim() || ''
+        adminToken: !!js process.env.ADMIN_TOKEN?.trim() || ''
+        webhookToken: !!js process.env.WEBHOOK_TOKEN?.trim() || ''
+        gcpUserKey: !!js process.env.GCP_USER_KEY?.trim() || ''
+        gcpUrl: !!js process.env.GCP_MCP_URL?.trim() || 'https://mcp.netease.com/servers/gcp/mcp'
+        gcpHost: !!js process.env.GCP_HOST?.trim() || 'promoteart.pm.netease.com'
+        popoWebhookUrl: !!js process.env.POPO_WEBHOOK_URL?.trim() || ''
+        popoWebhookSecret: !!js process.env.POPO_WEBHOOK_SECRET?.trim() || ''
+        completedStatusId: !!js Number(process.env.GCP_COMPLETED_STATUS_ID) || 6
+        projectIdChannelArt: !!js Number(process.env.PROJECT_ID_CHANNEL_ART) || 7
+        projectIdReturnBusiness: !!js Number(process.env.PROJECT_ID_RETURN_BUSINESS) || 2001
+        projectIdAiOperations: !!js Number(process.env.PROJECT_ID_AI_OPERATIONS) || 2004
+        reviewEnabled: !!js process.env.REVIEW_ENABLED !== 'false'
+        reviewProvider: !!js process.env.REVIEW_MODEL_PROVIDER?.trim() || ''
+        reviewModel: !!js process.env.REVIEW_MODEL?.trim() || ''
+        reviewMaxTokens: !!js Number(process.env.REVIEW_MAX_TOKENS) || 800
+        reviewKnowledgeBase: ''
+        reviewNotificationEnabled: !!js process.env.REVIEW_NOTIFICATION_ENABLED !== 'false'

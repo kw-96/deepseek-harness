@@ -48,6 +48,20 @@ export interface TerminalSpawnRequest {
   name?: string
   /** Optional initial working directory interpreted by the backend. */
   cwd?: string
+  /**
+   * Interaction mode. Defaults to `line` for model tools (controlled prompt,
+   * sanitized scrollback). `interactive` is the Web UI bypass (xterm-capable TERM, resizable).
+   */
+  interaction?: 'line' | 'interactive'
+  /** Initial columns for interactive spawns; backends own defaults when omitted. */
+  cols?: number
+  /** Initial rows for interactive spawns; backends own defaults when omitted. */
+  rows?: number
+  /**
+   * Optional per-session shell dialect for backends that support more than one
+   * (bash | pwsh). When omitted, the backend plugin Config dialect applies.
+   */
+  shellDialect?: 'bash' | 'pwsh'
 }
 
 /** Fully identified request handed from the registry to a backend. */
@@ -144,6 +158,14 @@ export interface TerminalSessionSnapshot {
   status: TerminalSessionStatus
 }
 
+/** One raw-output frame for UI followers (CSI preserved). */
+export interface TerminalFollowFrame {
+  /** Monotonic sequence within the session follow feed. */
+  readonly seq: number
+  /** Decoded PTY text for this frame. */
+  readonly chunk: string
+}
+
 /** Backend-owned live session retained by {@link TerminalSessionService}. */
 export interface TerminalBackendSession {
   /** Initial bounded terminal output returned from `terminal_open`. */
@@ -158,6 +180,24 @@ export interface TerminalBackendSession {
   signal(signal: TerminalSignal): Promise<TerminalSignalResult>
   /** Observe top-level process status. */
   status(): TerminalSessionStatus
+  /**
+   * Write raw text to the PTY without Enter or send exclusivity.
+   * Must fail loud while a {@link startSend} is active.
+   * @param data - UTF-8 text delivered without implicit newline conversion.
+   */
+  write(data: string): Promise<void>
+  /**
+   * Resize the live PTY window.
+   * @param cols - positive column count.
+   * @param rows - positive row count.
+   */
+  resize(cols: number, rows: number): Promise<void>
+  /**
+   * Subscribe to decoded PTY output with CSI preserved for UI rendering.
+   * @param signal - cancels the subscription.
+   * @returns frames in delivery order, including a bounded recent raw buffer first.
+   */
+  followOutput(signal: AbortSignal): AsyncIterable<TerminalFollowFrame>
   /** Idempotently close the captured owned process tree and await quiescence. */
   close(reason: string): Promise<void>
 }

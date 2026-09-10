@@ -75,7 +75,9 @@ afterEach(async () => {
   scaffold = undefined
 })
 
-it('assembles the shipped Web transport, catalog, guidance, and defaults', async () => {
+// The catalog asserts the bash tool, which the shipped presets mount only on
+// POSIX (Windows composes pwsh instead), so this test is Linux/macOS-only.
+it.skipIf(process.platform === 'win32')('assembles the shipped Web transport, catalog, guidance, and defaults', async () => {
   scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
   const ctx = scaffold.ctx
   const index = await fetch(`http://127.0.0.1:${String(ctx.webServer.port)}`, {
@@ -209,7 +211,9 @@ it('ships PTC with run_code but without the general workflow SDK binding', async
   }
 }, 120_000)
 
-it('lets a preset producer reach the background-job registry', async () => {
+// The producer probe executes the bash tool, which the shipped presets mount
+// only on POSIX (Windows composes pwsh instead), so this test is Linux/macOS-only.
+it.skipIf(process.platform === 'win32')('lets a preset producer reach the background-job registry', async () => {
   scaffold = await launchWebScaffold()
   const ctx = scaffold.ctx
   const handle = await ctx.agents.create({

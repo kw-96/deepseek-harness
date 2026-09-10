@@ -22,7 +22,7 @@ The session group makes an agent's conversation durable and reusable outside the
 <a id="packages"></a>
 ## Packages
 
-The group splits into four families: durable storage (persistence seam, backends, checkpoint policy), projections, titles, and telemetry. Each package README owns its contract and configuration.
+The group splits into five families: durable storage (persistence seam, backends, checkpoint policy), imports, projections, titles, and telemetry. Each package README owns its contract and configuration.
 
 ### Persistence
 
@@ -32,6 +32,12 @@ The group splits into four families: durable storage (persistence seam, backends
 | [`session-persistence-jsonl/`](session-persistence-jsonl/README.md) | Shipped backend: one append-only JSONL log per session, optionally Zstandard-compressed | registers on `ctx.sessionPersistence` |
 | [`session-checkpoint-policy/`](session-checkpoint-policy/README.md) | Makes model requests, top-level tool side effects, and completed steps durable before the next action | wraps `ctx.llm` and `ctx.tools` |
 | [`session-log-deepseek/`](session-log-deepseek/README.md) | Uploads the incremental canonical log as optional official DeepSeek request metadata | contributes `dsh_session_log` |
+
+### Imports
+
+| Package | Role | ctx key |
+|---|---|---|
+| [`session-import-codex/`](session-import-codex/README.md) | Imports local Codex threads as durable, listed DSH sessions on host start | registers on `ctx.sessions` + `ctx.sessionPersistence` |
 
 ### Projection
 

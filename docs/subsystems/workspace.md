@@ -123,7 +123,7 @@ Sessions get their cwd at create time from whoever creates them, not from this r
 
 ## Consumers
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD and Session membership (`attachSession` / `detachSession` / `insertSessionBefore`) to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -226,6 +226,20 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('insertSessionBefore') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>
 
 /**
+ * Account one Session whose stored cwd matches the Workspace path.
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('attachSession') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>
+
+/**
+ * Remove one Session from a Workspace account (Ungrouped).
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('detachSession') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>
+
+/**
  * Hide one known Session from Workspace grouping surfaces.
  * @param request - Session identity to archive.
  * @returns the complete resulting archive set.
@@ -276,6 +290,53 @@ get(id: WorkspaceId): Workspace | undefined
  * @returns a fresh ordered array of workspace entities.
  */
 list(): Workspace[]
+
+/**
+ * Create a project grouping over ordered directory roots.
+ * @param name - Display tier name.
+ * @param roots - Ordered directory roots whose prefix matches workspaces.
+ * @returns the newly durable project.
+ */
+createProject(name: string, roots: readonly string[] = []): Promise<Project>
+
+/**
+ * Look up a project by id.
+ * @param id - Project id.
+ * @returns the project, or `undefined` when unknown.
+ */
+getProject(id: ProjectId): Project | undefined
+
+/**
+ * Synchronous project projection in durable registry order.
+ * @returns a fresh ordered array of project entities.
+ */
+listProjects(): Project[]
+
+/**
+ * Resolve the project owning one canonical directory path by longest root
+ * prefix; the empty root never matches, and longer roots win ties.
+ * @param path - Canonical directory path to classify.
+ * @returns the owning project, or `undefined` when no root prefixes it.
+ */
+projectForPath(path: string): Project | undefined
+
+/**
+ * Delete one project registration; its directory roots and workspaces are
+ * retained. The durable order is updated before the table deletion; a
+ * failed table write restores the prior order. Unknown ids are an idempotent
+ * no-op.
+ * @param id - Project to remove.
+ * @returns `true` when a record was deleted, `false` when it was unknown.
+ */
+deleteProject(id: ProjectId): Promise<boolean>
+
+/**
+ * Move one project within the durable display order, DOM-insertBefore-like.
+ * @param id - The project to move.
+ * @param beforeId - Project to insert before; omitted appends.
+ * @returns the complete committed project order.
+ */
+insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>
 
 /**
  * Delete one workspace registration while retaining its directory and every

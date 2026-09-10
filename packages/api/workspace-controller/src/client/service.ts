@@ -74,6 +74,27 @@ export interface IWorkspaces {
     sessionId: SessionId,
     beforeSessionId?: SessionId,
   ): Promise<WorkspaceView>
+  /**
+   * Account a Session whose stored cwd matches the Workspace path.
+   * @param workspaceId - target Workspace.
+   * @param sessionId - Session to attach.
+   * @returns the changed Workspace.
+   */
+  attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>
+  /**
+   * Move a Session into a target Workspace, detaching its current owner.
+   * @param workspaceId - target Workspace.
+   * @param sessionId - Session to move.
+   * @returns the changed target Workspace.
+   */
+  moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>
+  /**
+   * Remove a Session from a Workspace account (Ungrouped).
+   * @param workspaceId - owning Workspace.
+   * @param sessionId - Session to detach.
+   * @returns the changed Workspace.
+   */
+  detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>
 }
 
 /** Owns the bare Workspace snapshot and Workspace-only commands. */
@@ -123,6 +144,30 @@ export class WorkspaceController extends Service implements IWorkspaces {
   ): Promise<WorkspaceView> {
     const result = await this.model.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     if (!result.ok) throw commandError('move', result.error)
+    return result.value.workspace
+  }
+
+  async attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    const result = await this.model.attachSession(workspaceId, sessionId)
+    if (!result.ok) throw commandError('attach', result.error)
+    return result.value.workspace
+  }
+
+  async moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    const owner = this.model.getSnapshot().items.find(workspace =>
+      workspace.sessionIds.includes(sessionId))
+    if (owner !== undefined && owner.workspaceId !== workspaceId) {
+      const detached = await this.model.detachSession(owner.workspaceId, sessionId)
+      if (!detached.ok) throw commandError('move session detach', detached.error)
+    }
+    const attached = await this.model.attachSession(workspaceId, sessionId)
+    if (!attached.ok) throw commandError('move session attach', attached.error)
+    return attached.value.workspace
+  }
+
+  async detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView> {
+    const result = await this.model.detachSession(workspaceId, sessionId)
+    if (!result.ok) throw commandError('detach', result.error)
     return result.value.workspace
   }
 }

@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Hmr from '@deepseek-ai/cordis-plugin-hmr'
 import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -447,6 +447,30 @@ describe('boot with user patches', () => {
       await expect(watchUserPatches(ctx, { binName: NAME, filename })).rejects.toThrow('already registered')
       await dispose()
     } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('uses a custom load reader for non-patch manifests', { timeout: 20_000 }, async () => {
+    const dir = tmp()
+    const filename = join(dir, 'package.json')
+    const basePatches = [{ id: 'noop', config: { value: 'generated' } }]
+    const ctx = await boot(NAME, writeTree(dir), basePatches)
+    await ctx.plugin(Timer)
+    await ctx.plugin(Hmr, { root: [], ignored: [], debounce: 0 })
+    const read = vi.fn(() => [{ id: 'noop', config: { value: 'live' } }])
+    const dispose = await watchUserPatches(ctx, {
+      binName: NAME,
+      filename,
+      load: read,
+      compose: userPatches => [...basePatches, ...userPatches],
+    })
+    try {
+      writeFileSync(filename, '{ "dsh": { "profile": { "bundles": [] } } }\n')
+      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'live', 'custom load was not applied')
+      expect(read).toHaveBeenCalled()
+    } finally {
+      await dispose()
       await ctx.fiber.dispose()
     }
   })

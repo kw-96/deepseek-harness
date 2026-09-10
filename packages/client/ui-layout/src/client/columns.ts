@@ -37,6 +37,12 @@ export const DETAILS_MIN = 300
 export const DETAILS_MAX = 520
 /** Details width before any user drag. */
 export const DETAILS_DEFAULT = 360
+/** 底部面板拖拽高度下限。 */
+export const BOTTOM_MIN = 180
+/** 底部面板拖拽高度上限。 */
+export const BOTTOM_MAX = 560
+/** 底部面板首次打开的高度。 */
+export const BOTTOM_DEFAULT = 280
 
 /**
  * Clamp a panel width into its contract range.

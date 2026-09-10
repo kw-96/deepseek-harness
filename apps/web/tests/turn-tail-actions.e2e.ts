@@ -38,7 +38,9 @@ const MODE = webSnapshotMode()
 const NARRATION = 'Reading the workspace now.'
 const PROMPT = `Begin your reply with the plain sentence "${NARRATION}" as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop.`
 
-describe('web e2e: assistant IconActions wait for the turn to end', () => {
+// The fixture's tool rows are bash calls, which the shipped presets mount only
+// on POSIX (Windows composes pwsh instead), so this suite is Linux/macOS-only.
+describe.skipIf(process.platform === 'win32')('web e2e: assistant IconActions wait for the turn to end', () => {
   let scaffold: WebScaffold | undefined
   let browser: Browser | undefined
   let page: Page
