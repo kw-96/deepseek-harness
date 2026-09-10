@@ -3,6 +3,7 @@ import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationLocationDataStore, ConversationTurnDataMap } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
+import { hasAssistantReplyContent } from '../contract/assistant-content.ts'
 import { TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
 import { storedTurnProcessEntry } from '../stores.ts'
 import { useSearchableHidden } from './searchable-hidden.ts'
@@ -12,7 +13,6 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
   readonly useChatNode: ChatViewSlotProps['useChatNode']
   readonly useChatNodeProcess: ChatViewSlotProps['useChatNodeProcess']
-  readonly historyIncomplete: boolean
   readonly compactTranscript: boolean
   readonly useStore: ChatViewSlotProps['useStore']
   readonly actions: ChatViewSlotProps['actions']
@@ -36,8 +36,8 @@ function turnOf(node: ChatNode | undefined): number | undefined {
 
 /** Subscribe, apply Turn-process visibility, and dispatch one stable Context key. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
-  cwd, openFile, inspectCall, forkAt,
+  nodeKey, useChatNode, useChatNodeProcess, compactTranscript,
+  selectedCallId, cwd, openFile, inspectCall, forkAt,
   loadImage, renderMessageImages, fileMentions, useStore, actions, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useChatNode(nodeKey)
@@ -47,30 +47,52 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const processSpec = processPresentation?.spec
   const storedEntry = useStore(state => processSpec === undefined
     ? undefined
-    : storedTurnProcessEntry(state, processSpec.turn))
+    : storedTurnProcessEntry(state, processSpec.turn, processSpec.answerStep))
   const processEntry = processSpec !== undefined
-    && processSpec.answerStep !== null
-    && storedEntry?.answerStep === processSpec.answerStep
+    && storedEntry !== undefined
+    && storedEntry.answerStep === processSpec.answerStep
     ? storedEntry
     : undefined
   const processOpen = processEntry !== undefined
   const setOpen = useCallback((open: boolean) => {
-    if (processSpec !== undefined && processSpec.answerStep !== null) {
+    if (processSpec !== undefined) {
       actions.setTurnProcessOpen(processSpec.turn, processSpec.answerStep, open)
     }
   }, [actions, processSpec])
+  // The window needs a fold boundary: the finalized answer when the Turn
+  // settled with one, or the streaming boundary while the Turn lacks an
+  // answer — running, or closed by interruption.
   const processWindowReady = processSpec !== undefined
     && processPresentation !== undefined
     && compactTranscript
-    && processSpec.answerAnchorSeq !== null
     && processPresentation.turn === processSpec.turn
-    && processPresentation.turnClosed
-    && !historyIncomplete
+    && (processSpec.answerAnchorSeq !== null || processPresentation.streamFoldEnd !== null)
+  const foldEndSeq = processWindowReady
+    ? (processSpec.answerAnchorSeq ?? processPresentation.streamFoldEnd)
+    : null
+  const streamingFold = processWindowReady && processSpec.answerAnchorSeq === null
+  // Streaming folds by member kind, not by position: settled Tool rows,
+  // reasoning-only Assistant rows, and any other process member (context
+  // injection, …) collapse regardless of where they sit relative to the
+  // message boundary. Contentful Assistant messages, the running call tree,
+  // and live model retries stay visible. The answered Turn keeps its
+  // answer-boundary fold across every process member.
+  const settledTool = routedNode !== undefined
+    && routedNode.kind === 'tool-call'
+    && 'kind' in routedNode.data.root
   const processMember = routedNode !== undefined
     && processWindowReady
+    && foldEndSeq !== null
     && !TURN_PROCESS_INDEPENDENT_KINDS.has(routedNode.kind)
+    && (streamingFold
+      ? settledTool
+        || (routedNode.kind === 'assistant-step'
+          && !hasAssistantReplyContent(routedNode.data.blocks))
+        || (routedNode.kind !== 'tool-call'
+          && routedNode.kind !== 'assistant-step'
+          && routedNode.kind !== 'model-retry')
+      : routedNode.anchorSeq < foldEndSeq)
     && routedNode.anchorSeq >= processSpec.processStartSeq
-    && routedNode.anchorSeq < processSpec.answerAnchorSeq
   const processAnswer = routedNode !== undefined
     && processWindowReady
     && routedNode.kind === 'assistant-step'
@@ -78,7 +100,9 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const ownsDisclosure = routedNode?.kind === 'turn-process' || processAnswer
   const foldable = processWindowReady
     && (processMember || (ownsDisclosure
-      && (processPresentation.hasExternalProcess || processSpec.inlineReasoning)))
+      && (processPresentation.hasExternalProcess
+        || processSpec.inlineReasoning
+        || streamingFold)))
   const turnProcess = useMemo(() => processSpec === undefined
     ? undefined
     : {
@@ -86,8 +110,12 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       foldable,
       open: processOpen,
       setOpen,
+      streamingFold,
+      foldedToolCalls: processPresentation?.foldedToolCalls ?? 0,
+      foldedSubagents: processPresentation?.foldedSubagents ?? 0,
     }, [
-    foldable, processOpen, processSpec, setOpen,
+    foldable, processOpen, processSpec, setOpen, streamingFold,
+    processPresentation?.foldedToolCalls, processPresentation?.foldedSubagents,
   ])
   const controllerInactive = routedNode?.kind === 'turn-process'
     && !foldable
@@ -103,6 +131,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const owner = useMemo<ChatNodeOwnerProps | null>(() => node === undefined
     ? null
     : {
+      selectedCallId,
       cwd,
       openFile,
       inspectCall,
@@ -112,7 +141,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       fileMentions,
       turnProcess,
     }, [
-    node, cwd, openFile, inspectCall, forkAt,
+    node, selectedCallId, cwd, openFile, inspectCall, forkAt,
     loadImage, renderMessageImages, fileMentions, turnProcess,
   ])
   if (routedNode === undefined || owner === null) return null

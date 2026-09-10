@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
+import { useSyncExternalStore } from 'react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DocumentTitle } from '../src/client/DocumentTitle.tsx'
@@ -13,6 +13,17 @@ beforeEach(() => { originalTitle = document.title })
 afterEach(() => {
   try { cleanup() } finally { document.title = originalTitle }
 })
+
+/**
+ * Test-local selector hook over a framework-neutral snapshot source（与
+ * app-frame spec 的 hookOf 同构）。测试运行时的公共包当前引用了尚未修复的
+ * ui-chat 模块链，故不经过 test-runtime 的 bindSnapshotSelector。
+ */
+function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapshot: () => T }) {
+  return function useSelector<S>(sel: (s: T) => S): S {
+    return sel(useSyncExternalStore(inst.subscribe, inst.getSnapshot))
+  }
+}
 
 function titleSources() {
   const sessionId = 'session-title' as SessionId
@@ -28,7 +39,7 @@ function titleSources() {
   const panelInfo = createSnapshotStore<PanelInfo>({ activePanelId: null })
   return {
     sessionId, sessions, panelInfo,
-    props: { useSessions: bindSnapshotSelector(sessions), usePanelInfo: bindSnapshotSelector(panelInfo) },
+    props: { useSessions: hookOf(sessions), usePanelInfo: hookOf(panelInfo) },
   }
 }
 

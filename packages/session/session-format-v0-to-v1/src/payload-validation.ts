@@ -25,7 +25,7 @@ export function assertReleasedPayloadSemantics(event: SessionFormatEvent, versio
       countValue(data['start'], `${label} start`)
       if (data['removedCount'] !== undefined) countValue(data['removedCount'], `${label} removedCount`)
       arrayValue(data['inserted'], `${label} inserted`, (value) => {
-        messageValue(value, `${label} inserted message`, version, 'user')
+        inboxInsertedMessageValue(value, `${label} inserted message`, version)
       })
       if (data['outcome'] !== undefined) literalValue(data['outcome'], ['canceled'], `${label} outcome`)
       return
@@ -508,6 +508,24 @@ function messageValue(
   }
 }
 
+/**
+ * 本地定制(dev fork)：0.1.2 时代 dsh-ocr-local 等插件写入 inbox 的插入
+ * 消息可能没有 `id`；官方 v0 校验要求 id。为让存量会话可迁移，此处放宽
+ * 为 id 可选（其余字段照常校验）。
+ */
+function inboxInsertedMessageValue(value: SessionFormatJsonValue | undefined, label: string, version: number): void {
+  const message = exactRecord(value, label, ['role', 'content', 'source'], ['id'])
+  if (message['id'] !== undefined) nonEmptyString(message['id'], `${label} id`)
+  literalValue(message['role'], ['user'], `${label} role`)
+  contentBlocksValue(message['content'], `${label} content`, version)
+  const source = releasedV0Record(message['source'], `${label} source`)
+  if (version < 2 && source['kind'] === 'goal' && source['change'] !== undefined) {
+    legacyGoalMessageValue(message, source, label)
+  } else {
+    messageSourceValue(source, `${label} source`, version, 'user')
+  }
+}
+
 function legacyGoalMessageValue(message: JsonRecord, source: JsonRecord, label: string): void {
   assertReleasedV0Keys(source, ['kind', 'goalId', 'revision', 'round', 'change'], [], `${label} source`)
   nonEmptyString(source['goalId'], `${label} source goalId`)
@@ -651,7 +669,10 @@ function pluginSourceValue(source: JsonRecord, label: string): void {
     throw new SessionFormatError(`${label} sections require snapshot form`)
   }
   if (form === 'notice') stringValue(source['summary'], `${label} summary`)
-  else if (source['summary'] !== undefined) throw new SessionFormatError(`${label} summary requires notice form`)
+  // 本地定制(dev fork)：0.1.2 时代 dsh-mnemon 插件写入的 user/message 携带
+  // form='instructions' 与 summary 并存；官方 v0 校验拒绝该组合。为让存量
+  // 会话可迁移，接受 summary 与任意 form 并存（summary 仅作提示文本）。
+  else if (source['summary'] !== undefined) stringValue(source['summary'], `${label} summary`)
 }
 
 function sessionReferenceSourceValue(source: JsonRecord, label: string, version: number): void {

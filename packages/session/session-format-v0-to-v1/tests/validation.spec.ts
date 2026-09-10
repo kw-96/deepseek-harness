@@ -688,10 +688,9 @@ describe('released event and payload inventory', () => {
           }],
         },
       }],
-      ['user/message', {
-        ...userMessage,
-        source: { kind: 'plugin', plugin: 'x', form: 'snapshot', sections: [], summary: 'x' },
-      }],
+      // 本地定制(dev fork)：旧插件写入的 plugin source 允许 summary 与任意
+      // form 并存，故 form='snapshot'+summary 不再作为无效分支（见
+      // payload-validation.ts 的容错注释）。
       ['user/message', {
         ...userMessage,
         source: { kind: 'plugin', plugin: 'compact' },

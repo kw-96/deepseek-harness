@@ -48,7 +48,7 @@ export class CodexImportReconciler {
     const reader = await this.ctx.sessionPersistence.open(snapshot.id, 'read')
     let events: readonly SessionEvent[]
     try {
-      events = await reader.read()
+      events = (await reader.read()).events
     } finally {
       await reader.close()
     }
@@ -58,7 +58,25 @@ export class CodexImportReconciler {
     }
     if (this.ctx.get('agents')?.get(snapshot.id) !== undefined) return 'deferred-active'
 
-    await this.ctx.sessionPersistence.replace(snapshot.header, snapshot.events)
+    // 0.1.5 的持久化句柄只追加、不重写整日志：Codex 线程通常只增消息，
+    // 存量日志是快照的严格前缀时直接追加差额；出现中段编辑则跳过持久化
+    // 更新并告警，避免破坏追加式日志的连续性。
+    const storedCount = events.length
+    if (snapshot.events.length >= storedCount
+      && isDeepStrictEqual(events, snapshot.events.slice(0, storedCount))) {
+      const delta = snapshot.events.slice(storedCount)
+      if (delta.length > 0) {
+        const handle = await this.ctx.sessionPersistence.open(snapshot.id, 'write')
+        try {
+          await handle.append(delta)
+          await handle.flush()
+        } finally {
+          await handle.close()
+        }
+      }
+    } else {
+      this.ctx.logger.warn(`Codex 导入会话 ${JSON.stringify(snapshot.id)} 历史中段有变化，跳过持久化更新`)
+    }
     // 仅当该会话已在 live store 时同步内存快照；冷会话只写持久化，
     // 避免把无 Agent 的导入会话塞进 store，进而让后续 resume 撞上
     // `session already exists`。

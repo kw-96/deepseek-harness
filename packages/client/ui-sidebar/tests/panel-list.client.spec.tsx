@@ -42,6 +42,11 @@ async function bench(collapsed = false) {
     selectPanel: vi.fn((activePanelId: MainPanelId | null) => { runtime.panelInfo.set({ activePanelId }) }),
     openRightbar: vi.fn(),
     closeRightbar: vi.fn(),
+    // 本地四区布局面板动作：面板行测试不触发，桩仅满足 ILayout 契约。
+    openDetails: vi.fn(),
+    closeDetails: vi.fn(),
+    openBottom: vi.fn(),
+    closeBottom: vi.fn(),
   } satisfies ILayout
   await runtime.mount({
     inject: ['slots'],

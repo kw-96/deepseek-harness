@@ -1,7 +1,7 @@
 {
   "name": "workorder-agent",
   "version": "0.1.4",
-  "description": "自研工单巡检插件：易协作工单查询、字段复核、POPO 通知与控制面面板",
+  "description": "鑷爺宸ュ崟宸℃鎻掍欢锛氭槗鍗忎綔宸ュ崟鏌ヨ銆佸瓧娈靛鏍搞€丳OPO 閫氱煡涓庢帶鍒堕潰闈㈡澘",
   "license": "UNLICENSED",
   "type": "module",
   "dsh": {
@@ -31,7 +31,7 @@
     "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.4.tgz workorder-agent"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",
     "@deepseek-ai/schemastery": "3.18.2",
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -42,11 +42,11 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-agent": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-settings": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-skill": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-agent": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-app-boot": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-skill": "^0.1.5-rc.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.0",
     "typescript": "^6.0.3",

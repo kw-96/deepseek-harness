@@ -115,7 +115,7 @@ export function assertReleasedArtifactRelationships(
         break
       case 'step/start':
         if (openTurn !== data['turn'] || openStep !== null || data['step'] !== nextStep) {
-          throw new SessionFormatError(`${event.type} does not match the open turn and next step`)
+          throw new SessionFormatError(`${event.type} ${event.seq} does not match the open turn and next step (turn=${String(data['turn'])} openTurn=${String(openTurn)} openStep=${String(openStep)} nextStep=${nextStep})`)
         }
         openStep = data['step']
         break
@@ -151,7 +151,17 @@ export function assertReleasedArtifactRelationships(
         requireOpenStep(event, data, openTurn, openStep)
         const callId = data['callId'] as string
         const lifecycle = toolLifecycles.get(callId)
-        if (lifecycle === undefined || lifecycle.state !== 'advertised'
+        if (lifecycle === undefined) {
+          // 本地定制(dev fork)：旧 Codex 导入会话的 tool/call 没有前置
+          // 助手消息广告；以调用自身字段隐式登记生命周期，容忍旧数据。
+          toolLifecycles.set(callId, {
+            name: data['name'] as string,
+            arguments: data['arguments'] as string,
+            state: 'started',
+          })
+          break
+        }
+        if (lifecycle.state !== 'advertised'
           || lifecycle.name !== data['name'] || lifecycle.arguments !== data['arguments']) {
           throw new SessionFormatError(`tool/call ${callId} does not match one advertised tool call`)
         }

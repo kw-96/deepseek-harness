@@ -296,6 +296,17 @@ export function convertCodexThread(
   for (let index = 0; index < groups.length; index++) {
     const group = groups[index] as { turn: CodexThreadTurn | undefined; items: CodexThreadItem[] }
     const turnState: TurnState = { turn: index + 1, step: 1, started: false }
+    let openStep: number | null = null
+    // 本地定制：为 step 坐标事件补 step/start 与 step/end 边界，使导入日志
+    // 满足 v3 的开放 step 不变式（旧版导入缺边界，官方迁移会拒绝）。
+    const ensureStep = (time: number): void => {
+      if (openStep === turnState.step) return
+      if (openStep !== null) {
+        push(events, state, 'step/end', time, { turn: turnState.turn, step: openStep })
+      }
+      push(events, state, 'step/start', time, { turn: turnState.turn, step: turnState.step })
+      openStep = turnState.step
+    }
     for (const item of group.items) {
       switch (item.itemType) {
         case 'userMessage': {
@@ -331,6 +342,7 @@ export function convertCodexThread(
             push(events, state, 'turn/start', group.turn?.startedAtMs ?? item.createdAtMs, { turn: turnState.turn })
             turnState.started = true
           }
+          ensureStep(item.createdAtMs)
           push(events, state, 'assistant/message', item.createdAtMs, {
             turn: turnState.turn,
             step: turnState.step,
@@ -340,6 +352,7 @@ export function convertCodexThread(
               content: [{ type: 'text', text }],
               source: { kind: 'model', ...CODEX_PROVENANCE },
             },
+            stream: [],
           }, 'append')
           turnState.step += 1
           break
@@ -353,6 +366,7 @@ export function convertCodexThread(
             push(events, state, 'turn/start', group.turn?.startedAtMs ?? item.createdAtMs, { turn: turnState.turn })
             turnState.started = true
           }
+          ensureStep(item.createdAtMs)
           pushToolItem(events, state, item, turnState, bounds)
           break
         }
@@ -366,6 +380,9 @@ export function convertCodexThread(
       // oxlint-disable-next-line typescript/no-non-null-assertion
       const lastTime = group.items[group.items.length - 1]!.createdAtMs
       const completed = group.turn?.status === 'completed'
+      if (openStep !== null) {
+        push(events, state, 'step/end', lastTime, { turn: turnState.turn, step: openStep })
+      }
       push(events, state, 'turn/end', group.turn?.completedAtMs ?? lastTime, {
         turn: turnState.turn,
         reason: completed

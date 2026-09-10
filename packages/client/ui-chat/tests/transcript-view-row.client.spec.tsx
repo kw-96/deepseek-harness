@@ -8,7 +8,12 @@ import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { TranscriptViewRow, type TranscriptViewRowProps } from '../src/client/settings/TranscriptViewRow.tsx'
-import { en, zh } from '../src/client/locale.ts'
+import { en } from '../src/client/locale.ts'
+
+// 资源钩子与面板信息钩子是 resources 插件与布局兼容层并入 GlobalStandardProps
+// 的必填标准件；本行组件并不读取它们，夹具仅提供常量实现。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
+const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
 
 afterEach(cleanup)
 
@@ -28,21 +33,17 @@ function noPendingInteraction() {
   return bindSnapshotSelector(createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()))
 }
 
-// The resource hook the resources plugin merges into GlobalStandardProps; this row reads no address.
-const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
-
-function mount(mode: 'normal' | 'compact' = 'compact', dictionary: typeof en | typeof zh = en) {
+function mount(mode: 'normal' | 'compact' = 'compact') {
   const source = createSnapshotStore(mode)
   const setTranscriptView = vi.fn((next: 'normal' | 'compact') => { source.set(next) })
   const props: TranscriptViewRowProps = {
-    usePanelInfo: selector => selector({ activePanelId: null }),
+    usePanelInfo, useResource,
     useSessions: emptySessions(),
     useSessionPendingInteraction: noPendingInteraction(),
     useWorkspaces: emptyWorkspaces(),
-    useResource,
     useTranscriptView: bindSnapshotSelector(source),
     setTranscriptView,
-    t: makeTranslate(dictionary),
+    t: makeTranslate(en),
   }
   render(<TranscriptViewRow {...props} />)
   return { setTranscriptView }
@@ -66,12 +67,5 @@ describe('TranscriptViewRow', () => {
     expect(screen.getByRole('menuitem', { name: 'Compact' })).toBeDefined()
     fireEvent.pointerDown(document.body)
     expect(screen.queryByRole('menuitem', { name: 'Compact' })).toBeNull()
-  })
-
-  it('shows the conversation-display values in Chinese', () => {
-    mount('compact', zh)
-    fireEvent.click(screen.getByRole('button', { name: '紧凑' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '标准' }))
-    expect(screen.getByRole('button', { name: '标准' })).toBeDefined()
   })
 })

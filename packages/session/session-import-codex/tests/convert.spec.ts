@@ -39,11 +39,11 @@ describe('convertCodexThread', () => {
     const { events, cwd } = convertCodexThread(fixture(), 'C:\\fallback', BOUNDS)
     expect(cwd).toBe('C:\\work')
     expect(typesOf(events)).toEqual([
-      'turn/start', 'user/message', 'session/title', 'assistant/message',
-      'tool/call', 'tool/result', 'assistant/message', 'turn/end',
-      'turn/start', 'user/message', 'tool/call', 'tool/result',
+      'turn/start', 'user/message', 'session/title', 'step/start', 'assistant/message',
+      'step/end', 'step/start', 'tool/call', 'tool/result', 'assistant/message', 'step/end', 'turn/end',
+      'turn/start', 'user/message', 'step/start', 'tool/call', 'tool/result',
       'tool/call', 'tool/result', 'tool/call', 'tool/result',
-      'tool/call', 'tool/result', 'turn/end', 'session/end-seed',
+      'tool/call', 'tool/result', 'step/end', 'turn/end', 'session/end-seed',
     ])
     expect(events.map(event => event.seq)).toEqual(events.map((_, index) => index))
     expect(events.every(event => event.time >= (events[event.seq - 1]?.time ?? 0))).toBe(true)
@@ -176,7 +176,7 @@ describe('convertCodexThread', () => {
       ],
       turns: [{ turnId: 'turn-a', status: 'completed', startedAtMs: 1, completedAtMs: 3 }],
     }, 'C:\\fallback', BOUNDS)
-    expect(typesOf(events)).toEqual(['turn/start', 'assistant/message', 'turn/end', 'session/end-seed'])
+    expect(typesOf(events)).toEqual(['turn/start', 'step/start', 'assistant/message', 'step/end', 'turn/end', 'session/end-seed'])
     expect(events.find(event => event.type === 'session/title')).toBeUndefined()
   })
 
@@ -192,9 +192,9 @@ describe('convertCodexThread', () => {
       ],
       turns: [{ turnId: 'turn-a', status: 'completed', completedAtMs: 6 }],
     }, 'C:\\fallback', BOUNDS)
-    expect(typesOf(events)).toEqual(['turn/start', 'assistant/message', 'user/message', 'session/title', 'user/message', 'turn/end', 'session/end-seed'])
-    if (events[2] === undefined || events[2].type !== 'user/message') throw new Error('missing joined user message')
-    expect(events[2].data.content[0]).toEqual({ type: 'text', text: 'one\ntwo' })
+    expect(typesOf(events)).toEqual(['turn/start', 'step/start', 'assistant/message', 'user/message', 'session/title', 'user/message', 'step/end', 'turn/end', 'session/end-seed'])
+    if (events[3] === undefined || events[3].type !== 'user/message') throw new Error('missing joined user message')
+    expect(events[3].data.content[0]).toEqual({ type: 'text', text: 'one\ntwo' })
     const title = events.find(event => event.type === 'session/title')
     expect(title).toMatchObject({ data: { title: 'one two' } })
   })

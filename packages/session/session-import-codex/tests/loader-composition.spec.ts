@@ -142,11 +142,11 @@ describe('session-import-codex through a real Loader composition', () => {
     expect(snapshot.header.cwd).toBe(join(root, 'workspace'))
     expect(snapshot.header.createdAt).toBe(1000)
     const handle = await first.sessionPersistence.open(id, 'read')
-    const stored = await handle.read()
+    const stored = (await handle.read()).events
     await handle.close()
     expect(stored.map(event => event.type)).toEqual([
-      'turn/start', 'user/message', 'session/title', 'assistant/message',
-      'tool/call', 'tool/result', 'turn/end', 'session/end-seed',
+      'turn/start', 'user/message', 'session/title', 'step/start', 'assistant/message',
+      'step/end', 'step/start', 'tool/call', 'tool/result', 'step/end', 'turn/end', 'session/end-seed',
     ])
     const title = stored.find(event => event.type === 'session/title')
     if (title === undefined || title.type !== 'session/title') throw new Error('missing title event')
@@ -187,7 +187,8 @@ describe('session-import-codex through a real Loader composition', () => {
     const result = await first.codexImport.run()
     const id = SessionId('codex-thread-1')
     expect(result).toMatchObject({ imported: 0, updated: 1, skippedExisting: 1, skippedEmpty: 1, deferredActive: 0 })
-    expect((await first.sessionPersistence.stat(id))?.header.cwd).toBe(nextWorkspace)
+    // 本地定制：v3 持久化头不可变，cwd 迁移体现在工作区成员关系上。
+    expect((await first.sessionPersistence.stat(id))).toBeDefined()
     const oldWorkspace = await first.workspaceRegistry.resolveByPath(join(root, 'workspace'))
     const newWorkspace = await first.workspaceRegistry.resolveByPath(nextWorkspace)
     expect(oldWorkspace?.sessionIds).not.toContain(id)

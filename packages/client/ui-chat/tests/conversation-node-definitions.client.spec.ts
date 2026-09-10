@@ -384,8 +384,8 @@ describe('built-in conversation node Definitions', () => {
       reason: { kind: 'aborted', reason: { kind: 'user' } },
     }))
     value.flush()
-    // An aborted Turn has no final answer: it keeps the streaming fold rules,
-    // so the answer boundary stays unset.
+    // 本地定制：中断收尾的轮次没有最终 answer，保持流式折叠规则
+    //（latestAnswer 对 closed+interrupted 返回 null）。
     expect(process()).toMatchObject({ answerAnchorSeq: null, answerStep: null })
 
     const recovered = assembler([
@@ -402,7 +402,7 @@ describe('built-in conversation node Definitions', () => {
       at(26, 'turn/end', { turn: 2, reason: { kind: 'interrupted' } }),
     ])
     const recoveredProcess = snapshot(recovered).timeline.turns.get(2)?.data.get('turn-process')
-    // Interrupted turns keep no answer boundary either — streaming fold rules.
+    // 本地定制：中断收尾的轮次没有最终 answer，保持流式折叠规则。
     expect(recoveredProcess)
       .toMatchObject({ answerStep: null, answerAnchorSeq: null })
 

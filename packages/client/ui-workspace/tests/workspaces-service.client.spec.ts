@@ -242,10 +242,15 @@ interface BenchOptions {
 
 function bench(options: BenchOptions = {}) {
   const ctx = new Context()
-  const layout = new LayoutController({
-    selectPanel: vi.fn(), retainMainPanels: vi.fn(),
-    setSidebar: vi.fn(), toggleSidebar: vi.fn(), setViewportWidth: vi.fn(),
-    setRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+  const layout = new LayoutController()
+  // 本地布局的 LayoutController 改为无参构造 + attachPanels 接入 store 动作：
+  // 面板几何动作本测试用不到，喂 vi.fn 假件即可；selectPanel/beginNavigation 是
+  // 控制器自有状态，不依赖这些 store 动作。hasMainPanel 恒真以放行面板 key。
+  layout.attachPanels({
+    setSidebar: vi.fn(), setDetails: vi.fn(), setBottom: vi.fn(),
+    toggleSidebar: vi.fn(), setNarrow: vi.fn(),
+    openDetails: vi.fn(), closeDetails: vi.fn(),
+    openBottom: vi.fn(), closeBottom: vi.fn(),
   }, () => true)
   const selectPanel = vi.spyOn(layout, 'selectPanel')
   ctx.provide('layout', layout)

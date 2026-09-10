@@ -229,7 +229,8 @@ describe('released v1 whole-artifact relationships', () => {
 
     expect(() => decode([...turnAndStep, advertised, { ...started, data: { ...started.data, name: 'write' } }]))
       .toThrow(/advertised tool call/)
-    expect(() => decode([...turnAndStep, { ...started, seq: 2, time: 3 }])).toThrow(/advertised tool call/)
+    // 本地定制(dev fork)：无广告的 tool/call 被隐式登记生命周期（旧数据容忍）。
+    expect(() => decode([...turnAndStep, { ...started, seq: 2, time: 3 }])).not.toThrow()
     expect(() => decode([...turnAndStep, result(2)])).toThrow(/no advertised tool lifecycle/)
     expect(() => decode([...turnAndStep, {
       ...advertised,

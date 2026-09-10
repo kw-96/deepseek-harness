@@ -13,10 +13,10 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { createChatStore } from '../stores.ts'
-import type { ToolCallId } from './store.ts'
+import type { SelectionTarget, ToolCallId } from './store.ts'
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type {
-  ChatNodeProcessSource, ChatNodeSource, ChatSnapshot, ChatTurnProcessPresentation,
+  ChatNodeProcessSource, ChatNodeSource, ChatSnapshot, ChatTurnProcessPresentation, ToolCallBlock,
 } from './snapshot.ts'
 import type { TurnProcessSpec } from './turn-process.ts'
 import type { TranscriptViewMode } from '../../chat-settings.ts'
@@ -78,6 +78,7 @@ export interface ChatNodeTurnDataInjected {
 
 /** Stable owner currency delivered to a keyed Chat renderer. */
 export interface ChatNodeOwnerProps {
+  selectedCallId?: ToolCallId | undefined
   cwd?: string | undefined
   openFile: (path: string, options?: OpenFileOptions) => void
   inspectCall: (callId: ToolCallId) => void
@@ -144,6 +145,8 @@ export interface ChatViewInjected {
     chatNodeProcess: (key: string) => ChatNodeProcessSource
   }
   openFile: (path: string, options?: OpenFileOptions) => Promise<void>
+  /** Select one Tool call and open the Chat details panel on it. */
+  openDetails: (target: SelectionTarget) => void
   loadOlder: () => void
   /** Jump loader: page history back through seq; resolves when the window covers it. */
   loadThrough: (seq: SessionSeq) => Promise<void>
@@ -166,6 +169,25 @@ export type ChatViewSlotProps =
 
 /** Full props of the durable-message image renderer. */
 export type MessageImagesProps = PropsRuntime<'conversation.message.images'> & PropsLocale<'conversation'>
+
+/** Tool block rendered in the details panel. */
+export interface DetailsToolOwnerProps {
+  block: ToolCallBlock
+  cwd?: string | undefined
+}
+
+/** Details-panel callbacks. */
+export interface DetailsInjected {
+  closeDetails: () => void
+}
+
+/** Full details-panel props. */
+export type DetailsSlotProps =
+  PropsRuntime<'details'>
+  & PropsRenderSlots<'conversation.details.tool'>
+  & PropsStore<ChatStore>
+  & InjectFace<DetailsInjected>
+  & PropsLocale<'chat'>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SessionStandardProps {
@@ -216,5 +238,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * that entry. With no entries, the standard action row remains unchanged.
      */
     'conversation.chat.assistant-actions': { kind: 'list'; scope: 'session'; owner: AssistantActionOwnerProps }
+    /**
+     * Whole details-panel body for the selected Tool call. The component receives
+     * the running or settled block and optional workspace root. A registration
+     * replaces the shipped Tool details renderer; absence uses the raw fallback.
+     */
+    'conversation.details.tool': { kind: 'single'; scope: 'session'; owner: DetailsToolOwnerProps }
   }
 }

@@ -242,6 +242,7 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const compactTranscript = useTranscriptView(mode => mode === 'compact')
+  const selectedCallId = useStore(s => s.selection?.callId)
   const inspectCall = useCallback((callId: string) => {
     openView('trajectory', callId)
   }, [openView])
@@ -789,6 +790,7 @@ export function ChatView({
             useStore={useStore}
             actions={actions}
             cwd={cwd}
+            selectedCallId={selectedCallId}
             openFile={requestOpenFile}
             inspectCall={inspectCall}
             forkAt={forkAt}
