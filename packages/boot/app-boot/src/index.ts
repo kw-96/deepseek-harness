@@ -231,13 +231,18 @@ export interface UserPatchWatchOptions {
   /** Absolute path of the watched patch file (a profile's `cordis.patch.yml`). */
   filename: string
   /**
+   * Read the watched file's patch list. Defaults to {@link loadOptionalPatches};
+   * a non-patch manifest (a profile `package.json`) supplies its own reader.
+   */
+  load?: (filename: string) => PatchOptions[] | undefined
+  /**
    * Compose the full patch list for a fresh user-layer generation —
    * the same composition the app booted with, so a reload can interleave the
    * new user patches between app-owned layers (bundle layers below,
    * overlays above). Identity when omitted: the user layer
    * is the whole patch list.
    */
-  compose?: (userPatches: PatchOptions[]) => PatchOptions[]
+  compose?: (userPatches: PatchOptions[]) => PatchOptions[] | Promise<PatchOptions[]>
 }
 
 /**
@@ -251,7 +256,12 @@ export async function watchUserPatches(
   ctx: Context,
   options: UserPatchWatchOptions,
 ): Promise<() => Promise<void>> {
-  const { binName, filename, compose = (patches: PatchOptions[]) => patches } = options
+  const {
+    binName,
+    filename,
+    compose = (patches: PatchOptions[]) => patches,
+    load = file => loadOptionalPatches(binName, file),
+  } = options
   const hmr = ctx.get('hmr')
   if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
   const entry = bootstrapIncludes.get(ctx)
@@ -260,8 +270,8 @@ export async function watchUserPatches(
     // Re-read the include's non-patch options per refresh so a writer that
     // updates another option between refreshes is not silently reverted.
     const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
-    const userPatches = loadOptionalPatches(binName, filename) ?? []
-    const patches = compose(userPatches)
+    const userPatches = load(filename) ?? []
+    const patches = await compose(userPatches)
     await entry.update({
       config: {
         ...includeConfig,

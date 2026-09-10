@@ -27,6 +27,16 @@ import type {
 } from './contract/slots.ts'
 import css from './SidebarRoot.module.css'
 
+/** Window event name mirrored from ui-layout desktop commands (no runtime import). */
+const DESKTOP_COMMAND_EVENT = 'dsh-desktop:command'
+
+/** Whether the page runs inside the Tauri desktop shell. */
+function isDesktopShell(): boolean {
+  if (typeof window === 'undefined') return false
+  const candidate = window as Window & { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
+  return candidate.__TAURI_INTERNALS__ !== undefined || candidate.__TAURI__ !== undefined
+}
+
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
 const COLLAPSE_SETTLE_MS = 150
 
@@ -162,6 +172,17 @@ export function SidebarRoot({
   }, [pointerInside])
 
   const buildVersion = localBuildVersion()
+  const desktop = isDesktopShell()
+
+  // Desktop title bar owns New Session (File menu); keep the sidebar button in sync.
+  useEffect(() => {
+    const onCommand = (event: Event): void => {
+      const detail = (event as CustomEvent<{ command?: string }>).detail
+      if (detail?.command === 'new-session') startSession()
+    }
+    window.addEventListener(DESKTOP_COMMAND_EVENT, onCommand)
+    return () => { window.removeEventListener(DESKTOP_COMMAND_EVENT, onCommand) }
+  }, [startSession])
 
   return (
     <div
@@ -206,24 +227,26 @@ export function SidebarRoot({
             </span>
           </button>
         )}
-        {/* Rail resting state is the whale mark; hovering swaps in the panel
-            icon (the expand affordance, figma sidebar-hover flow). */}
-        <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
-          <button
-            type="button"
-            className={clsx(css.iconButton, css.toggle)}
-            aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
-            onClick={() => { toggleSidebar() }}
-          >
-            {!wide && (
-              <span className={css.railMark} aria-hidden="true">
-                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
-              </span>
-            )}
-            {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
-            <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
-          </button>
-        </Tooltip>
+        {/* Desktop title bar owns the sidebar toggle while expanded; the
+            collapsed rail still needs this control for the brand/expand affordance. */}
+        {!(desktop && wide) && (
+          <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
+            <button
+              type="button"
+              className={clsx(css.iconButton, css.toggle)}
+              aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
+              onClick={() => { toggleSidebar() }}
+            >
+              {!wide && (
+                <span className={css.railMark} aria-hidden="true">
+                  {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+                </span>
+              )}
+              {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
+              <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {/* Expanded, the button carries its own label — tooltip only on the rail. */}

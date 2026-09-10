@@ -7,6 +7,7 @@ import TerminalSessionService, { TerminalBackendCleanupError, TerminalError, Ter
 import type {
   TerminalBackend,
   TerminalBackendSession,
+  TerminalBackendSpawnSpec,
   TerminalReadRequest,
   TerminalSendOperation,
   TerminalSendRequest,
@@ -92,6 +93,12 @@ class StubSession implements TerminalBackendSession {
     return { delivered: true as const, targetPgid: signal === 'SIGINT' ? 12 : 13 }
   }
 
+  async write(_data: string): Promise<void> {}
+
+  async resize(_cols: number, _rows: number): Promise<void> {}
+
+  async *followOutput(_signal: AbortSignal) {}
+
   status(): TerminalSessionStatus {
     return this.statusValue
   }
@@ -107,15 +114,17 @@ class StubSession implements TerminalBackendSession {
 
 function backend(type = 'stub') {
   const sessions: StubSession[] = []
+  const specs: TerminalBackendSpawnSpec[] = []
   const provider: TerminalBackend = {
     type,
-    async spawn() {
+    async spawn(spec) {
+      specs.push(spec)
       const session = new StubSession()
       sessions.push(session)
       return session
     },
   }
-  return { provider, sessions }
+  return { provider, sessions, specs }
 }
 
 async function harness() {
@@ -173,6 +182,25 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     await expect(Promise.resolve().then(() => ctx.terminals.kill(foreign, created.sessionId))).rejects.toThrow('belongs to another agent')
   })
 
+  it('forwards per-session shellDialect to the backend spawn spec', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    await ctx.terminals.spawn(owner, {
+      type: 'stub',
+      name: 'ui-pwsh-1',
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })
+    expect(b.specs[0]).toMatchObject({
+      name: 'ui-pwsh-1',
+      interaction: 'interactive',
+      shellDialect: 'pwsh',
+    })
+  })
+
   it('rejects unknown backends, non-live owners, duplicate names, and active sends', async () => {
     const ctx = await harness()
     const owner = stubAgent(ctx, 'owner')
@@ -201,6 +229,14 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     b.sessions[0]!.rejectSend = true
     await expect(ctx.terminals.startSend(owner, created.sessionId, { text: 'bad', submit: true }).done).rejects.toThrow('send failed')
     await new Promise(resolve => setTimeout(resolve, 0))
+
+    const ui = await ctx.terminals.spawn(owner, { type: 'stub', name: 'ui' })
+    const active = ctx.terminals.startSend(owner, ui.sessionId, { text: 'busy', submit: true })
+    await expect(ctx.terminals.write(owner, ui.sessionId, 'x')).rejects.toMatchObject({ code: 'SEND_ACTIVE' })
+    active.cancel()
+    await active.done
+    await ctx.terminals.write(owner, ui.sessionId, 'ok')
+    await ctx.terminals.resize(owner, ui.sessionId, 100, 30)
   })
 
   it('reserves concurrent names and rolls back a spawn whose owner disappears', async () => {

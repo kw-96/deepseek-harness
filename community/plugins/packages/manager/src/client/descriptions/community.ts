@@ -1,0 +1,35 @@
+/**
+ * 社区与第三方插件的简体中文说明。
+ * 插件管理页在 zh-CN 语言下优先显示这里的中文说明，缺失时回退英文原文。
+ */
+export const COMMUNITY = {
+  'workorder-agent': '自研工单巡检插件：易协作工单查询、字段复核、POPO 通知与控制面面板',
+  '@dsh-external/dsh-kb-sieve': '知识库筛子：把文档（md/txt/docx/pdf）构建成可审计知识包（references + SQLite FTS5），提供确定性检索（kb_query）与原文精读（kb_read）工具，可生成零脚本的 DSH skill 并动态加载',
+  '@huiliyi37/dsh-office': 'DeepSeek Harness 的 Office 文档工具（xlsx/pdf/pptx/docx）：生成、读取与编辑电子表格、PDF、演示文稿和 Word 文档',
+  'dsh-doc': 'DeepSeek Harness 的本地 PDF、Office、图片与 OCR 文档智能',
+  'dsh-ocr-local': 'DeepSeek Harness 本地 OCR 插件：粘贴/附加图片，经 PP-OCRv5 + ONNX Runtime 提取文字，完全离线，支持 TUI 与 Web',
+  'dsh-plugin-manager': 'DeepSeek Harness 的 Cordis HMR 插件管理器：热加载、查看、启用、停用、分组并管理运行时插件',
+  '@ruihuahe/dsh-plugin-marketplace': 'DeepSeek Harness 的生成目录插件发现与 npm 安装市场',
+  'ntes-dsh-market': '网易内部插件市场：逛一逛，点一下，装好',
+  '@dap-dsh-plugins/netease-auth': '维护持续刷新的网易内部用户 Access Token：写入 credentials（NETEASE_AUTH_TOKEN），提供 neteaseAuth 服务、校验/刷新/获取 auth key 等工具与设置页（设置 → 网易认证）',
+  'dsh-codex-shell': 'Codex 风格集成工作区外壳：Codex 应用式侧栏浏览、右缘文件/git/项目/插件/命令面板、置顶摘要覆盖与会话上下文操作，单插件组合',
+  'dsh-soul-md': 'soul.md 风格人设 + 长期记忆插件：设置页输入人设卡名称和内容即可，文件由插件自动管理；可按工作区指定人设、聊天框可给会话单独切人设；AI 可自行演化人设与记忆（soul_read/soul_update/memory_*）',
+  'dsh-mnemon': 'DeepSeek Harness 的可组合三层记忆控制面：持久运行时上下文、可搜索项目文档、可插拔长期记忆、守卫策略、WebUI 与 headless 工具',
+  '@liustack/modlens': '纯文本 LLM 的插件式视觉：由免费 Antigravity CLI 驱动，为无视觉模型提供看图能力',
+  'dsh-mnemon-provider-byterover': 'Memory Spaces Source 的 ByteRover 提供方子插件',
+  'dsh-mnemon-provider-hindsight': 'Memory Spaces Source 的 Hindsight 提供方子插件',
+  'dsh-mnemon-provider-holographic': 'Memory Spaces Source 的 Holographic 提供方子插件',
+  'dsh-mnemon-provider-honcho': 'Memory Spaces Source 的 Honcho 提供方子插件',
+  'dsh-mnemon-provider-mem0': 'Memory Spaces Source 的 Mem0 提供方子插件',
+  'dsh-mnemon-provider-mnemon-native': 'Memory Spaces 的原生 Mnemon CLI 提供方',
+  'dsh-mnemon-provider-openviking': 'Memory Spaces Source 的 OpenViking 提供方子插件',
+  'dsh-mnemon-provider-retaindb': 'Memory Spaces Source 的 RetainDB 提供方子插件',
+  'dsh-mnemon-provider-supermemory': 'Memory Spaces Source 的 Supermemory 提供方子插件',
+  'dsh-mnemon-source-documents': '可组合视图记忆的自包含文档 Source',
+  'dsh-mnemon-source-memory-spaces': 'Memory Spaces Source 及其私有 Provider SDK',
+  'dsh-mnemon-source-runtime': '可组合视图记忆的自包含运行时 Source',
+  'dsh-mnemon-strategy-auto-capture': '回合内持久记忆捕获的附加指引；无后台任务或新增写权限',
+  'dsh-mnemon-strategy-default-three-tier': '可组合视图记忆的显式三层 View 策略',
+  'dsh-mnemon-strategy-light-context': 'Mnemon 默认三层策略的附加共享投影预算上限',
+  'dsh-mnemon-strategy-scoped': 'Mnemon 默认三层策略的附加 Source 选择与写收窄',
+} as const

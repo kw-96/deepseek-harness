@@ -101,6 +101,11 @@ export interface TurnProcessOwnerProps {
   readonly foldable: boolean
   readonly open: boolean
   setOpen(open: boolean): void
+  /** Whether the Turn still runs and this disclosure folds settled calls. */
+  readonly streamingFold?: boolean
+  /** Settled-call counts the disclosure shows while streaming. */
+  readonly foldedToolCalls?: number
+  readonly foldedSubagents?: number
 }
 
 /** Full props of one keyed Chat renderer. */

@@ -20,6 +20,7 @@ import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@
 import {
   LlmError,
   createAssistantMessage,
+  createUserMessage,
   errorChain,
   markAgentLoopRequest,
 } from '@deepseek-ai/dsh-llm'
@@ -126,11 +127,17 @@ export class ReactLoopAgent implements Agent {
   }
 
   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void {
+    // 第三方插件可能绕过类型传缺 id 的消息；兜底补一个稳定 id，
+    // 避免把没有 identified message 的 user/message 写进 session 日志。
+    const id = (message as { id?: unknown }).id
+    const identified = typeof id === 'string' && id !== ''
+      ? message
+      : createUserMessage(message as Omit<UserMessage, 'id' | 'role'>)
     // Waking input cannot join an aborted activity, so it starts the next turn.
     // Captured before the insertion so a reentrant cancel from a splice observer cannot reclassify it.
     const wakingAfterAbort = wakeup && this.phase.kind !== 'idle' && this.phase.abort.signal.aborted
     const resolvedTarget = wakingAfterAbort ? 'next-turn' : target
-    this.inbox.splice(resolvedTarget, Infinity, 0, [message])
+    this.inbox.splice(resolvedTarget, Infinity, 0, [identified])
     if (wakeup) this.wakeDriver(wakingAfterAbort)
   }
 

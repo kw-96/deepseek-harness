@@ -131,6 +131,22 @@ describe('normalizeStdout', () => {
     expect(frame).toEqual({ cwd: '{{cwd}}', path: '{{cwd}}/nested/proof.txt' })
   })
 
+  it('scrubs the JSON-stringified backslash spelling of the cwd', () => {
+    const windowsCtx: NormalizeContext = {
+      sessionIds: [],
+      cwd: String.raw`C:\Users\runner\AppData\Local\Temp\acp-snapshot`,
+    }
+    const raw = JSON.stringify({
+      plain: `session workspace: ${windowsCtx.cwd}. Writable.`,
+      quoted: `session workspace: ${JSON.stringify(windowsCtx.cwd)}. Writable.`,
+    })
+    const frame = JSON.parse(normalizeStdout(raw, windowsCtx)) as { plain: string; quoted: string }
+    expect(frame).toEqual({
+      plain: 'session workspace: {{cwd}}. Writable.',
+      quoted: 'session workspace: "{{cwd}}". Writable.',
+    })
+  })
+
   it('canonicalizes only cwd-rooted path separators', () => {
     const windowsCtx: NormalizeContext = {
       sessionIds: [],

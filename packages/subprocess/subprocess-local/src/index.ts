@@ -236,7 +236,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     spec.signal?.throwIfAborted()
     const env = targetEnvironment(spec)
     const options: IPtyForkOptions = {
-      name: 'dumb',
+      name: spec.name ?? 'dumb',
       rows: spec.rows,
       cols: spec.cols,
       cwd: spec.cwd,

@@ -43,6 +43,12 @@ describe.skipIf(MODE === 'record')('web e2e: cancelled Bash row disclosure', () 
     const sessionRow = page.locator('[role="treeitem"]').nth(1)
     await sessionRow.waitFor({ timeout: 10_000 })
     await sessionRow.click()
+    // The cancelled Turn folds its settled Bash rows into the process
+    // disclosure (streaming rules apply to interrupted turns): expand it
+    // before the row-level assertions below.
+    const disclosure = page.locator('[data-turn-process]').first()
+    await disclosure.waitFor({ timeout: 15_000 })
+    await disclosure.click()
     await page.locator('[data-sample="bash"]').nth(1).waitFor({ timeout: 15_000 })
   }, 120_000)
 

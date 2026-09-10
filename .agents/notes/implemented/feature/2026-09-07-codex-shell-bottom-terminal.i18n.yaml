@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-07-codex-shell-bottom-terminal.md
+2026-09-07-codex-shell-bottom-terminal.md: c15e5506d144f9c7629211182c20099b34fc90a6
+2026-09-07-codex-shell-bottom-terminal.zh.md: 9b817cc527beba21da38087ebee903790a64b0a8

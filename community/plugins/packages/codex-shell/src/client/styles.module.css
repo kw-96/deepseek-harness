@@ -1,0 +1,2090 @@
+/* Codex 工作台 v5 —— Codex 式极简侧栏 + 宿主 DSH 令牌。
+   侧栏工作区面板参考 Codex 左侧栏排布：常驻圆角搜索框、单行会话、
+   细字分组标题、悬停才显露的时间与操作；全部颜色映射宿主 --dsw-*
+   主题别名（亮/暗自动跟随）。右栏停靠宿主 details 第三列不变。 */
+
+.root,
+.panel,
+.modal {
+  --cx-bg: var(--dsw-specific-sidebar-fill, #f9fafb);
+  --cx-bg-surface: var(--dsw-alias-bg-base, #ffffff);
+  --cx-bg-raised: var(--dsw-alias-bg-overlay, #ececec);
+  --cx-bg-inset: var(--dsw-alias-bg-module-platform, #f5f6f7);
+  --cx-text-hi: var(--dsw-alias-label-primary, #0f1115);
+  --cx-text-mid: var(--dsw-alias-label-secondary, #61656b);
+  --cx-text-low: var(--dsw-alias-label-tertiary, #818589);
+  --cx-line: var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+  --cx-line-strong: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  --cx-accent: var(--dsw-alias-brand-primary, #0f1115);
+  --cx-accent-strong: var(--dsw-alias-state-business-primary, #4d90fe);
+  --cx-accent-muted: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  --cx-hover: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  --cx-active: var(--dsw-alias-interactive-bg-active, rgba(38, 49, 72, 0.1));
+  --cx-current: var(--dsw-specific-sidebar-nav-item-active, #ebeef2);
+  --cx-success: var(--dsw-alias-state-success-primary, #22c55e);
+  --cx-error: var(--dsw-alias-state-error-primary, #ec1313);
+  --cx-warn: var(--dsw-alias-state-warn-primary, #f59e0b);
+  --cx-info: var(--dsw-alias-state-business-primary, #4d90fe);
+}
+
+/* ── 基础 ─────────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  user-select: none;
+  color: var(--cx-text-hi);
+  font-family: var(--dsw-font-family, -apple-system, 'Segoe UI', system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.root ::selection,
+.panel ::selection,
+.modal ::selection {
+  background: var(--cx-accent-muted);
+}
+
+.root input,
+.root textarea,
+.panel input,
+.panel textarea,
+.modal input,
+.modal textarea {
+  caret-color: var(--cx-accent-strong);
+  user-select: text;
+}
+
+.code {
+  user-select: text;
+}
+
+.scroll,
+.code,
+.treeBody,
+.pickerList {
+  scrollbar-color: var(--dsw-alias-scrollbar-bg-l2, rgba(0, 0, 0, 0.2)) transparent;
+  scrollbar-width: thin;
+}
+
+.scroll::-webkit-scrollbar,
+.code::-webkit-scrollbar,
+.treeBody::-webkit-scrollbar,
+.pickerList::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scroll::-webkit-scrollbar-track,
+.code::-webkit-scrollbar-track,
+.treeBody::-webkit-scrollbar-track,
+.pickerList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll::-webkit-scrollbar-thumb,
+.code::-webkit-scrollbar-thumb,
+.treeBody::-webkit-scrollbar-thumb,
+.pickerList::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--dsw-alias-scrollbar-bg-l2, rgba(0, 0, 0, 0.2));
+  background-clip: padding-box;
+}
+
+.scroll::-webkit-scrollbar-thumb:hover,
+.code::-webkit-scrollbar-thumb:hover,
+.treeBody::-webkit-scrollbar-thumb:hover,
+.pickerList::-webkit-scrollbar-thumb:hover {
+  background: var(--dsw-alias-scrollbar-hover-l2, rgba(0, 0, 0, 0.3));
+  background-clip: padding-box;
+}
+
+/* ── 侧栏搜索条（Codex 风格：常驻圆角输入） ─────────────── */
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 4px 8px 8px;
+  padding: 0 10px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 10px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-low);
+  flex: none;
+  transition: border-color 140ms var(--ds-ease-in-out, ease), box-shadow 140ms var(--ds-ease-in-out, ease);
+}
+
+.searchBar:focus-within {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+/* ── 侧栏轨道模式（折叠时只留搜索 36px 圆形控件） ───────── */
+
+.rail {
+  align-items: center;
+  padding-top: 4px;
+}
+
+.rail .searchBar,
+.rail .treeBody {
+  display: none;
+}
+
+.railControls {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.railButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 12px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-hi);
+  cursor: pointer;
+}
+
+.railButton:hover {
+  background: var(--cx-hover);
+}
+
+/* ── 通用控件 ─────────────────────────────────────────── */
+
+.iconButton,
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+.iconButton:hover:not(:disabled),
+.chevron:hover:not(:disabled) {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.iconButton:active:not(:disabled),
+.chevron:active:not(:disabled) {
+  background: var(--cx-active);
+}
+
+.iconButton:disabled,
+.chevron:disabled {
+  color: var(--cx-text-low);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iconButtonActive {
+  composes: iconButton;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  flex: none;
+}
+
+.title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-hi);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 13px;
+}
+
+.clearButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+}
+
+.clearButton:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+/* ── 工作区面板分组（Codex 式细字标题，安静不打扰） ────── */
+
+.treeBody {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 4px 16px 0;
+}
+
+.workspaceGroup {
+  margin: 0 0 10px;
+}
+
+.workspaceHead {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  box-sizing: border-box;
+  border: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  user-select: none;
+}
+
+.workspaceHead:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-mid);
+}
+
+/* 工作区图标：展开 = 打开文件夹，收起 = 闭合文件夹（代替收起箭头）。 */
+.workspaceIcon {
+  flex: none;
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* 工作区标题：与 14px 会话行形成字体层级（弱化色、轻字距）。 */
+.workspaceLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceActions {
+  display: none;
+  align-items: center;
+  flex: none;
+}
+
+.workspaceHead:hover .workspaceActions,
+.workspaceHead:focus-within .workspaceActions {
+  display: inline-flex;
+}
+
+/* ── 单行会话行（Codex 式：固定行高 + 悬停/选中显露操作） ── */
+
+.row,
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  color: var(--cx-text-mid);
+  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+/* 文件行保留圆角（右侧文件面板），侧栏会话行高亮为直角。 */
+.fileRow {
+  border-radius: 8px;
+}
+
+/* 树形嵌套行：左侧缩进引导线，右缘保持圆角。 */
+.fileRowNested {
+  border-radius: 0 8px 8px 0;
+  box-shadow: inset 1px 0 0 var(--cx-line);
+}
+
+.row {
+  height: 32px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.row:hover,
+.fileRow:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.row:active,
+.fileRow:active {
+  background: var(--cx-active);
+}
+
+.rowCurrent {
+  composes: row;
+  background: var(--cx-current);
+  color: var(--cx-text-hi);
+}
+
+.rowCurrent:hover {
+  background: var(--cx-current);
+}
+
+.rowArchived {
+  composes: row;
+  color: var(--cx-text-low);
+}
+
+.rowLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.reveal {
+  opacity: 0;
+  transition: opacity 120ms var(--ds-ease-in-out, ease);
+}
+
+.row:hover .reveal,
+.row:focus-within .reveal,
+.rowCurrent .reveal {
+  opacity: 1;
+}
+
+.pinMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+}
+
+.pinMark:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+/* 状态点：只给运行中的会话点亮，其余保持安静。 */
+.dot {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--cx-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  flex: none;
+}
+
+/* 非运行行的隐形占位槽：与状态点同尺寸，保证标题水平对齐。 */
+.dotSlot {
+  width: 7px;
+  height: 7px;
+  background: transparent;
+  flex: none;
+}
+
+.dotRunning {
+  composes: dot;
+  border-color: var(--cx-info);
+  background: var(--cx-info);
+  animation: cx-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cx-pulse {
+  50% { opacity: 0.45; }
+}
+
+.badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cx-info);
+  flex: none;
+}
+
+/* 搜索结果：标题 + 摘要两行，独立于普通行。 */
+.searchResult {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 44px;
+  border: 0;
+  padding: 5px 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchResult:hover {
+  background: var(--cx-hover);
+}
+
+.searchResultTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cx-text-hi);
+  font-size: 13px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResultSnippet {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 行菜单（弹出面板） ────────────────────────────────── */
+
+.menu {
+  position: fixed;
+  z-index: 2147482000;
+  min-width: 204px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+  animation: cx-menu-in 120ms var(--ds-ease-out, ease-out);
+}
+
+@keyframes cx-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--cx-hover);
+}
+
+.menuItem:active {
+  background: var(--cx-active);
+}
+
+.menuIcon {
+  flex: none;
+  color: var(--cx-text-low);
+}
+
+.menuItemDanger {
+  composes: menuItem;
+  color: var(--cx-error);
+}
+
+.menuItemDanger .menuIcon {
+  color: inherit;
+}
+
+.menuSep {
+  height: 0.5px;
+  margin: 5px 8px;
+  background: var(--cx-line-strong);
+}
+
+.menuItemDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menuItemDisabled:hover {
+  background: transparent;
+}
+
+.menuItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuChevron {
+  flex: none;
+  opacity: 0.55;
+}
+
+.submenuAnchor {
+  position: relative;
+}
+
+.submenuFlyout {
+  position: absolute;
+  top: 0;
+  left: calc(100% - 4px);
+  z-index: 1;
+  min-width: 196px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+}
+
+.menuHint {
+  margin: 6px 8px 2px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.menuGroupLabel {
+  margin: 4px 8px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* 悬停操作默认不占布局：仅悬浮、键盘聚焦或选中行显示，
+   标题在常态占满可用宽度，只在真正溢出时省略。 */
+.rowHoverActions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.row:hover .rowHoverActions,
+.row:focus-within .rowHoverActions,
+.rowCurrent .rowHoverActions {
+  display: inline-flex;
+}
+
+.sectionHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 4px 8px 2px;
+  padding: 0 4px;
+}
+
+.sectionTitle {
+  flex: 1;
+  min-width: 0;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.sectionMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+}
+
+.projectInfoAnchor {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  z-index: 30;
+}
+
+.projectInfoCard {
+  width: 260px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+  color: var(--cx-text-hi);
+}
+
+.projectInfoHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.projectInfoTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectInfoMeta {
+  margin-top: 6px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+}
+
+.projectInfoPath {
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--cx-text-mid);
+  font-size: 11px;
+  line-height: 15px;
+  word-break: break-all;
+}
+
+.projectInfoPin {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.projectInfoPin:hover {
+  background: var(--cx-active);
+}
+
+/* ── 空状态 ───────────────────────────────────────────── */
+
+.empty {
+  padding: 16px 12px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  text-align: center;
+}
+
+.emptyWrap {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 32px 20px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.emptyWrap > svg {
+  color: var(--cx-text-low);
+}
+
+.emptyTitle {
+  color: var(--cx-text-mid);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── 添加工作区弹窗（居中模态，标题栏 + 触发） ───────────── */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-mask-1, rgba(0, 0, 0, 0.24));
+}
+
+.modal {
+  display: flex;
+  width: min(420px, calc(100vw - 48px));
+  max-height: min(480px, calc(100vh - 96px));
+  flex-direction: column;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--cx-bg-raised);
+  box-shadow: var(--dsw-elevation-prominent, 0 16px 40px rgba(0, 0, 0, 0.25));
+}
+
+.pickerTitle {
+  margin-bottom: 8px;
+  color: var(--cx-text-hi);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pickerList {
+  max-height: 240px;
+  min-height: 0;
+  overflow: auto;
+  border-top: 0.5px solid var(--cx-line);
+  padding-top: 6px;
+}
+
+/* ── 右侧面板（停靠进宿主 details 列，填充整列） ───────── */
+
+.panel {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  background: var(--cx-bg-surface);
+  color: var(--cx-text-hi);
+}
+
+/* ── 顶部横向图标栏（Cursor 式：5 个主图标 + 溢出菜单） ── */
+
+.tabBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 6px 0 4px;
+  flex: none;
+}
+
+.tabStrip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  min-width: 32px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+.tab:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.tabActive {
+  composes: tab;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent);
+}
+
+.tabLabel {
+  display: none;
+}
+
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--cx-text-low);
+  cursor: pointer;
+  flex: none;
+  transition: background-color 140ms var(--ds-ease-in-out, ease), color 140ms var(--ds-ease-in-out, ease);
+}
+
+.tabClose:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.panelBody {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 文件面板：可伸缩列，目录列表为唯一滚动区 */
+.filesRoot {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filesScroll {
+  composes: scroll;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 12px 0;
+}
+
+.filesSearchBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 8px 10px 10px;
+}
+
+.filesSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 8px;
+  padding: 0 4px 0 8px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-low);
+}
+
+.filesSearchRow:focus-within {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+.filesSearchInput {
+  composes: search;
+  min-height: 28px;
+}
+
+.filesToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 4px;
+  background: transparent;
+  color: var(--cx-text-low);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+
+.filesToggle:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.filesToggleOn {
+  composes: filesToggle;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent-strong);
+}
+
+.filesFieldLabel {
+  margin: 2px 2px 0;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.filesResultGroup {
+  margin: 6px 0 2px;
+  padding: 4px 8px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filesResultRow {
+  composes: fileRow;
+  align-items: flex-start;
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.filesResultMeta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filesResultPath {
+  overflow: hidden;
+  color: var(--cx-text-hi);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesResultSnippet {
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesPreview {
+  display: flex;
+  min-height: 120px;
+  max-height: 260px;
+  flex-direction: column;
+  flex: none;
+  border-top: 1px solid var(--cx-line);
+}
+
+/* 文件面板底部 git 时间线（IDE 时间线模式）。 */
+.filesTimeline {
+  display: flex;
+  min-height: 64px;
+  max-height: 180px;
+  flex-direction: column;
+  flex: none;
+  border-top: 1px solid var(--cx-line);
+}
+
+.filesTimelineHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 10px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  flex: none;
+}
+
+.filesTimelineScope {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cx-text-mid);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filesTimelineScroll {
+  composes: scroll;
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 8px 8px;
+}
+
+/* ── 面板通用：分组 / 路径屑 / 预览 / 输入行 ───────────── */
+
+.group {
+  margin: 0 0 12px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  user-select: none;
+}
+
+.groupName {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* 文件面板根目录标题行（只读，VSCode Explorer 式 section header）。 */
+.filesDirHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 4px 10px;
+  flex: none;
+}
+
+.filesDirName {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-hi);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileRow {
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.code {
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--cx-text-hi);
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  border-top: 0.5px solid var(--cx-line);
+  padding: 10px 12px;
+}
+
+.textInput {
+  min-width: 0;
+  flex: 1;
+  height: 32px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 10px;
+  padding: 0 10px;
+  outline: 0;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 140ms var(--ds-ease-in-out, ease), box-shadow 140ms var(--ds-ease-in-out, ease);
+}
+
+.textInput:focus {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: var(--cx-accent);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 140ms var(--ds-ease-in-out, ease), opacity 140ms var(--ds-ease-in-out, ease);
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primaryButton:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.primaryButton:disabled {
+  background: var(--cx-line-strong);
+  color: var(--cx-text-low);
+  cursor: default;
+}
+
+.error {
+  margin: 8px 10px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.05));
+  color: var(--cx-error);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.note {
+  color: var(--cx-text-low);
+  font-size: 12px;
+}
+
+.card {
+  margin: 8px 10px;
+  border: 0.5px solid var(--cx-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--cx-bg-inset);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 20px;
+  margin-bottom: 6px;
+  color: var(--cx-text-mid);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cardText {
+  color: var(--cx-text-hi);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.iframe {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  background: #ffffff;
+}
+
+/* ── Git 面板（Cursor 式源代码管理） ─────────────── */
+
+.gitToolbar {
+  composes: header;
+  border-bottom: 0.5px solid var(--cx-line);
+}
+
+.branchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 168px;
+  height: 28px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-mid);
+  font-size: 12px;
+  cursor: pointer;
+  flex: none;
+}
+
+.branchButton:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.branchButton span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchDelta {
+  color: var(--cx-text-low);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.gitSummary {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commitArea {
+  padding: 8px 10px;
+  flex: none;
+}
+
+.gitCommitSection {
+  border-bottom: 0.5px solid var(--cx-line);
+  flex: none;
+}
+
+.gitCommitHead,
+.gitChangeHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--cx-text-mid);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gitCommitHead:hover,
+.gitChangeHead:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.commitBox {
+  width: 100%;
+  min-height: 56px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: 0;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-hi);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: border-color 140ms var(--ds-ease-in-out, ease), box-shadow 140ms var(--ds-ease-in-out, ease);
+}
+
+.commitBox:focus {
+  border-color: var(--cx-accent-strong);
+  box-shadow: 0 0 0 2px var(--cx-accent-muted);
+}
+
+.commitRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.commitButton {
+  composes: primaryButton;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin: 8px 10px 4px;
+  border: 0.5px solid var(--cx-line-strong);
+  border-radius: 8px;
+  padding: 0 8px;
+  background: var(--cx-bg-inset);
+  color: var(--cx-text-low);
+  flex: none;
+}
+
+.filterRow:focus-within {
+  border-color: var(--cx-accent-strong);
+}
+
+.gitFilterInput {
+  composes: search;
+  font-size: 12px;
+}
+
+.gitScroll {
+  composes: scroll;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 4px 12px 0;
+}
+
+.gitChangesRoot {
+  padding: 4px 0 8px;
+}
+
+.gitChangesTitle {
+  min-height: 26px;
+  padding: 5px 8px 3px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.gitChangeGroup {
+  border-bottom: 0.5px solid var(--cx-line);
+}
+
+.gitChangeCount {
+  min-width: 18px;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: var(--cx-hover);
+  color: var(--cx-text-mid);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.gitFileRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 2px 8px 2px 20px;
+  color: var(--cx-text-mid);
+  cursor: pointer;
+}
+
+.gitFileRow:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+.gitFileIcon {
+  flex: none;
+  color: var(--cx-text-low);
+}
+
+.gitFileMain {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.gitFileName,
+.gitFileDirectory {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitFileName {
+  flex: none;
+  color: inherit;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.gitFileDirectory {
+  min-width: 0;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.gitFileState {
+  margin-left: auto;
+}
+
+.gitFilePath {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitLogMeta {
+  flex: none;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文件行悬停才显露操作（与侧栏行一致）。 */
+.fileRow .reveal {
+  opacity: 0;
+  transition: opacity 120ms var(--ds-ease-in-out, ease);
+}
+
+.fileRow:hover .reveal,
+.fileRow:focus-within .reveal {
+  opacity: 1;
+}
+
+/* 单字母状态徽标（VSCode 配色）。 */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+.statusModified {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-business-tertiary, rgba(65, 118, 230, 0.12));
+  color: var(--cx-info);
+}
+
+.statusAdded {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-success-tertiary, rgba(34, 197, 94, 0.12));
+  color: var(--cx-success);
+}
+
+.statusDeleted {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-error-tertiary, rgba(236, 19, 19, 0.1));
+  color: var(--cx-error);
+}
+
+.statusRenamed {
+  composes: statusBadge;
+  background: var(--dsw-alias-state-warn-tertiary, rgba(245, 158, 11, 0.12));
+  color: var(--cx-warn);
+}
+
+.statusUnmerged {
+  composes: statusDeleted;
+}
+
+.statusUntracked {
+  composes: statusBadge;
+  border: 0.5px solid var(--cx-line-strong);
+  background: var(--cx-bg-raised);
+  color: var(--cx-text-mid);
+}
+
+.statusBlank {
+  composes: statusBadge;
+}
+
+/* 提交历史折叠头。 */
+.historyHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  border-radius: 7px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--cx-text-low);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.historyHead:hover {
+  color: var(--cx-text-mid);
+}
+
+.gitTimeline {
+  padding: 2px 8px 10px;
+}
+
+.gitTimelineItem {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 34px;
+  padding: 2px 0;
+}
+
+.gitTimelineRail {
+  position: relative;
+  display: flex;
+  width: 10px;
+  min-height: 30px;
+  flex: none;
+  justify-content: center;
+}
+
+.gitTimelineRail::before {
+  position: absolute;
+  top: 10px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--cx-line-strong);
+  content: '';
+}
+
+.gitTimelineItem:last-child .gitTimelineRail::before {
+  display: none;
+}
+
+.gitTimelineRail span {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border: 2px solid var(--cx-accent);
+  border-radius: 50%;
+  background: var(--cx-bg-surface);
+  box-sizing: border-box;
+}
+
+.gitTimelineIcon {
+  margin-top: 2px;
+  flex: none;
+  color: var(--cx-text-low);
+}
+
+.gitTimelineBody {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.gitTimelineSubject,
+.gitTimelineMeta,
+.gitTimelineRefs {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitTimelineSubject {
+  color: var(--cx-text-mid);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.gitTimelineMeta {
+  color: var(--cx-text-low);
+  font-size: 10.5px;
+  line-height: 15px;
+}
+
+.gitTimelineRefs {
+  max-width: 96px;
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: var(--cx-accent-muted);
+  color: var(--cx-accent);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* 下拉菜单小标题与自适应标签。 */
+.menuCaption {
+  padding: 6px 8px 4px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.menuLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 内联着色差异视图。 */
+.diffWrap {
+  display: flex;
+  border-top: 0.5px solid var(--cx-line);
+  flex-direction: column;
+}
+
+.diffHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 10px;
+  color: var(--cx-text-mid);
+  flex: none;
+}
+
+.diffPath {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffBody {
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.diffLine {
+  padding: 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diffAdd {
+  composes: diffLine;
+  background: var(--dsw-alias-state-success-tertiary, rgba(34, 197, 94, 0.12));
+  color: var(--cx-success);
+}
+
+.diffDel {
+  composes: diffLine;
+  background: var(--dsw-alias-state-error-tertiary, rgba(236, 19, 19, 0.08));
+  color: var(--cx-error);
+}
+
+.diffMeta {
+  composes: diffLine;
+  color: var(--cx-text-low);
+}
+
+.diffHunk {
+  composes: diffLine;
+  background: var(--cx-accent-muted);
+  color: var(--cx-text-mid);
+}
+
+.diffContext {
+  composes: diffLine;
+  color: var(--cx-text-hi);
+}
+
+.diffNote {
+  padding: 6px 10px;
+  color: var(--cx-text-low);
+  font-size: 11px;
+}
+
+.skeleton {
+  height: 28px;
+  margin: 4px 8px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-skeleton, rgba(0, 0, 0, 0.04));
+  animation: cx-skeleton 1.3s ease-in-out infinite alternate;
+}
+
+@keyframes cx-skeleton {
+  to { opacity: 0.45; }
+}
+
+.spin {
+  animation: cx-spin 0.85s linear infinite;
+}
+
+@keyframes cx-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 焦点环 ───────────────────────────────────────────── */
+
+.iconButton:focus-visible,
+.chevron:focus-visible,
+.railButton:focus-visible,
+.clearButton:focus-visible,
+.search:focus-visible,
+.textInput:focus-visible,
+.primaryButton:focus-visible,
+.menuItem:focus-visible,
+.workspaceHead:focus-visible,
+.row:focus-visible,
+.fileRow:focus-visible,
+.tab:focus-visible,
+.tabClose:focus-visible,
+.branchButton:focus-visible,
+.commitBox:focus-visible,
+.historyHead:focus-visible {
+  outline: 2px solid var(--cx-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .dotRunning,
+  .skeleton,
+  .spin {
+    animation: none;
+  }
+
+  .iconButton,
+  .chevron,
+  .railButton,
+  .clearButton,
+  .searchBar,
+  .workspaceHead,
+  .row,
+  .fileRow,
+  .tab,
+  .textInput,
+  .primaryButton,
+  .reveal {
+    transition: none;
+  }
+}
+
+/* ── 底部持久终端 ───────────────────────────────────── */
+
+.bottomTerminal {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--cx-bg);
+  color: var(--cx-text-hi);
+}
+
+.bottomTerminalHead {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 8px;
+  flex: none;
+}
+
+.bottomTerminalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cx-text-mid);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bottomTerminalCwd {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--cx-text-low);
+  font-family: var(--ds-font-family-code, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomTabStrip {
+  display: flex;
+  min-height: 28px;
+  align-items: stretch;
+  gap: 4px;
+  border-bottom: 0.5px solid var(--cx-line);
+  padding: 0 4px;
+  flex: none;
+  background: color-mix(in srgb, var(--cx-bg) 92%, #000);
+}
+
+.bottomTabList {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.bottomTab,
+.bottomTabActive {
+  display: inline-flex;
+  max-width: 200px;
+  min-width: 72px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--cx-text-mid);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.bottomTab:hover {
+  background: color-mix(in srgb, var(--cx-line) 40%, transparent);
+}
+
+.bottomTabActive {
+  background: #0d0d0d;
+  color: var(--cx-text-hi);
+}
+
+.bottomTabLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomTabBadge {
+  margin-left: 4px;
+  border-radius: 3px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--cx-accent, #3b82f6) 25%, transparent);
+  color: var(--cx-text-mid);
+  font-size: 10px;
+}
+
+.bottomTabClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0.55;
+}
+
+.bottomTabClose:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--cx-line) 55%, transparent);
+}
+
+.bottomTabActions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.bottomTabMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 140px;
+  border: 0.5px solid var(--cx-line);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--cx-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.bottomTabMenuItem {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--cx-text-hi);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.bottomTabMenuItem:hover {
+  background: color-mix(in srgb, var(--cx-line) 45%, transparent);
+}
+
+.bottomTerminalEmpty {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--cx-text-low);
+  font-size: 12px;
+  text-align: center;
+  background: #0d0d0d;
+}
+
+.bottomTerminalStack {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+
+.bottomTerminalPane,
+.bottomTerminalPaneHidden {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bottomTerminalPaneHidden {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bottomTerminalPane {
+  position: relative;
+  z-index: 1;
+}
+
+.bottomTerminalXterm {
+  min-height: 0;
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  background: #0d0d0d;
+}
+
+.bottomTerminalXterm :global(.xterm),
+.bottomTerminalXterm :global(.xterm-viewport),
+.bottomTerminalXterm :global(.xterm-screen) {
+  height: 100%;
+}

@@ -217,6 +217,26 @@ describe('WorkspaceController commands', () => {
       sessionId: session.id,
     })).rejects.toMatchObject({ code: 'workspace/not-found' })
 
+    const ungrouped = ctx.sessions.create(SessionId('session-ungrouped'), {
+      meta: { cwd: first.workspace.path },
+    })
+    await expect(controller.attachSession({
+      workspaceId: first.workspace.workspaceId,
+      sessionId: ungrouped.id,
+    })).resolves.toMatchObject({
+      workspace: { sessionIds: expect.arrayContaining([session.id, ungrouped.id]) },
+    })
+    await expect(controller.attachSession({
+      workspaceId: second.workspace.workspaceId,
+      sessionId: ungrouped.id,
+    })).resolves.toMatchObject({ workspace: { sessionIds: [ungrouped.id] } })
+    await expect(controller.detachSession({
+      workspaceId: first.workspace.workspaceId,
+      sessionId: ungrouped.id,
+    })).resolves.toMatchObject({
+      workspace: { sessionIds: [session.id] },
+    })
+
     await expect(controller.archiveSession({ sessionId: session.id }))
       .resolves.toEqual({ archivedSessionIds: [session.id] })
     await expect(controller.archiveSession({ sessionId: SessionId('unknown') }))

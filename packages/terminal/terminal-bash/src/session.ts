@@ -11,6 +11,7 @@ import type {
 import { TerminalError } from '@deepseek-ai/dsh-terminal'
 import type {
   TerminalBackendSession,
+  TerminalFollowFrame,
   TerminalReadRequest,
   TerminalReadResult,
   TerminalSendOperation,
@@ -198,6 +199,9 @@ export class LocalPtySession implements TerminalBackendSession {
   private responseWrites = Promise.resolve()
   private pendingResponseWrites = 0
   private emulatorClosed = false
+  private followSeq = 0
+  private readonly rawFollowBuffer = new BoundedTextBuffer(256 * 1024)
+  private readonly followers = new Set<(chunk: string) => void>()
 
   constructor(
     private readonly terminal: SubprocessTerminalHandle,
@@ -380,6 +384,76 @@ export class LocalPtySession implements TerminalBackendSession {
     return { delivered: true, targetPgid }
   }
 
+  /**
+   * Write raw keys/bytes without Enter or claim of the line-mode send slot.
+   * @param data - UTF-8 text delivered without implicit newline conversion.
+   */
+  async write(data: string): Promise<void> {
+    if (this.closing) throw new Error('PTY session is closing')
+    if (this.statusValue.kind === 'exited') throw new Error('PTY session has exited')
+    if (this.active !== undefined) {
+      throw new TerminalError('PTY session already has an active send', 'SEND_ACTIVE')
+    }
+    await this.terminal.write(data)
+  }
+
+  /**
+   * Resize the provider PTY and the headless emulator used by line-mode reads.
+   * @param cols - positive column count.
+   * @param rows - positive row count.
+   */
+  async resize(cols: number, rows: number): Promise<void> {
+    if (this.closing) throw new Error('PTY session is closing')
+    if (this.statusValue.kind === 'exited') throw new Error('PTY session has exited')
+    await this.terminal.resize(cols, rows)
+    this.emulator.resize(cols, rows)
+  }
+
+  /**
+   * Stream decoded PTY text with CSI preserved for UI followers.
+   * @param signal - cancels the subscription.
+   * @returns recent raw buffer first, then live frames.
+   */
+  async *followOutput(signal: AbortSignal): AsyncIterable<TerminalFollowFrame> {
+    const queue: TerminalFollowFrame[] = []
+    let wake: (() => void) | undefined
+    const push = (chunk: string): void => {
+      if (chunk.length === 0) return
+      this.followSeq += 1
+      queue.push({ seq: this.followSeq, chunk })
+      wake?.()
+    }
+    const snapshot = this.rawFollowBuffer.snapshot().text
+    if (snapshot.length > 0) push(snapshot)
+    this.followers.add(push)
+    try {
+      while (!signal.aborted) {
+        if (queue.length === 0) {
+          await new Promise<void>((resolve) => {
+            wake = resolve
+            const onAbort = (): void => {
+              wake = undefined
+              resolve()
+            }
+            signal.addEventListener('abort', onAbort, { once: true })
+          })
+          if (signal.aborted) break
+        }
+        // Batch small chunks into one frame to protect high-rate Remote streams.
+        let merged = ''
+        let seq = 0
+        while (queue.length > 0 && merged.length < 16 * 1024) {
+          const next = queue.shift()!
+          seq = next.seq
+          merged += next.chunk
+        }
+        if (merged.length > 0) yield { seq, chunk: merged }
+      }
+    } finally {
+      this.followers.delete(push)
+    }
+  }
+
   status(): TerminalSessionStatus {
     return this.statusValue
   }
@@ -399,12 +473,19 @@ export class LocalPtySession implements TerminalBackendSession {
   private readonly onTerminalData = (chunk: Buffer | Uint8Array | string): void => {
     const bytes = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk
     const data = this.decoder.decode(bytes, { stream: true })
+    this.rawFollowBuffer.append(data)
+    for (const follower of this.followers) follower(data)
     this.queueEmulatorData(data)
     this.onData(data)
   }
 
   private readonly onTerminalEnd = (): void => {
-    this.onData(this.decoder.decode())
+    const tail = this.decoder.decode()
+    if (tail.length > 0) {
+      this.rawFollowBuffer.append(tail)
+      for (const follower of this.followers) follower(tail)
+    }
+    this.onData(tail)
     this.appendOutput(this.sanitizer.flush())
     this.closeEmulator()
     this.outputEnded.resolve()

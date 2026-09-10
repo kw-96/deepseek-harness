@@ -13,7 +13,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { networkInterfaces } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
@@ -158,8 +158,14 @@ function localWebUrl(ctx: Context): string {
  * concern — the fallback owner reads files per request, so a composition
  * whose page never reaches the fallback seat (the static worker preview
  * ships its own page and carries no dist) boots without one.
+ * `DSH_WEB_DIST_INDEX` optionally freezes that path for one process (desktop
+ * shells snapshot `apps/web/dist` so an in-flight session ignores later rebuilds).
  */
 function resolveDistIndex(): string {
+  const override = process.env.DSH_WEB_DIST_INDEX?.trim()
+  if (override !== undefined && override !== '') {
+    return resolve(override)
+  }
   const require = createRequire(import.meta.url)
   try {
     return join(dirname(require.resolve('@deepseek-ai/dsh-web-frontend/package.json')), 'dist', 'index.html')

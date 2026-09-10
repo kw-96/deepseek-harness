@@ -2,7 +2,8 @@ import type { ChatNode } from '../contract/chat-nodes.ts'
 import type {
   ChatLocationNodeIndex, ChatNodeStore, ChatTurnProcessPresentation,
 } from '../contract/snapshot.ts'
-import { TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
+import { hasAssistantReplyContent } from '../contract/assistant-content.ts'
+import { isSubagentDelegationTool, TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
 
 function nodeTurn(node: ChatNode | undefined): number | undefined {
   const location = node?.location
@@ -18,7 +19,78 @@ function samePresentation(
     && left.turn === right.turn
     && left.turnClosed === right.turnClosed
     && left.hasExternalProcess === right.hasExternalProcess
-    && left.compactAnswer === right.compactAnswer)
+    && left.compactAnswer === right.compactAnswer
+    && left.streamFoldEnd === right.streamFoldEnd
+    && left.foldedToolCalls === right.foldedToolCalls
+    && left.foldedSubagents === right.foldedSubagents)
+}
+
+/** A call's wire name and settled status, read off its root lifecycle value. */
+function toolCallFacts(node: ChatNode | undefined): { name: string; settled: boolean } | undefined {
+  if (node?.kind !== 'tool-call') return undefined
+  const root = node.data.root
+  const settled = 'kind' in root
+  return {
+    name: settled ? root.call?.name ?? '' : root.name,
+    settled,
+  }
+}
+
+/**
+ * Streaming fold presence anchor: the latest contentful message, or the
+ * earliest still-running call while no message exists yet. Streaming folds
+ * are kind-based (settled Tools, reasoning-only rows, context), so this value
+ * only marks that a foldable window exists rather than gating members.
+ * @param keys - ordered Chat Node keys of the Turn.
+ * @param nodes - current Chat Node store.
+ * @returns the anchor (MAX when the Turn owns neither anchor).
+ */
+function streamingFoldEnd(keys: readonly string[], nodes: ChatNodeStore): number {
+  let runningAnchor: number | null = null
+  let messageAnchor: number | null = null
+  for (const key of keys) {
+    const node = nodes.get(key) as ChatNode | undefined
+    if (node === undefined) continue
+    if (node.kind === 'tool-call') {
+      const facts = toolCallFacts(node)
+      if (facts !== undefined && !facts.settled && runningAnchor === null) runningAnchor = node.anchorSeq
+    } else if (node.kind === 'assistant-step' && hasAssistantReplyContent(node.data.blocks)) {
+      messageAnchor = node.anchorSeq
+    }
+  }
+  return messageAnchor ?? runningAnchor ?? Number.MAX_SAFE_INTEGER
+}
+
+/** Settled-fold counts for one streaming Turn (kind-based, position-free). */
+function streamingFoldCounts(
+  keys: readonly string[],
+  nodes: ChatNodeStore,
+  startSeq: number,
+): { toolCalls: number; subagents: number; others: number } {
+  let toolCalls = 0
+  let subagents = 0
+  let others = 0
+  for (const key of keys) {
+    const node = nodes.get(key) as ChatNode | undefined
+    if (node === undefined || node.anchorSeq < startSeq) continue
+    if (node.kind === 'tool-call') {
+      // Settled calls fold regardless of position — only the running tree
+      // stays visible.
+      const facts = toolCallFacts(node)
+      if (facts === undefined || !facts.settled) continue
+      if (isSubagentDelegationTool(facts.name)) subagents += 1
+      else toolCalls += 1
+      continue
+    }
+    // Contentful Assistant rows stay visible (the message boundary) and a
+    // live retry is an active signal, not foldable noise; every other process
+    // member folds wherever it sits: context injection, reasoning-only
+    // Assistant rows.
+    if (node.kind === 'assistant-step' && hasAssistantReplyContent(node.data.blocks)) continue
+    if (node.kind === 'model-retry' || TURN_PROCESS_INDEPENDENT_KINDS.has(node.kind)) continue
+    others += 1
+  }
+  return { toolCalls, subagents, others }
 }
 
 function derivePresentation(
@@ -61,12 +133,29 @@ function derivePresentation(
       hasExternalProcess = true
     }
   }
+  const turnClosed = location.turn.status === 'closed'
+  // Streaming fold applies whenever the Turn lacks a final answer — running,
+  // or closed by interruption. Settled calls, reasoning-only rows, and other
+  // process rows collapse into the disclosure; the closed answered Turn keeps
+  // its answer-boundary fold exclusively.
+  const streaming = spec.answerAnchorSeq === null
+  const streamCounts = streaming
+    ? streamingFoldCounts(keys, nodes, spec.processStartSeq)
+    : { toolCalls: 0, subagents: 0, others: 0 }
+  // No member to fold: keep the live Turn fully expanded (an empty
+  // disclosure line is noise, not a control).
+  const streamFoldEnd = streamCounts.toolCalls + streamCounts.subagents + streamCounts.others === 0
+    ? null
+    : streamingFoldEnd(keys, nodes)
   return {
     turn,
     spec,
-    turnClosed: location.turn.status === 'closed',
+    turnClosed,
     hasExternalProcess,
     compactAnswer,
+    streamFoldEnd,
+    foldedToolCalls: streamCounts.toolCalls,
+    foldedSubagents: streamCounts.subagents,
   }
 }
 

@@ -140,9 +140,59 @@ class FakeWorkspaces implements IWorkspaces {
   declare readonly delete: IWorkspaces['delete']
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']
+  declare readonly attachSession: IWorkspaces['attachSession']
+  declare readonly moveSession: IWorkspaces['moveSession']
+  declare readonly detachSession: IWorkspaces['detachSession']
 
   constructor(initial: WorkspaceSnapshot) {
     this.list = new MutableSource(initial)
+    this.attachSession = async (workspaceId, sessionId) => {
+      let updated: WorkspaceView | undefined
+      this.list.update((state) => {
+        const items = state.items.map((item) => {
+          if (item.workspaceId !== workspaceId) return item
+          if (item.sessionIds.includes(sessionId)) {
+            updated = item
+            return item
+          }
+          const next = { ...item, sessionIds: [sessionId, ...item.sessionIds] }
+          updated = next
+          return next
+        })
+        return { ...state, items }
+      })
+      return updated ?? {
+        workspaceId,
+        title: '',
+        path: '',
+        sessionIds: [sessionId],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }
+    }
+    this.detachSession = async (workspaceId, sessionId) => {
+      let updated: WorkspaceView | undefined
+      this.list.update((state) => {
+        const items = state.items.map((item) => {
+          if (item.workspaceId !== workspaceId) return item
+          const next = {
+            ...item,
+            sessionIds: item.sessionIds.filter(id => id !== sessionId),
+          }
+          updated = next
+          return next
+        })
+        return { ...state, items }
+      })
+      return updated ?? {
+        workspaceId,
+        title: '',
+        path: '',
+        sessionIds: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }
+    }
   }
 
   archiveSession(sessionId: SessionId): Promise<void> {

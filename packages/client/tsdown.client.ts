@@ -12,12 +12,12 @@ import { readFile } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 import { optionalStringArray } from './modules/src/client/manifest.ts'
 import { PLATFORM_MODULES, PRELOADED_CLIENT_EXTERNALS } from './web/src/platform.ts'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
+import { cssModuleClassName } from '../../scripts/css-module-class-name.ts'
 
 /**
  * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline
@@ -77,7 +77,7 @@ const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
  */
 const SKIP_WORKSPACE_BUILD: UserConfig = { entry: '' }
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
+const REPOSITORY_ROOT = resolvePath(process.cwd())
 
 /** Rebase a physical lib-relative source onto a browser URL that mirrors the repository directories. */
 function browserSourcePath(source: string, sourcemapPath: string): string {
@@ -520,7 +520,7 @@ function clientConfig(id: string, entry: string): UserConfig {
         const classMap: Record<string, string> = {}
         const exportEntries = Object.entries(cssExports ?? {})
           .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        for (const [local, exp] of exportEntries) classMap[local] = exp.name
+        for (const [local, exp] of exportEntries) classMap[local] = cssModuleClassName(exp)
         return styleInjectionModule(id, fileId, code.toString(), classMap)
       },
     }, {

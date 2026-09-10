@@ -77,6 +77,17 @@ export interface ChatTurnProcessPresentation {
   readonly turnClosed: boolean
   readonly hasExternalProcess: boolean
   readonly compactAnswer: boolean
+  /**
+   * Streaming fold boundary: while the Turn runs, process members whose
+   * anchorSeq is below this value fold into the process disclosure (settled
+   * calls only — the active tail stays expanded). null while there is no
+   * streaming fold: the Turn closed, or no call has settled yet.
+   */
+  readonly streamFoldEnd: number | null
+  /** Settled Tool-call members folded while streaming (disclosure counts). */
+  readonly foldedToolCalls: number
+  /** Settled subagent-delegation members folded while streaming. */
+  readonly foldedSubagents: number
 }
 
 /** Compatibility projection backing StatsPills and the legacy top-level snapshot fields. */

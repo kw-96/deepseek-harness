@@ -192,6 +192,16 @@ export class FakeApiClient {
   onWorkspaceInsertSessionBefore: (payload: unknown) => Promise<RemoteResult<{ workspace: WorkspaceView }>> =
     () => Promise.resolve(ok({ workspace: fakeWorkspace('fk-ws') }))
 
+  onWorkspaceAttachSession: (payload: unknown) => Promise<RemoteResult<{ workspace: WorkspaceView }>> =
+    payload => Promise.resolve(ok({
+      workspace: fakeWorkspace('fk-ws', {
+        sessionIds: [(payload as { sessionId: SessionId }).sessionId],
+      }),
+    }))
+
+  onWorkspaceDetachSession: (payload: unknown) => Promise<RemoteResult<{ workspace: WorkspaceView }>> =
+    () => Promise.resolve(ok({ workspace: fakeWorkspace('fk-ws', { sessionIds: [] }) }))
+
   onWorkspaceArchiveSession: (payload: unknown) => Promise<RemoteResult<{ archivedSessionIds: SessionId[] }>> =
     payload => Promise.resolve(ok({ archivedSessionIds: [(payload as { sessionId: SessionId }).sessionId] }))
 
@@ -267,6 +277,16 @@ export class FakeApiClient {
           'workspace.insertSessionBefore',
           payload,
           this.onWorkspaceInsertSessionBefore(payload),
+        ),
+        attachSession: payload => this.record(
+          'workspace.attachSession',
+          payload,
+          this.onWorkspaceAttachSession(payload),
+        ),
+        detachSession: payload => this.record(
+          'workspace.detachSession',
+          payload,
+          this.onWorkspaceDetachSession(payload),
         ),
         archiveSession: payload => this.record(
           'workspace.archiveSession',

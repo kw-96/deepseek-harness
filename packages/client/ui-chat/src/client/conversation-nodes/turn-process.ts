@@ -118,6 +118,10 @@ function latestAnswer(turn: TurnLocation): Readonly<FinalAssistantChatData> | nu
   const latestStep = turn.steps.at(-1)
   const data: Readonly<AssistantChatData> | undefined = latestStep?.data.get('assistant-step')
   if (!isFinalAssistant(data) || !hasAssistantReplyContent(data.blocks)) return null
+  // A Turn closed by interruption has no final answer: it keeps the streaming
+  // fold rules instead. A partial window's interrupted projection (Turn still
+  // open) remains the window's answer anchor.
+  if (data.status === 'interrupted' && turn.status === 'closed') return null
   return data.blocks.some(block => block.kind === 'tool-call') ? null : data
 }
 

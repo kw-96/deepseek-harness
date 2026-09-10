@@ -394,11 +394,16 @@ export function chatSnapshotFixture(input: {
         return typeof step === 'number' ? [step] : []
       }),
     )
-    const answer = assistants.findLast((candidate): candidate is FinalAssistantChatData =>
-      candidate.step === latestStep
-      && candidate.finalNode !== undefined
-      && hasAssistantReplyContent(candidate.blocks)
-      && !candidate.blocks.some(block => block.kind === 'tool-call'))
+    // Mirrors production latestAnswer: a Turn with live calls has no final
+    // answer yet — the process window keeps the streaming fold rules.
+    const answer = legacy.runningCalls.length > 0
+      ? undefined
+      : assistants.findLast((candidate): candidate is FinalAssistantChatData =>
+        candidate.step === latestStep
+        && candidate.finalNode !== undefined
+        && candidate.status !== 'interrupted'
+        && hasAssistantReplyContent(candidate.blocks)
+        && !candidate.blocks.some(block => block.kind === 'tool-call'))
     const controlAnchor = inTurn.find(candidate => candidate.kind === 'assistant-step'
       || candidate.kind === 'tool-call'
       || candidate.kind === 'model-retry')

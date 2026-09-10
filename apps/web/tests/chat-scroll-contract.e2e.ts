@@ -661,7 +661,10 @@ describe('web e2e: long Chat scroll contract', () => {
     })
   }, 180_000)
 
-  it.skipIf(MODE === 'record')('keeps streaming ownership and tool disclosure state across a long scroll-away cycle', async () => {
+  // The live tool stream drives the bash tool, which the shipped presets
+  // mount only on POSIX (Windows composes pwsh instead); the ready/release
+  // markers are written by that shell execution.
+  it.skipIf(MODE === 'record' || process.platform === 'win32')('keeps streaming ownership and tool disclosure state across a long scroll-away cycle', async () => {
     await withScrollWorld({
       failureShot: 'web-e2e-chat-scroll-live-tool',
       replay: [
@@ -892,7 +895,9 @@ describe('web e2e: long Chat scroll contract', () => {
     })
   }, 180_000)
 
-  it.skipIf(MODE === 'record')('touch-style fling scrolling owns streaming bottom-follow without wheel input', async () => {
+  // The fling stream's ready marker is written by the replayed bash tool,
+  // which the shipped presets mount only on POSIX.
+  it.skipIf(MODE === 'record' || process.platform === 'win32')('touch-style fling scrolling owns streaming bottom-follow without wheel input', async () => {
     await withScrollWorld({
       failureShot: 'web-e2e-chat-scroll-fling-stream',
       replay: [

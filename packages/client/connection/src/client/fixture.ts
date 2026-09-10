@@ -357,6 +357,14 @@ interface WorkspaceInsertSessionBeforeRequest {
   readonly sessionId: SessionId
   readonly beforeSessionId?: SessionId
 }
+interface WorkspaceAttachSessionRequest {
+  readonly workspaceId: WorkspaceId
+  readonly sessionId: SessionId
+}
+interface WorkspaceDetachSessionRequest {
+  readonly workspaceId: WorkspaceId
+  readonly sessionId: SessionId
+}
 interface WorkspaceArchiveSessionRequest { readonly sessionId: SessionId }
 interface WorkspaceArchiveValue { readonly archivedSessionIds: readonly SessionId[] }
 
@@ -379,6 +387,8 @@ interface FixtureWorkspaceApi {
   delete(request: WorkspaceDeleteRequest): Promise<ConnectionRpcResult<WorkspaceDeleteValue>>
   insertBefore(request: WorkspaceInsertBeforeRequest): Promise<ConnectionRpcResult<WorkspaceOrderValue>>
   insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<ConnectionRpcResult<WorkspaceValue>>
+  attachSession(request: WorkspaceAttachSessionRequest): Promise<ConnectionRpcResult<WorkspaceValue>>
+  detachSession(request: WorkspaceDetachSessionRequest): Promise<ConnectionRpcResult<WorkspaceValue>>
   archiveSession(request: WorkspaceArchiveSessionRequest): Promise<ConnectionRpcResult<WorkspaceArchiveValue>>
 }
 
@@ -3784,6 +3794,57 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       }
       return sessionOk({ workspace: workspaceSnapshot(workspace) })
     },
+    attachSession: (request) => {
+      const workspace = workspaces.find(candidate => candidate.workspaceId === request.workspaceId)
+      if (workspace === undefined) {
+        return sessionErr({
+          code: 'workspace/not-found',
+          message: `no workspace ${request.workspaceId}`,
+          details: { workspaceId: request.workspaceId },
+        })
+      }
+      const summary = summaryOf(request.sessionId)
+      if (summary === undefined) {
+        return sessionErr({
+          code: 'workspace/attach-invalid',
+          message: `no session ${request.sessionId}`,
+          details: { workspaceId: request.workspaceId, sessionId: request.sessionId },
+        })
+      }
+      if (summary.cwd !== workspace.path) {
+        return sessionErr({
+          code: 'workspace/attach-invalid',
+          message: `session cwd does not match workspace path`,
+          details: { workspaceId: request.workspaceId, sessionId: request.sessionId },
+        })
+      }
+      for (const other of workspaces) {
+        if (other.workspaceId === workspace.workspaceId) continue
+        other.sessionIds = other.sessionIds.filter(id => id !== request.sessionId)
+      }
+      if (!workspace.sessionIds.includes(request.sessionId)) {
+        workspace.sessionIds = [request.sessionId, ...workspace.sessionIds]
+        workspace.updatedAt = new Date().toISOString()
+        emitWorkspace({ type: 'upsert', workspace: workspaceSnapshot(workspace) })
+      }
+      return sessionOk({ workspace: workspaceSnapshot(workspace) })
+    },
+    detachSession: (request) => {
+      const workspace = workspaces.find(candidate => candidate.workspaceId === request.workspaceId)
+      if (workspace === undefined) {
+        return sessionErr({
+          code: 'workspace/not-found',
+          message: `no workspace ${request.workspaceId}`,
+          details: { workspaceId: request.workspaceId },
+        })
+      }
+      if (workspace.sessionIds.includes(request.sessionId)) {
+        workspace.sessionIds = workspace.sessionIds.filter(id => id !== request.sessionId)
+        workspace.updatedAt = new Date().toISOString()
+        emitWorkspace({ type: 'upsert', workspace: workspaceSnapshot(workspace) })
+      }
+      return sessionOk({ workspace: workspaceSnapshot(workspace) })
+    },
     archiveSession: (request) => {
       if (summaryOf(request.sessionId) === undefined) {
         return sessionErr({
@@ -3989,6 +4050,12 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         case 'workspace/insertBefore': return workspaceApi.insertBefore(request as WorkspaceInsertBeforeRequest)
         case 'workspace/insertSessionBefore': return workspaceApi.insertSessionBefore(
           request as WorkspaceInsertSessionBeforeRequest,
+        )
+        case 'workspace/attachSession': return workspaceApi.attachSession(
+          request as WorkspaceAttachSessionRequest,
+        )
+        case 'workspace/detachSession': return workspaceApi.detachSession(
+          request as WorkspaceDetachSessionRequest,
         )
         case 'workspace/archiveSession': return workspaceApi.archiveSession(request as WorkspaceArchiveSessionRequest)
         default:

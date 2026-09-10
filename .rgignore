@@ -1,2 +1,6 @@
 # Frozen Agent Notes are historical snapshots, not current search authority.
 /.agents/notes/archived/
+
+# Vendored community deploy assets (plugins, skills, profile template) live
+# outside the harness workspace and are not subject to its source gates.
+/community/

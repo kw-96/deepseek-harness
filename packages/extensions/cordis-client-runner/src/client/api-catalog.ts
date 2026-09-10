@@ -412,6 +412,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'workspaceId', description: 'owning Workspace.' }, { name: 'sessionId', description: 'Session to move.' }, { name: 'beforeSessionId', description: 'anchor Session; omitted appends.' }],
         returns: 'the changed Workspace.',
       },
+      {
+        signature: 'attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>',
+        description: 'Account a Session whose stored cwd matches the Workspace path.',
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'sessionId', description: 'Session to attach.' }],
+        returns: 'the changed Workspace.',
+      },
+      {
+        signature: 'detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>',
+        description: 'Remove a Session from a Workspace account (Ungrouped).',
+        parameters: [{ name: 'workspaceId', description: 'owning Workspace.' }, { name: 'sessionId', description: 'Session to detach.' }],
+        returns: 'the changed Workspace.',
+      },
     ],
   },
 ]

@@ -123,7 +123,7 @@ interface Workspace {
 
 ## 消费方
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD，[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD 与会话归属（`attachSession` / `detachSession` / `insertSessionBefore`），[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -224,6 +224,20 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the updated Workspace projection.
  */
 @Remote('insertSessionBefore') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>
+
+/**
+ * Account one Session whose stored cwd matches the Workspace path.
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('attachSession') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>
+
+/**
+ * Remove one Session from a Workspace account (Ungrouped).
+ * @param request - Workspace and Session identities.
+ * @returns the updated Workspace projection.
+ */
+@Remote('detachSession') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>
 
 /**
  * Hide one known Session from Workspace grouping surfaces.
@@ -355,6 +369,53 @@ get(id: WorkspaceId): Workspace | undefined
  * @returns a fresh ordered array of workspace entities.
  */
 list(): Workspace[]
+
+/**
+ * Create a project grouping over ordered directory roots.
+ * @param name - Display tier name.
+ * @param roots - Ordered directory roots whose prefix matches workspaces.
+ * @returns the newly durable project.
+ */
+createProject(name: string, roots: readonly string[] = []): Promise<Project>
+
+/**
+ * Look up a project by id.
+ * @param id - Project id.
+ * @returns the project, or `undefined` when unknown.
+ */
+getProject(id: ProjectId): Project | undefined
+
+/**
+ * Synchronous project projection in durable registry order.
+ * @returns a fresh ordered array of project entities.
+ */
+listProjects(): Project[]
+
+/**
+ * Resolve the project owning one canonical directory path by longest root
+ * prefix; the empty root never matches, and longer roots win ties.
+ * @param path - Canonical directory path to classify.
+ * @returns the owning project, or `undefined` when no root prefixes it.
+ */
+projectForPath(path: string): Project | undefined
+
+/**
+ * Delete one project registration; its directory roots and workspaces are
+ * retained. The durable order is updated before the table deletion; a
+ * failed table write restores the prior order. Unknown ids are an idempotent
+ * no-op.
+ * @param id - Project to remove.
+ * @returns `true` when a record was deleted, `false` when it was unknown.
+ */
+deleteProject(id: ProjectId): Promise<boolean>
+
+/**
+ * Move one project within the durable display order, DOM-insertBefore-like.
+ * @param id - The project to move.
+ * @param beforeId - Project to insert before; omitted appends.
+ * @returns the complete committed project order.
+ */
+insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>
 
 /**
  * Delete one workspace registration while retaining its directory and every

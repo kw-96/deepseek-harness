@@ -15,18 +15,27 @@ import type {} from '@deepseek-ai/dsh-typert-protocol'
  */
 export type WorkspaceId = Branded<'WorkspaceId'>
 
+/**
+ * Identifies one project record. A generated uuid; the display name can be
+ * rewritten and roots can change, so the anchor stays stable.
+ */
+export type ProjectId = Branded<'ProjectId'>
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** No registration carries that Workspace identity. */
     'workspace/not-found': { readonly workspaceId: WorkspaceId }
+    /** No registration carries that Project identity. */
+    'project/not-found': { readonly projectId: ProjectId }
   }
 }
 
 /**
  * One workspace: a stable id over an existing directory, a display title, and
- * an ordered candidate account of sessions. Membership requires both an id in
- * that account and a session header whose canonical cwd equals the workspace
- * path. Consumers only see this interface; the implementation stays private.
+ * an ordered account of sessions. The directory is the default location for
+ * new sessions and the Explorer target; membership is an explicit, durable
+ * account and does not require a session's cwd to equal {@link path}.
+ * Consumers only see this interface; the implementation stays private.
  */
 export interface Workspace {
   /** Stable record id (generated uuid). */
@@ -49,12 +58,10 @@ export interface Workspace {
   readonly updatedAt: string
 
   /**
-   * Header-validated sessions in manually owned order: a new session is
+   * Explicitly accounted sessions in manually owned order: a new session is
    * prepended at attach, explicit reordering goes through
-   * `insertSessionBefore`, and activity never reorders. The durable candidate
-   * account is filtered synchronously: missing headers, invalid cwd values,
-   * and canonical cwd mismatches are never returned. A subsequent workspace
-   * mutation prunes those filtered candidates durably.
+   * `insertSessionBefore`, and activity never reorders. The account is not
+   * filtered by cwd; a session may be moved across workspaces freely.
    */
   readonly sessionIds: readonly SessionId[]
 
@@ -66,13 +73,9 @@ export interface Workspace {
   setTitle(title: string): Promise<void>
 
   /**
-   * Prepend a session to this workspace's candidate account. An already
-   * accounted id resolves without writing, aside from the durable
-   * filtered-candidate prune every accepted mutation performs. A new id's
-   * live or persisted
-   * header cwd must resolve to an existing directory equal to {@link path};
-   * unknown ids, missing or invalid cwd values, and mismatches reject without
-   * writing.
+   * Prepend a session to this workspace's account. An already accounted id
+   * resolves without writing. A new id must exist in the session store or
+   * persistence; unknown ids reject without writing.
    * @param sessionId - The session to record.
    * @returns resolution after durability.
    */
@@ -83,9 +86,7 @@ export interface Workspace {
    * with an anchor the session lands before it, without one it appends to the
    * end. Only the moved id changes position. A session or anchor absent from
    * the account rejects without writing; a move to the current position
-   * resolves without writing, aside from the durable filtered-candidate
-   * prune every accepted mutation performs; decided on the domain write
-   * chain.
+   * resolves without writing; decided on the domain write chain.
    * @param sessionId - The accounted session to move.
    * @param beforeSessionId - Accounted anchor to insert before; omitted appends.
    * @returns resolution after durability.
@@ -94,9 +95,8 @@ export interface Workspace {
 
   /**
    * Remove a session from this workspace's account. Idempotent: an id not on
-   * the account resolves without writing, aside from the durable
-   * filtered-candidate prune every accepted mutation performs; decided on
-   * the domain write chain like attach. Never touches the session's own stored log.
+   * the account resolves without writing; decided on the domain write chain
+   * like attach. Never touches the session's own stored log.
    * @param sessionId - The session to remove.
    * @returns resolution after durability.
    */
@@ -109,4 +109,41 @@ export interface Workspace {
    * @returns `'ok'` when the directory exists, `'missing-dir'` otherwise.
    */
   status(): Promise<'ok' | 'missing-dir'>
+}
+
+/**
+ * One project: a stable id over a display name and an ordered list of
+ * directory roots. Workspaces group under the project whose longest root
+ * prefixes their canonical path; roots may span several directories so one
+ * logical project can own multiple checkout directories.
+ */
+export interface Project {
+  /** Stable record id (generated uuid). */
+  readonly id: ProjectId
+
+  /** Display name shown in the sidebar project tier. */
+  readonly name: string
+
+  /** Ordered directory roots, in user order. */
+  readonly roots: readonly string[]
+
+  /** ISO-8601 creation instant. */
+  readonly createdAt: string
+
+  /** ISO-8601 instant of the last durable mutation. */
+  readonly updatedAt: string
+
+  /**
+   * Replace the display name durably.
+   * @param name - New name; any non-empty string, duplicates allowed.
+   * @returns resolution after durability.
+   */
+  setName(name: string): Promise<void>
+
+  /**
+   * Replace the ordered directory roots durably.
+   * @param roots - New ordered root paths.
+   * @returns resolution after durability.
+   */
+  setRoots(roots: readonly string[]): Promise<void>
 }
