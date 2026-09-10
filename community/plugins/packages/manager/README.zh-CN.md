@@ -57,7 +57,7 @@ Git 安装会运行 `prepare`，pnpm 10 及更高版本要求用户明确授权�
 
 Web API 沿用 Harness 连接层的受信任 Host 判定。能够使用受信任 Web 控制面的访问者也能启停插件，因此不要把 Harness Web 服务暴露给不可信网络。
 
-管理器默认保护自身条目及其 Loader 祖先、根 Include、配置 HMR 服务，以及远程接口、Web 服务、客户端运行时、设置页、模块加载、连接和语言服务。这些条目维持配置刷新和管理页面本身，不能从该页面安全停用。
+管理器默认保护自身条目及其 Loader 祖先、根 Include、配置 HMR 服务，以及远程接口、Web 服务、客户端运行时、设置页、模块加载、连接和语言服务。这些条目维持配置刷新和管理页面本身，不能从该页面安全停用。它还会保护 `ui-settings-plugin-inventory`，即其 bundle patch 替换掉的只读列表：管理器标签页占用同一批 `settings.plugins.tab` 单元，重新启用该条目会因标签 id 重复导致 Loader 加载失败。
 
 ## 分类与条目名称
 

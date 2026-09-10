@@ -30,6 +30,14 @@ import type {
 export type * from './types.js'
 
 const SELF_MODULE = 'dsh-plugin-manager'
+/**
+ * Entry ids the manager's bundle patch replaces. Their `settings.plugins.tab`
+ * contribution reuses the manager's own tab id, so a re-enabled entry fails
+ * the Loader on the occupied slot cell.
+ */
+const REPLACED_ENTRY_IDS = new Set([
+  'ui-settings-plugin-inventory',
+])
 const DEFAULT_PROTECTED_IDS = new Set([
   'api-gateway',
   'api-remotes',
@@ -213,6 +221,8 @@ export class PluginManager extends TypertRemoteService {
       ? 'The plugin manager cannot disable itself.'
       : protectsManager
         ? 'This entry owns the plugin manager lifecycle.'
+      : REPLACED_ENTRY_IDS.has(entry.options.id)
+        ? 'This entry is replaced by the plugin manager and cannot be enabled alongside it.'
       : protectedById
         ? 'This entry is required by profile reload or the Web management surface.'
         : null

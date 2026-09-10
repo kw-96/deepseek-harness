@@ -57,6 +57,20 @@ describe('PluginManager', () => {
     expect(snapshot.entries.find(entry => entry.entryId === featureId)).toMatchObject({ category: 'third-party', group: 'ungrouped', description: null })
   })
 
+  it('protects the read-only inventory entry its bundle patch replaces', async () => {
+    const { ctx, manager } = await harness()
+    const created = await ctx.loader.create({ name: 'cordis:empty' })
+    // `Entry.id` reads `options.id`; the store key stays the created id.
+    ctx.loader.resolve(created).options.id = 'ui-settings-plugin-inventory'
+    ctx.loader.resolve(created).options.name = '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
+    const entryId = 'ui-settings-plugin-inventory'
+    const reason = 'This entry is replaced by the plugin manager and cannot be enabled alongside it.'
+    expect(manager.list().entries.find(entry => entry.entryId === entryId))
+      .toMatchObject({ protected: true, protectionReason: reason })
+    const receipt = await manager.setEnabled(created, true)
+    expect(receipt.items).toEqual([{ entryId, status: 'skipped', message: reason }])
+  })
+
   it('persists and waits for the Loader state before reporting success', async () => {
     const { ctx, manager, featureId, patch } = await harness()
     const hmr = emulateHmr(ctx, [featureId], false)
