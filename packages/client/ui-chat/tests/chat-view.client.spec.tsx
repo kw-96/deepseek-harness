@@ -1165,13 +1165,25 @@ describe('ChatView', () => {
     const baseRenderSlot = h.props.renderSlot
     const renderSlot = ((key: string, owner: object, opts?: { fallback?: React.ReactNode }) => {
       if (key !== 'conversation.message.images') return baseRenderSlot(key as never, owner as never, opts as never)
-      const images = (owner as { images: readonly unknown[] }).images
-      return <div data-testid="echo-images" data-count={images.length} data-first={JSON.stringify(images[0])} />
+      const { images, compact } = owner as { images: readonly unknown[]; compact?: boolean }
+      return (
+        <div
+          data-testid="echo-image"
+          data-count={images.length}
+          data-compact={String(compact)}
+          data-first={JSON.stringify(images[0])}
+        />
+      )
     }) as unknown as ChatViewSlotProps['renderSlot']
     const view = render(<h.ChatView {...{ ...h.props, renderSlot }} />)
-    const gallery = view.getByTestId('echo-images')
-    expect(gallery.getAttribute('data-count')).toBe('2')
-    expect(JSON.parse(gallery.getAttribute('data-first') ?? '{}')).toEqual({
+    // 官方 0.1.5 语义：message-image 槽按附件逐图调用（每次恰好一张），
+    // 多图时槽位携带 compact 折叠标记；断言按逐图调用展开。
+    const images = view.getAllByTestId('echo-image')
+    expect(images).toHaveLength(2)
+    expect(images.every(image => image.getAttribute('data-count') === '1')).toBe(true)
+    expect(images.every(image => image.getAttribute('data-compact') === 'true')).toBe(true)
+    expect(images[0]?.parentElement).toBe(images[1]?.parentElement)
+    expect(JSON.parse(images[0]?.getAttribute('data-first') ?? '{}')).toEqual({
       preview: { url: 'blob:echo-a', name: 'a.png', width: 4, height: 3 },
     })
   })
@@ -2389,15 +2401,21 @@ describe('ChatView', () => {
     })
   })
 
-  it('names a workspace-folder Host refusal as a folder', async () => {
+  it('surfaces a workspace-folder Host refusal through the shared file-open dialog', async () => {
+    // 官方 0.1.5 ChatView 没有文件夹专属对话框：不存在 isFolderOpenPath 判定，
+    // locale 也没有 fileOpen.folder* 文案，openFile 的一切拒绝都进「无法打开文件」
+    // 对话框。本 fork 的 apply.ts 把文件夹路径同样交给 Host 的 openWorkspacePath
+    // 端点，拒绝时抛出 `path open failed: <原因>`。因此这里按当前 apply 的真实
+    // 行为断言：文件夹拒绝复用文件对话框，并把 Host 的拒绝原因透传进描述文案。
     const openFile = vi.fn<(path: string) => Promise<void>>()
-      .mockRejectedValueOnce(new Error(''))
+      .mockRejectedValueOnce(new Error('path open failed: workspace folder not accessible'))
     const h = makeHarness({ nodes: [toolResult(3, 'a')] })
     h.props.openFile = openFile
     render(<h.ChatView {...h.props} />)
     await act(async () => { h.toolOwners[0]!.openFile('.') })
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: '无法打开文件夹' }).textContent).toContain('无法打开此文件夹')
+      expect(screen.getByRole('dialog', { name: '无法打开文件' }).textContent)
+        .toContain('path open failed: workspace folder not accessible')
     })
   })
 

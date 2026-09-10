@@ -70,10 +70,11 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
       source = restored.source
       data = restored.data
     }
+    // 本地定制(dev fork)：v3 要求受保护的 system 头先于首个 surface。旧
+    // Codex 导入会话没有 step/start，surface 到达时若尚无开放 step，先合成
+    // 一个 step/start（当前轮次 step 1）再合成空 system 头。
     if (SURFACE_TYPES.has(event.type) && this.head === undefined) {
       if (this.step === undefined) {
-        // 用户消息等无 step 坐标的 surface：在空 system 头前先开一个
-        // 确定性 step（当前轮次、step 1），满足 system/message 的坐标要求。
         this.step = { turn: this.turn, step: 1 }
         this.nextStep = 2
         context.emitEvent(canonicalizeTransformedEvent({
@@ -102,18 +103,14 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
         data: { turn: step.turn, step: step.step },
       }))
     }
-    // 本地定制(dev fork)：合成 step 与随后到达的真实 step/start 撞车时，
-    // 先闭合合成 step，再照常处理真实事件，保持目标流稠密且边界合法。
+    // 本地定制(dev fork)：合成 step 已打开同一 step 时吸收真实 step/start，
+    // 不重复发出（mapping 仍推进以保持序号稠密，目标序号不消耗）。
     if (event.type === 'step/start' && this.step !== undefined) {
       const turn = data['turn'] as number
       const step = data['step'] as number
       if (this.step.turn === turn && this.step.step === step) {
-        const closed = this.step
-        this.step = undefined
-        context.emitEvent(canonicalizeTransformedEvent({
-          type: 'step/end', seq: this.targetSeq++, time: event.time,
-          data: { turn: closed.turn, step: closed.step },
-        }))
+        this.mapping.push(this.targetSeq)
+        return
       }
     }
     const target = remapEvent(source, this.targetSeq, this.mapping)
@@ -173,6 +170,7 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
         type: 'step/start', seq: this.targetSeq++, time: event.time,
         data: { turn, step },
       }))
+      if (this.head === undefined) this.emitSystem('', event, context)
     }
     return { changed: turn !== (input['turn'] as number), source, data }
   }

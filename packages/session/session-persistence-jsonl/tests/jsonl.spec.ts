@@ -882,7 +882,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await retried.close()
   })
 
-  it.each(['read', 'write'] as const)('refuses the frozen pre-step V0 fixture on %s open without publishing a successor', async (access) => {
+  it.each(['read', 'write'] as const)('restores the frozen pre-step V0 fixture with a synthesized head on %s open', async (access) => {
     const id = SessionId('released-v0-real-shapes')
     const sourcePath = historicalLogPath(root, '/work', id)
     const currentPath = rawLogPath(root, '/work', id)
@@ -893,19 +893,23 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await writeFile(sourcePath, source)
     const before = await stat(sourcePath, { bigint: true })
 
-    await expect(ctx.sessionPersistence.open(id, access)).rejects.toMatchObject({
-      name: 'SessionFormatUnsupportedError',
-      message: expect.stringContaining('surface before first step') as unknown,
-    })
+    // 本地定制：pre-step 表面不再拒绝，而是合成空 system 头后还原。
+    const handle = await ctx.sessionPersistence.open(id, access)
+    const stored = await handle.read()
+    expect(stored.events.some(event => event.type === 'system/message')).toBe(true)
+    await handle.close()
     await ctx.sessionPersistence.flush()
 
     const after = await stat(sourcePath, { bigint: true })
     expect({ dev: after.dev, ino: after.ino, size: after.size, mtimeNs: after.mtimeNs, ctimeNs: after.ctimeNs })
       .toEqual({ dev: before.dev, ino: before.ino, size: before.size, mtimeNs: before.mtimeNs, ctimeNs: before.ctimeNs })
     expect(await readFile(sourcePath)).toEqual(source)
-    await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect((await readdir(dirname(sourcePath))).filter(name => name !== 'session.lock'))
-      .toEqual(['session.jsonl'])
+    // 写打开发布当前代后继；读打开不发布。
+    if (access === 'write') {
+      expect(await readFile(currentPath)).toBeDefined()
+    } else {
+      await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    }
   })
 
   it.each(['read', 'write'] as const)('restores canonical replacement envelopes from valid V2 chronology on %s open', async (access) => {

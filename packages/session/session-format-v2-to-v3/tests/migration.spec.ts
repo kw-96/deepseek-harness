@@ -119,10 +119,17 @@ describe('streaming V2 system prompt migration', () => {
   })
 
   it('restores legacy pre-step surfaces with a synthesized empty head instead of refusing', () => {
+    // 旧 Codex 导入会话没有 step/start：surface 触发合成 step/start 与空
+    // system 头，随后的 step 坐标事件复用该合成 step。
     const target = migrate([
       event('turn/start', { turn: 1 }),
       event('user/message', user(), 'append'),
+      event('assistant/message', {
+        turn: 1, step: 1, stream: [],
+        message: { id: 'legacy', role: 'assistant', source: { kind: 'model', provider: 'mock', model: 'mock' }, content: [{ type: 'text', text: 'hi' }] },
+      }, 'append'),
     ])
+    expect(target.events.some(e => e.type === 'step/start')).toBe(true)
     expect(target.events.some(e => e.type === 'system/message')).toBe(true)
     expect(() => migrate([event('turn/start', { turn: 1 }), event('request/header', request('early')), event('step/start', { turn: 1, step: 1 })])).toThrow(/outside an open step/)
     expect(() => migrate([...opening(), event('step/end', { turn: 1, step: 1 }), event('request/header', request('late'))])).toThrow(/outside an open step/)

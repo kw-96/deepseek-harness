@@ -950,8 +950,10 @@ describe('running and lock semantics', () => {
     expect(button.getAttribute('aria-label')).toBe('排队发送')
     expect(interruptButton).not.toBeNull()
     expect(textarea.getAttribute('aria-disabled')).not.toBe('true')
-    expect((view.getByLabelText('添加附件') as HTMLButtonElement).disabled).toBe(true)
-    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')?.disabled).toBe(true)
+    // 本地定制：输入框不提供回形针/文件选择按钮（仅粘贴与拖放），
+    // 子代理运行中拖放摄入关闭。
+    expect(view.queryByLabelText('添加附件')).toBeNull()
+    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).toBeNull()
     expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(false)
     fireEvent.click(button)
     expect(sink).toHaveBeenCalledWith('后续消息', [], 'queue', expect.any(AbortSignal))
@@ -986,8 +988,10 @@ describe('running and lock semantics', () => {
   ])('%s keeps ordinary generic-file intake enabled', (_name, projection) => {
     const added = vi.fn(() => null)
     const { view, slotCalls } = bench({ ...projection, addFiles: added })
-    expect((view.getByLabelText('添加附件') as HTMLButtonElement).disabled).toBe(false)
-    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')?.disabled).toBe(false)
+    // 本地定制：输入框不提供回形针/文件选择按钮（仅粘贴与拖放），
+    // 通用文件摄入在计划/目标进行中仍通过拖放启用。
+    expect(view.queryByLabelText('添加附件')).toBeNull()
+    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).toBeNull()
     expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(true)
   })
 
