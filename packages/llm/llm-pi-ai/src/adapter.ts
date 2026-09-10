@@ -97,8 +97,9 @@ export interface PiAiAdapterOptions {
   /** Bridge one attachment reference into the current model-tool execution world. */
   resolveImageAccess?: (attachments: AttachmentStore, ref: ImageAttachmentRef) => ImageAttachmentAccess | undefined
   /**
-   * Observe one assistant history message degrading to provider-neutral
-   * conversion because its stored replay state is unusable by this build.
+   * Observe one history item degrading to provider-neutral conversion: an
+   * assistant message whose stored replay state is unusable by this build, or
+   * a tool result whose matching tool call the history does not record.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
 }

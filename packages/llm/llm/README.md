@@ -95,7 +95,7 @@ The service is built on one separation: **the logical contract is provider-neutr
 | [`src/call-config.ts`](src/call-config.ts) | Call-config validation, adapter-default materialization, and request freezing |
 | [`src/retry-policy.ts`](src/retry-policy.ts) | Provider-owned retry policy resolution (normal and always modes) |
 | [`src/error.ts`](src/error.ts) | `HarnessError`/`LlmError` taxonomy and provider-neutral failure codes |
-| [`src/content.ts`](src/content.ts) | Shared file and image projection helpers, including request-image offloading |
+| [`src/content.ts`](src/content.ts) | Shared file and image projection helpers, including request-image offloading and the `unpairedToolResultText` / `unpairedToolResultReason` fallback for a tool result whose recorded call is absent from the replayed history |
 | [`src/api-key.ts`](src/api-key.ts) | Credential format check shared by every adapter |
 | [`src/adapter-failure.ts`](src/adapter-failure.ts) | Failure normalization into terminal finish chunks |
 
@@ -137,7 +137,7 @@ Read these pages when the package-level contract is not enough. They move from t
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as the LLM service adds no content; adapters choose when to add the shared image descriptors and per-image placeholders exported by this package.
+None, as the LLM service adds no content; adapters choose when to add the shared image descriptors and per-image placeholders exported by this package, and when to render a tool result whose history declares no matching tool call as the `unpairedToolResultText` fallback instead of a provider tool message.
 
 #### KV Cache effect
 

@@ -128,7 +128,7 @@ export type BuildMenusInput = {
   forwardEnabled: boolean
   sessionIdsLength: number
   toggleSidebar: () => void
-  toggleDetails: () => void
+  toggleRightbar: () => void
   toggleBottom: () => void
   openBottom: () => void
   walkHistory: (direction: 'back' | 'forward') => void
@@ -143,7 +143,7 @@ export type BuildMenusInput = {
 export function buildMenus(input: BuildMenusInput): { id: MenuId; label: string; items: MenuItem[] }[] {
   const {
     t, win, backEnabled, forwardEnabled, sessionIdsLength,
-    toggleSidebar, toggleDetails, toggleBottom, openBottom, walkHistory, neighborSession,
+    toggleSidebar, toggleRightbar, toggleBottom, openBottom, walkHistory, neighborSession,
   } = input
   return [
     {
@@ -175,7 +175,7 @@ export function buildMenus(input: BuildMenusInput): { id: MenuId; label: string;
         { kind: 'item', id: 'sidebar', label: t('desktop.menu.toggleSidebar'), shortcut: 'Ctrl+B', run: toggleSidebar },
         { kind: 'item', id: 'bottom', label: t('desktop.menu.toggleBottom'), shortcut: 'Ctrl+J', run: toggleBottom },
         { kind: 'item', id: 'terminal', label: t('desktop.menu.openTerminal'), shortcut: 'Ctrl+`', run: openBottom },
-        { kind: 'item', id: 'details', label: t('desktop.menu.toggleDetails'), shortcut: 'Ctrl+Shift+E', run: toggleDetails },
+        { kind: 'item', id: 'details', label: t('desktop.menu.toggleDetails'), shortcut: 'Ctrl+Shift+E', run: toggleRightbar },
         { kind: 'sep' },
         { kind: 'item', id: 'prev', label: t('desktop.menu.prevSession'), shortcut: 'Ctrl+Shift+[', disabled: sessionIdsLength < 2, run: () => { neighborSession(-1) } },
         { kind: 'item', id: 'next', label: t('desktop.menu.nextSession'), shortcut: 'Ctrl+Shift+]', disabled: sessionIdsLength < 2, run: () => { neighborSession(1) } },

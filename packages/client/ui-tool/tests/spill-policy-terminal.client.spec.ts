@@ -130,8 +130,15 @@ describe.each([
       const notice = formatSpillNotice({ kind: 'exact', count: Buffer.byteLength(original, 'utf8') }, spillReference)
       const { block, saves } = await executeShell(original, nested, name, Buffer.byteLength(notice, 'utf8'))
       expect(block.content).toEqual([{ type: 'text', text: notice }])
-      expect(saves).toHaveLength(1)
-      expect(saves[0]!.bytes).toEqual(Buffer.from(original, 'utf8'))
+      // This case pins the arm it can observe deterministically: the dispatch-log
+      // copy of an oversized sub-call result. A nested run may spill its own
+      // outer `run_code` result too, because that text carries the program's
+      // captured worker logs — Node's type-stripping warning alone exceeds this
+      // deliberately tiny cap — so the nested case asserts the dispatch save
+      // rather than the total save count.
+      const spills = nested ? saves.filter(save => save.input.source.label === 'dispatch') : saves
+      expect(spills).toHaveLength(1)
+      expect(spills[0]!.bytes).toEqual(Buffer.from(original, 'utf8'))
       expect(terminalCardModel(block)).toBeNull()
       expect(isSpilledShellCall(block)).toBe(true)
     })

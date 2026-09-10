@@ -1,7 +1,7 @@
 /** Bottom-panel tab state: UI spawns + Agent list merge. */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CodexApi } from '../RightPanel.js'
+import type { TerminalApi } from './terminal-api.js'
 import type { TFn } from '../faces.js'
 
 export type ShellDialect = 'bash' | 'pwsh'
@@ -48,7 +48,7 @@ function toTab(
  * @param t - locale lookup (reserved for future title copy).
  */
 export function useBottomTerminals(
-  api: CodexApi,
+  api: TerminalApi,
   sessionId: string | undefined,
   cwd: string | undefined,
   _t: TFn,

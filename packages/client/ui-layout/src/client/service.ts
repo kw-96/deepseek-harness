@@ -62,6 +62,8 @@ export interface ILayout {
   openDetails(): void
   /** Close the details panel. */
   closeDetails(): void
+  /** Toggle the details panel (closed ⟷ contract default width). */
+  toggleDetails(): void
   /** Open the bottom panel (no-op when already open). */
   openBottom(): void
   /** Close the bottom panel. */
@@ -160,6 +162,11 @@ export class LayoutController implements ILayout {
   /** Close the details panel. */
   closeDetails(): void {
     this.#require().closeDetails()
+  }
+
+  /** Toggle the details panel (closed ⟷ contract default width). */
+  toggleDetails(): void {
+    this.#require().toggleDetails()
   }
 
   /** Open the bottom panel (no-op when already open). */

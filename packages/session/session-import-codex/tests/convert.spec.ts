@@ -40,10 +40,11 @@ describe('convertCodexThread', () => {
     expect(cwd).toBe('C:\\work')
     expect(typesOf(events)).toEqual([
       'turn/start', 'user/message', 'session/title', 'step/start', 'assistant/message',
-      'step/end', 'step/start', 'tool/call', 'tool/result', 'assistant/message', 'step/end', 'turn/end',
-      'turn/start', 'user/message', 'step/start', 'tool/call', 'tool/result',
-      'tool/call', 'tool/result', 'tool/call', 'tool/result',
-      'tool/call', 'tool/result', 'step/end', 'turn/end', 'session/end-seed',
+      'step/end', 'step/start', 'assistant/message', 'tool/call', 'tool/result', 'assistant/message',
+      'step/end', 'turn/end',
+      'turn/start', 'user/message', 'step/start', 'assistant/message', 'tool/call', 'tool/result',
+      'assistant/message', 'tool/call', 'tool/result', 'assistant/message', 'tool/call', 'tool/result',
+      'assistant/message', 'tool/call', 'tool/result', 'step/end', 'turn/end', 'session/end-seed',
     ])
     expect(events.map(event => event.seq)).toEqual(events.map((_, index) => index))
     expect(events.every(event => event.time >= (events[event.seq - 1]?.time ?? 0))).toBe(true)
@@ -111,10 +112,33 @@ describe('convertCodexThread', () => {
     expect((block.content[0] as { type: 'text'; text: string }).text).toBe('x'.repeat(50))
   })
 
+  it('declares every tool call in an assistant message before its result', () => {
+    const { events } = convertCodexThread(fixture(), 'C:\\fallback', BOUNDS)
+    const declared = new Set<string>()
+    let results = 0
+    for (const event of events) {
+      if (event.type === 'assistant/message') {
+        for (const block of event.data.message.content) {
+          if (block.type === 'tool-call') declared.add(block.id)
+        }
+      }
+      if (event.type === 'tool/result') {
+        results += 1
+        expect(declared.has(event.data.message.source.callId)).toBe(true)
+      }
+    }
+    // Every recorded call is declared exactly once, and every result found it.
+    const calls = events.filter(event => event.type === 'tool/call')
+    expect(declared.size).toBe(calls.length)
+    expect(results).toBe(calls.length)
+  })
+
   it('numbers steps per turn and closes non-completed turns as aborted', () => {
     const { events } = convertCodexThread(fixture(), 'C:\\fallback', BOUNDS)
-    const assistant = events.filter(event => event.type === 'assistant/message')
-    expect(assistant.map(event => event.data.step)).toEqual([1, 2])
+    const steps = events
+      .filter(event => event.type === 'step/start')
+      .map(event => `${event.data.turn}.${event.data.step}`)
+    expect(steps).toEqual(['1.1', '1.2', '2.1'])
     const endings = events.filter(event => event.type === 'turn/end')
     expect(endings.map(event => event.data.reason)).toEqual([
       { kind: 'completed' },

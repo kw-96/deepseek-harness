@@ -249,7 +249,7 @@ function bench(options: BenchOptions = {}) {
   layout.attachPanels({
     setSidebar: vi.fn(), setDetails: vi.fn(), setBottom: vi.fn(),
     toggleSidebar: vi.fn(), setNarrow: vi.fn(),
-    openDetails: vi.fn(), closeDetails: vi.fn(),
+    openDetails: vi.fn(), closeDetails: vi.fn(), toggleDetails: vi.fn(),
     openBottom: vi.fn(), closeBottom: vi.fn(),
   }, () => true)
   const selectPanel = vi.spyOn(layout, 'selectPanel')

@@ -17,6 +17,24 @@ function request(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
   return { provider: 'deepseek-official', model: 'deepseek-v4-flash', messages: [], ...overrides }
 }
 
+/** The assistant message that declares tool calls, which real histories carry before their results. */
+function assistantDeclares(...ids: string[]): Message {
+  return createMessage({
+    role: 'assistant',
+    content: ids.map(id => ({ type: 'tool-call' as const, id: ToolCallId(id), name: 'tool', arguments: '{}' })),
+    source: { kind: 'plugin', plugin: 'test' },
+  })
+}
+
+/** The wire entry {@link assistantDeclares} serializes to. */
+function assistantWire(...ids: string[]): unknown {
+  return {
+    role: 'assistant',
+    content: '',
+    tool_calls: ids.map(id => ({ id, type: 'function', function: { name: 'tool', arguments: '{}' } })),
+  }
+}
+
 function imageRef(mediaType: ImageMediaType = 'image/png', bytes = 3): ImageAttachmentRef {
   const digit = ({
     'image/png': 'a',
@@ -154,6 +172,7 @@ describe('serializeMessages', () => {
 
   it('turns tool results into role:tool messages', () => {
     const wire = serializeMessages([
+      assistantDeclares('call-1'),
       createUserMessage({
         content: [{
           type: 'tool-result',
@@ -163,21 +182,70 @@ describe('serializeMessages', () => {
         source: { kind: 'plugin', plugin: 'test' },
       }),
     ])
-    expect(wire).toEqual([{ role: 'tool', tool_call_id: 'call-1', content: 'Sunny 22C' }])
+    expect(wire).toEqual([
+      assistantWire('call-1'),
+      { role: 'tool', tool_call_id: 'call-1', content: 'Sunny 22C' },
+    ])
+  })
+
+  it('replays a tool result whose call the history never recorded as user text', () => {
+    const onDegrade = vi.fn()
+    const wire = serializeMessages([
+      createUserMessage({
+        content: [{
+          type: 'tool-result',
+          toolCallId: ToolCallId('ghost'),
+          content: [{ type: 'text', text: 'orphan output' }],
+        }],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
+    ], onDegrade)
+
+    expect(wire).toEqual([{
+      role: 'user',
+      content: '[earlier tool result for call "ghost"; its tool call is absent from this transcript]\norphan output',
+    }])
+    expect(onDegrade).toHaveBeenCalledWith(
+      'tool result for call "ghost" has no recorded tool call in this history',
+    )
+  })
+
+  it('marks a failed unpaired tool result in its fallback text', () => {
+    const wire = serializeMessages([
+      createUserMessage({
+        content: [{
+          type: 'tool-result',
+          toolCallId: ToolCallId('ghost'),
+          content: [],
+          isError: true,
+        }],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
+    ])
+
+    expect(wire).toEqual([{
+      role: 'user',
+      content: '[earlier failed tool result for call "ghost"; its tool call is absent from this transcript]\n(no output)',
+    }])
   })
 
   it('sends a sentinel for empty tool-result content', () => {
     const wire = serializeMessages([
+      assistantDeclares('call-1'),
       createUserMessage({
         content: [{ type: 'tool-result', toolCallId: ToolCallId('call-1'), content: [] }],
         source: { kind: 'plugin', plugin: 'test' },
       }),
     ])
-    expect(wire).toEqual([{ role: 'tool', tool_call_id: 'call-1', content: '(no output)' }])
+    expect(wire).toEqual([
+      assistantWire('call-1'),
+      { role: 'tool', tool_call_id: 'call-1', content: '(no output)' },
+    ])
   })
 
   it('splits mixed user text + tool results into separate wire messages', () => {
     const wire = serializeMessages([
+      assistantDeclares('call-1'),
       createUserMessage({
         content: [
           { type: 'text', text: 'context note' },
@@ -187,6 +255,7 @@ describe('serializeMessages', () => {
       }),
     ])
     expect(wire).toEqual([
+      assistantWire('call-1'),
       { role: 'user', content: 'context note' },
       { role: 'tool', tool_call_id: 'call-1', content: 'ok' },
     ])
@@ -473,6 +542,7 @@ describe('image serialization', () => {
 
   it('keeps tool content textual and groups consecutive tool-result images afterward', async () => {
     const messages = [
+      assistantDeclares('first', 'second'),
       createUserMessage({
         content: [{
           type: 'tool-result',
@@ -500,6 +570,7 @@ describe('image serialization', () => {
       [png, jpeg],
       vi.fn((version: RequestImageAttachment) => Promise.resolve(`file-api-${version.mediaType}`)),
     ))).resolves.toEqual([
+      assistantWire('first', 'second'),
       {
         role: 'tool',
         tool_call_id: 'first',
@@ -522,42 +593,50 @@ describe('image serialization', () => {
   })
 
   it('does not emit an empty user message for ignored content beside a tool result', async () => {
-    const messages = [createUserMessage({
-      content: [
-        { type: 'text', text: '' },
-        { type: 'chart', data: 'ignored' } as unknown as ContentBlock,
-        {
-          type: 'tool-result',
-          toolCallId: ToolCallId('result'),
-          content: [{ type: 'text', text: 'ok' }],
-        },
-      ],
-      source: { kind: 'plugin', plugin: 'test' },
-    })]
+    const messages = [
+      assistantDeclares('result'),
+      createUserMessage({
+        content: [
+          { type: 'text', text: '' },
+          { type: 'chart', data: 'ignored' } as unknown as ContentBlock,
+          {
+            type: 'tool-result',
+            toolCallId: ToolCallId('result'),
+            content: [{ type: 'text', text: 'ok' }],
+          },
+        ],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
+    ]
 
     await expect(serializeMessagesWithImages(messages, imageOptions([], fileResolver()))).resolves.toEqual([
+      assistantWire('result'),
       { role: 'tool', tool_call_id: 'result', content: 'ok' },
     ])
   })
 
   it('recursively converts nested tool-result content and preserves the empty fallback', async () => {
-    const messages = [createUserMessage({
-      content: [
-        {
-          type: 'tool-result',
-          toolCallId: ToolCallId('nested'),
-          content: [{
+    const messages = [
+      assistantDeclares('nested', 'empty'),
+      createUserMessage({
+        content: [
+          {
             type: 'tool-result',
-            toolCallId: ToolCallId('inner'),
-            content: [{ type: 'text', text: 'inside' }],
-          }],
-        },
-        { type: 'tool-result', toolCallId: ToolCallId('empty'), content: [] },
-      ],
-      source: { kind: 'plugin', plugin: 'test' },
-    })]
+            toolCallId: ToolCallId('nested'),
+            content: [{
+              type: 'tool-result',
+              toolCallId: ToolCallId('inner'),
+              content: [{ type: 'text', text: 'inside' }],
+            }],
+          },
+          { type: 'tool-result', toolCallId: ToolCallId('empty'), content: [] },
+        ],
+        source: { kind: 'plugin', plugin: 'test' },
+      }),
+    ]
 
     await expect(serializeMessagesWithImages(messages, imageOptions([], fileResolver()))).resolves.toEqual([
+      assistantWire('nested', 'empty'),
       { role: 'tool', tool_call_id: 'nested', content: 'inside' },
       { role: 'tool', tool_call_id: 'empty', content: '(no output)' },
     ])
@@ -573,6 +652,7 @@ describe('image serialization', () => {
       source: { kind: 'plugin' as const, plugin: 'test' },
     })
     const messages = [
+      assistantDeclares('before-system', 'before-assistant'),
       imageResult('before-system'),
       createMessage({
         role: 'system',
@@ -589,6 +669,7 @@ describe('image serialization', () => {
 
     const wire = await serializeMessagesWithImages(messages, imageOptions([imageRef()], fileResolver()))
     expect(wire).toEqual([
+      assistantWire('before-system', 'before-assistant'),
       {
         role: 'tool',
         tool_call_id: 'before-system',

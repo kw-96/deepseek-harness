@@ -6,8 +6,11 @@
  * @module dsh-llm-deepseek/serialize
  */
 
-import { contentHasImage, LlmError, offloadedImageText, offloadRequestImagesWithPolicy, requestImageHandleText } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message } from '@deepseek-ai/dsh-llm'
+import {
+  contentHasImage, LlmError, offloadedImageText, offloadRequestImagesWithPolicy, requestImageHandleText,
+  unpairedToolResultReason, unpairedToolResultText,
+} from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type {
   WireImageContentPart,
@@ -239,12 +242,16 @@ function serializeAssistant(message: Message): WireMessage {
  * Serialize the conversation. `tool-result` blocks become standalone
  * `{role: 'tool'}` messages; the harness puts each tool result in its own
  * user-role message, so a mixed user message contributes its text first and
- * its tool results as separate wire messages after.
+ * its tool results as separate wire messages after. A result whose tool call
+ * this history never recorded cannot become a `tool` message — the API rejects
+ * one that follows no call — so it rides as user text instead.
  * @param messages - the harness conversation, in order.
+ * @param onDegrade - called with the reason for each result replayed as text.
  * @returns the wire messages; order preserved, each tool result expanded into its own entry.
  */
-export function serializeMessages(messages: Message[]): WireMessage[] {
+export function serializeMessages(messages: Message[], onDegrade?: (reason: string) => void): WireMessage[] {
   const wire: WireMessage[] = []
+  const declaredCalls = new Set<ToolCallId>()
   for (const message of messages) {
     assertTextOnly(message.content)
     if (message.role === 'system') {
@@ -252,6 +259,9 @@ export function serializeMessages(messages: Message[]): WireMessage[] {
       continue
     }
     if (message.role === 'assistant') {
+      for (const block of message.content) {
+        if (block.type === 'tool-call') declaredCalls.add(block.id)
+      }
       wire.push(serializeAssistant(message))
       continue
     }
@@ -263,11 +273,20 @@ export function serializeMessages(messages: Message[]): WireMessage[] {
       wire.push({ role: 'user', content: text })
     }
     for (const result of toolResults) {
+      // Empty tool output still needs SOME content on the wire.
+      const content = flattenText(result.content) || '(no output)'
+      if (!declaredCalls.has(result.toolCallId)) {
+        onDegrade?.(unpairedToolResultReason(result.toolCallId))
+        wire.push({
+          role: 'user',
+          content: unpairedToolResultText(result.toolCallId, content, result.isError ?? false),
+        })
+        continue
+      }
       wire.push({
         role: 'tool',
         tool_call_id: result.toolCallId,
-        // Empty tool output still needs SOME content on the wire.
-        content: flattenText(result.content) || '(no output)',
+        content,
       })
     }
   }
@@ -285,9 +304,11 @@ export function serializeMessages(messages: Message[]): WireMessage[] {
 export async function serializeMessagesWithImages(
   messages: readonly Message[],
   images: ImageSerializationOptions,
+  onDegrade?: (reason: string) => void,
 ): Promise<WireMessage[]> {
   assertSupportedImageRoles(messages)
   const wire: WireMessage[] = []
+  const declaredCalls = new Set<ToolCallId>()
   let pendingToolImages: WireImageContentPart[] = []
   const flushToolImages = (): void => {
     if (pendingToolImages.length === 0) return
@@ -307,6 +328,9 @@ export async function serializeMessagesWithImages(
     }
     if (message.role === 'assistant') {
       flushToolImages()
+      for (const block of message.content) {
+        if (block.type === 'tool-call') declaredCalls.add(block.id)
+      }
       wire.push(serializeAssistant(message))
       continue
     }
@@ -327,6 +351,23 @@ export async function serializeMessagesWithImages(
       const parts = await contentParts(result.content, images, messageIndex + 1, nextImage)
       const imageParts = parts.filter((part): part is WireImageContentPart => part.type !== 'text')
       const text = parts.filter(part => part.type === 'text').map(part => part.text).join('')
+      // Unpaired result (see `serializeMessages`): the fallback text takes the
+      // tool message's place and keeps this result's images beside it.
+      if (!declaredCalls.has(result.toolCallId)) {
+        onDegrade?.(unpairedToolResultReason(result.toolCallId))
+        flushToolImages()
+        wire.push({
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: unpairedToolResultText(result.toolCallId, text || '(no output)', result.isError ?? false),
+            },
+            ...imageParts,
+          ],
+        })
+        continue
+      }
       wire.push({
         role: 'tool',
         tool_call_id: result.toolCallId,
@@ -376,17 +417,19 @@ function requestWithMessages(
  * provider defaults apply.
  * @param options - the harness request (model, history, system, tools, sampling).
  * @param defaults - adapter-level thinking defaults; undefined fields put nothing on the wire.
+ * @param onDegrade - called with the reason for each unpaired tool result replayed as text.
  * @returns the chat-completions request body.
  */
 export function serializeRequest(
   options: GenerateOptions,
   defaults: RequestDefaults = {},
+  onDegrade?: (reason: string) => void,
 ): WireRequest {
   const messages: WireMessage[] = []
   if (options.system !== undefined) {
     messages.push({ role: 'system', content: options.system })
   }
-  messages.push(...serializeMessages(options.messages))
+  messages.push(...serializeMessages(options.messages, onDegrade))
 
   return requestWithMessages(options, messages, defaults)
 }
@@ -398,12 +441,14 @@ export function serializeRequest(
  * @param options - harness request containing image-capable user content.
  * @param images - request versions, optional current access resolver, and request bounds.
  * @param defaults - adapter-level thinking defaults.
+ * @param onDegrade - called with the reason for each unpaired tool result replayed as text.
  * @returns the fully materialized DeepSeek request body.
  */
 export async function serializeRequestWithImages(
   options: GenerateOptions,
   images: ImageSerializationOptions,
   defaults: RequestDefaults = {},
+  onDegrade?: (reason: string) => void,
 ): Promise<WireRequest> {
   assertSupportedImageRoles(options.messages)
   const requestMessages = offloadRequestImagesWithPolicy(options.messages, {
@@ -425,6 +470,6 @@ export async function serializeRequestWithImages(
   if (options.system !== undefined) {
     messages.push({ role: 'system', content: options.system })
   }
-  messages.push(...await serializeMessagesWithImages(requestMessages, images))
+  messages.push(...await serializeMessagesWithImages(requestMessages, images, onDegrade))
   return requestWithMessages(options, messages, defaults)
 }

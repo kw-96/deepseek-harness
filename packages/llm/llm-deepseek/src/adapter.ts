@@ -139,6 +139,12 @@ export interface DeepSeekAdapterOptions {
   resolveFiles?: () => DeepSeekFileStore
   /** Prepare the official API's plugin-contributed top-level fields for one exact wire request. */
   prepareExtensions: (request: DeepSeekLlmApiExtensionRequest) => Promise<PreparedDeepSeekLlmApiExtensions>
+  /**
+   * Observe one history tool result degrading to provider-neutral text because
+   * the history records no matching tool call for it. The API rejects a tool
+   * message that follows no call, so that result cannot travel as one.
+   */
+  onReplayDegrade?: (reason: string) => void
 }
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
@@ -576,7 +582,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       const usedFiles: UsedRequestFile[] = []
       let body: WireRequest
       if (attachments === undefined) {
-        body = serializeRequest(requestOptions, connection.defaults)
+        body = serializeRequest(requestOptions, connection.defaults, this.config.onReplayDegrade)
       } else if (representation === 'base64') {
         body = await serializeRequestWithImages(requestOptions, {
           representation: { kind: 'base64' },
@@ -586,7 +592,7 @@ export class DeepSeekAdapter extends LlmAdapter {
           maxImagesPerRequest: connection.maxImagesPerRequest,
           byteQuantum: connection.inlineImageOffloadByteQuantum,
           countQuantum: connection.imageOffloadCountQuantum,
-        }, connection.defaults)
+        }, connection.defaults, this.config.onReplayDegrade)
       } else {
         try {
           body = await serializeRequestWithImages(requestOptions, {
@@ -617,7 +623,7 @@ export class DeepSeekAdapter extends LlmAdapter {
             maxImagesPerRequest: connection.maxImagesPerRequest,
             byteQuantum: connection.imageOffloadByteQuantum,
             countQuantum: connection.imageOffloadCountQuantum,
-          }, connection.defaults)
+          }, connection.defaults, this.config.onReplayDegrade)
         } catch (error: unknown) {
           if (!(error instanceof FileResolutionFailure)) throw error
           representation = 'base64'

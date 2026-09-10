@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-`@deepseek-ai/dsh-session-import-codex` 默认提供手动导入。其 `autoSync` 设置默认值为 `false`；开启后会立即导入一次，并启用配置的定时扫描。它通过 `node:sqlite` 只读读取 Codex 的 `thread_history_1.sqlite`（`thread_items` 与 `thread_turns`），并合并可选的 `session_index.jsonl` 标题。每个线程转换为连续的 DSH 事件——`user/message`、`assistant/message`、`tool/call`/`tool/result` 对、`turn/start`/`turn/end`、`session/title` 以及结尾的 `session/end-seed`——保留 Codex 时间戳，并对工具结果与标题文本设置上限。每个线程映射到固定会话 id `codex-<线程id>`。
+`@deepseek-ai/dsh-session-import-codex` 默认提供手动导入。其 `autoSync` 设置默认值为 `false`；开启后会立即导入一次，并启用配置的定时扫描。它通过 `node:sqlite` 只读读取 Codex 的 `thread_history_1.sqlite`（`thread_items` 与 `thread_turns`），并合并可选的 `session_index.jsonl` 标题。每个线程转换为连续的 DSH 事件——`user/message`、`assistant/message`，以及每个 Codex 工具 item 的"发起该调用的 assistant 消息 + 它的 `tool/call`/`tool/result` 对"——再加上 `turn/start`/`turn/end`、`session/title` 以及结尾的 `session/end-seed`，保留 Codex 时间戳，并对工具结果与标题文本设置上限。那条 assistant 消息携带 Codex item 记录的调用 id、名称与参数，因此导入的每条工具结果都回答一条已声明的调用，转录在任何提供方上都保持合规（[理由](../bug-fix/2026-09-10-tool-call-pairing-in-imported-history.zh.md)）。每个线程映射到固定会话 id `codex-<线程id>`。
 
 每份转换日志先经 `ctx.sessionPersistence` 写入,再由 `ctx.sessions.replace` 以 seed 事件发布为活跃会话。先落盘意味着活跃发布失败也不丢数据,落盘日志是重启后的冷数据权威来源;活跃发布则让侧边栏列表经既有的 `session/created` → `api-session/added` 路径即时更新。导入在会话头记录最新绝对 command 或 MCP cwd,否则用配置的回退值,因为冷列表路径会跳过没有 cwd 的会话。`session_index.jsonl` 缺标题时回退到第一条用户消息，因此索引外的有效线程不会变成被隐藏的 blank session。重复扫描会比较转换事件和 header 与存储快照：无变化会话只对账成员关系，变化的冷会话或导入器拥有的活跃会话会替换持久快照并迁到匹配的规范化工作区，Agent 拥有的会话则延后到下一轮扫描。JSONL provider 会记录跨 cwd 替换，以便启动时恢复中断的迁移。
 

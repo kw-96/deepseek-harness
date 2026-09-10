@@ -108,6 +108,7 @@ function mountFrame() {
       useWorkspaces={((sel: (s: WorkspaceSnapshot) => unknown) => sel(workspaceState)) as never}
       SessionProvider={SessionProviderStub}
       openSession={vi.fn()}
+      toggleRightbar={vi.fn()}
       t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
     />
   )

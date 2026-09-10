@@ -483,6 +483,12 @@ export function apply(ctx: Context, config: Config): void {
       return extensions?.prepare(request)
         ?? Promise.resolve({ fields: {}, accept: () => Promise.resolve() })
     },
+    onReplayDegrade: (reason) => {
+      ctx.logger.warn(
+        'llm-deepseek: history this route cannot replay natively;'
+        + ` sending that item as provider-neutral content (${reason})`,
+      )
+    },
   })
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: 'DeepSeek', settingsNs: NS, settingsPath: [] },

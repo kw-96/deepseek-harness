@@ -62,7 +62,7 @@ function mountBar(win: DesktopAppWindow) {
       t={t}
       sidebarCollapsed={false}
       toggleSidebar={vi.fn()}
-      toggleDetails={vi.fn()}
+      toggleRightbar={vi.fn()}
       toggleBottom={vi.fn()}
       openBottom={vi.fn()}
       openSession={vi.fn()}
@@ -164,13 +164,13 @@ describe('DesktopTitleBar panel toggles', () => {
     const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
       sel({ ids: [], current: undefined } as unknown as SessionListState))
     const toggleBottom = vi.fn()
-    const toggleDetails = vi.fn()
+    const toggleRightbar = vi.fn()
     const { container } = render(
       <DesktopTitleBar
         t={t}
         sidebarCollapsed={false}
         toggleSidebar={vi.fn()}
-        toggleDetails={toggleDetails}
+        toggleRightbar={toggleRightbar}
         toggleBottom={toggleBottom}
         openBottom={vi.fn()}
         openSession={vi.fn()}
@@ -189,6 +189,6 @@ describe('DesktopTitleBar panel toggles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleBottom' }))
     expect(toggleBottom).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleDetails' }))
-    expect(toggleDetails).toHaveBeenCalledTimes(1)
+    expect(toggleRightbar).toHaveBeenCalledTimes(1)
   })
 })

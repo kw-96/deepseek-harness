@@ -47,18 +47,45 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('details')).toEqual({ kind: 'single', scope: 'session' })
   })
 
-  it('injects openSession and attaches the layout actions', async () => {
+  it('injects openSession, toggleRightbar, and attaches the layout actions', async () => {
     const { ctx, slots } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     const actions = {
-      setSidebar: vi.fn(), setDetails: vi.fn(), toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
+      setSidebar: vi.fn(), setDetails: vi.fn(), toggleSidebar: vi.fn(),
+      openDetails: vi.fn(), closeDetails: vi.fn(), toggleDetails: vi.fn(),
     }
-    const injected = (slots.entries('root')[0]!.inject as (actions: never) => { openSession: (id: string) => void })(actions as never)
+    const injected = (slots.entries('root')[0]!.inject as (actions: never) => {
+      openSession: (id: string) => void
+      toggleRightbar: () => void
+    })(actions as never)
     expect(typeof injected.openSession).toBe('function')
     const layout = ctx.get('layout') as LayoutController
     layout.toggleSidebar()
     expect(actions.toggleSidebar).toHaveBeenCalledOnce()
+    layout.toggleDetails()
+    expect(actions.toggleDetails).toHaveBeenCalledOnce()
+    // 无 ui-sidebar-right 的组合：右侧面板开合回落到 details 列。
+    injected.toggleRightbar()
+    expect(actions.toggleDetails).toHaveBeenCalledTimes(2)
+  })
+
+  it('drives the official right sidebar when the composition provides one', async () => {
+    const { ctx, slots } = await bench()
+    const toggleExpanded = vi.fn()
+    ctx.provide('sidebarRight', { toggleExpanded } as never)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const actions = {
+      setSidebar: vi.fn(), setDetails: vi.fn(), toggleSidebar: vi.fn(),
+      openDetails: vi.fn(), closeDetails: vi.fn(), toggleDetails: vi.fn(),
+    }
+    const injected = (slots.entries('root')[0]!.inject as (actions: never) => {
+      toggleRightbar: () => void
+    })(actions as never)
+    injected.toggleRightbar()
+    expect(toggleExpanded).toHaveBeenCalledOnce()
+    expect(actions.toggleDetails).not.toHaveBeenCalled()
   })
 
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {

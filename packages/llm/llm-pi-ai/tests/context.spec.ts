@@ -169,14 +169,16 @@ describe('pi-ai request context conversion', () => {
         timestamp: 0,
       },
       {
-        role: 'toolResult',
-        toolCallId: 'missing-call',
-        toolName: 'unknown',
+        role: 'user',
         content: [
-          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+          {
+            type: 'text',
+            text: expect.stringMatching(
+              /^\[earlier failed tool result for call "missing-call"; its tool call is absent from this transcript\]\nImage sha256:/,
+            ) as string,
+          },
           { type: 'image', data: 'AQ==', mimeType: 'image/png' },
         ],
-        isError: true,
         timestamp: 0,
       },
     ])
@@ -205,55 +207,68 @@ describe('pi-ai request context conversion', () => {
 
   it('recursively converts nested tool-result text and images', async () => {
     const callId = ToolCallId('nested-call')
-    const context = await toPiContext(request([user([{
-      type: 'tool-result',
-      toolCallId: callId,
-      content: [
-        {
-          type: 'tool-result',
-          toolCallId: callId,
-          content: [{ type: 'text', text: 'nested text' }],
-        },
-        {
-          type: 'tool-result',
-          toolCallId: callId,
-          content: [{ type: 'image', attachment: ref }],
-        },
-      ],
-    }])]), imageContext(attachments))
+    const context = await toPiContext(request([
+      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
+      user([{
+        type: 'tool-result',
+        toolCallId: callId,
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: callId,
+            content: [{ type: 'text', text: 'nested text' }],
+          },
+          {
+            type: 'tool-result',
+            toolCallId: callId,
+            content: [{ type: 'image', attachment: ref }],
+          },
+        ],
+      }]),
+    ]), imageContext(attachments))
 
-    expect(context.messages).toEqual([{
-      role: 'toolResult',
-      toolCallId: 'nested-call',
-      toolName: 'unknown',
-      content: [
-        { type: 'text', text: 'nested text' },
-        { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
-        { type: 'image', data: 'AQ==', mimeType: 'image/png' },
-      ],
-      isError: false,
-      timestamp: 0,
-    }])
+    expect(context.messages).toEqual([
+      expect.objectContaining({ role: 'assistant' }),
+      {
+        role: 'toolResult',
+        toolCallId: 'nested-call',
+        toolName: 'lookup',
+        content: [
+          { type: 'text', text: 'nested text' },
+          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+          { type: 'image', data: 'AQ==', mimeType: 'image/png' },
+        ],
+        isError: false,
+        timestamp: 0,
+      },
+    ])
   })
 
   it('flattens nested text-only tool results and ignores other block types without storage', () => {
     const callId = ToolCallId('nested-text')
-    expect(toPiContext(request([user([{
-      type: 'tool-result',
-      toolCallId: callId,
-      content: [
-        { type: 'chart', data: 'ignored' } as unknown as ContentBlock,
+    expect(toPiContext(request([
+      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
+      user([{
+        type: 'tool-result',
+        toolCallId: callId,
+        content: [
+          { type: 'chart', data: 'ignored' } as unknown as ContentBlock,
+          {
+            type: 'tool-result',
+            toolCallId: callId,
+            content: [{ type: 'text', text: 'nested' }],
+          },
+        ],
+      }]),
+    ]))).toMatchObject({
+      messages: [
+        expect.objectContaining({ role: 'assistant' }),
         {
-          type: 'tool-result',
-          toolCallId: callId,
+          role: 'toolResult',
+          toolName: 'lookup',
           content: [{ type: 'text', text: 'nested' }],
         },
       ],
-    }])]))).toMatchObject({
-      messages: [{
-        role: 'toolResult',
-        content: [{ type: 'text', text: 'nested' }],
-      }],
     })
   })
 
@@ -267,6 +282,7 @@ describe('pi-ai request context conversion', () => {
     // Three 3-byte images cost 4 base64 characters each (12 total); a bound of
     // 8 forces exactly the oldest one out, including one nested in a tool result.
     const context = await toPiContext(request([
+      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
       user([{
         type: 'tool-result',
         toolCallId: callId,
@@ -277,10 +293,11 @@ describe('pi-ai request context conversion', () => {
     ]), imageContext(store, { maxRequestImageBytes: 8 }))
 
     expect(context.messages).toEqual([
+      expect.objectContaining({ role: 'assistant' }),
       {
         role: 'toolResult',
         toolCallId: 'shot-call',
-        toolName: 'unknown',
+        toolName: 'lookup',
         content: [{ type: 'text', text: offloadedImageText(sized) }],
         isError: false,
         timestamp: 0,
@@ -417,12 +434,12 @@ describe('pi-ai request context conversion', () => {
   })
 
   it('keeps empty text-only users while separating result-only messages', () => {
-    const callId = ToolCallId('unknown-call')
+    const callId = ToolCallId('paired-call')
     expect(toPiContext(request([
       user([]),
       history('assistant', [
         { type: 'text', text: 'answer' },
-        { type: 'tool-call', id: ToolCallId('other-call'), name: 'lookup', arguments: '{}' },
+        { type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' },
       ]),
       user([{
         type: 'tool-result',
@@ -433,7 +450,12 @@ describe('pi-ai request context conversion', () => {
       messages: [
         { role: 'user', content: '' },
         { role: 'assistant' },
-        { role: 'toolResult', toolName: 'unknown' },
+        {
+          role: 'toolResult',
+          toolCallId: 'paired-call',
+          toolName: 'lookup',
+          content: [{ type: 'text', text: 'result' }],
+        },
       ],
     })
   })

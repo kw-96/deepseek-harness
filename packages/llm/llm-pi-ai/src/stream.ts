@@ -56,6 +56,13 @@ function classifyPiAiError(message: string): string {
   // finish_reason`). The connection dropped mid-response, so this is a transport
   // truncation, not a model-level error.
   if (/stream ended (?:before|without)\b/i.test(message)) return 'TRANSPORT'
+  // A gateway relaying its own upstream's stream failure. The proxy names the
+  // condition (`upstream_stream_error`) and quotes its HTTP client's wording for
+  // a body it could not decode (`error decoding response body`), which is what a
+  // truncated or malformed supplier stream looks like one hop further out. The
+  // response began and then broke upstream, so it is the same mid-response
+  // truncation as the wire closures below, not a model-level failure.
+  if (/upstream[ _]stream[ _]error|error decoding response body/i.test(message)) return 'TRANSPORT'
   if (/\b(?:network|connection|socket|fetch)\b|\bECONN[A-Z]+\b/i.test(message)
     || /\b(?:other side closed|HTTP2 request did not get a response|WebSocket closed unexpectedly)\b/i.test(message)
     // undici renders a mid-stream socket drop as a bare `terminated` (its

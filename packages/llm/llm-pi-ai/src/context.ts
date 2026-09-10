@@ -5,7 +5,10 @@
  */
 
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { contentHasImage, LlmError, offloadedImageText, offloadRequestImagesWithPolicy, requestImageHandleText } from '@deepseek-ai/dsh-llm'
+import {
+  contentHasImage, LlmError, offloadedImageText, offloadRequestImagesWithPolicy, requestImageHandleText,
+  unpairedToolResultReason, unpairedToolResultText,
+} from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {
   AttachmentId,
@@ -197,15 +200,29 @@ function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: st
     const results = message.content.filter(block => block.type === 'tool-result')
     if (text.length > 0 || results.length === 0) messages.push({ role: 'user', content: text, timestamp: 0 })
     for (const result of results) {
+      const toolName = toolNames.get(result.toolCallId)
+      const isError = result.isError ?? false
+      // A result whose call this history never recorded cannot become a
+      // provider tool message: every wire protocol rejects a result that
+      // follows no call. It rides as text on the user role instead.
+      if (toolName === undefined) {
+        onReplayDegrade?.(unpairedToolResultReason(result.toolCallId))
+        messages.push({
+          role: 'user',
+          content: unpairedToolResultText(result.toolCallId, toolResultText(result.content), isError),
+          timestamp: 0,
+        })
+        continue
+      }
       messages.push({
         role: 'toolResult',
         toolCallId: result.toolCallId,
-        toolName: toolNames.get(result.toolCallId) ?? 'unknown',
+        toolName,
         content: [{
           type: 'text',
           text: toolResultText(result.content) || '(no output)',
         }],
-        isError: result.isError ?? false,
+        isError,
         timestamp: 0,
       })
     }
@@ -227,10 +244,11 @@ export interface PiImageRequestContext {
 
 /**
  * Convert text-only harness history to a synchronous pi-ai Context. Tool
- * result names are recovered from preceding assistant tool calls.
+ * result names are recovered from preceding assistant tool calls; a result
+ * whose call this history never recorded becomes provider-neutral text instead.
  * @param options - the harness request; `options.system`, else a leading `system` message, maps to pi-ai's single `systemPrompt` slot.
  * @param images - absent; selects the synchronous conversion.
- * @param onReplayDegrade - forwarded to {@link toPiAssistant} for each assistant message.
+ * @param onReplayDegrade - called for each item this conversion cannot replay natively.
  * @returns the pi-ai context; `tools` is omitted when the request declares none.
  * @throws {LlmError} `UNSUPPORTED_CONTENT` for images in any history role, including a leading system message.
  */
@@ -241,13 +259,14 @@ export function toPiContext(
 ): PiContext
 /**
  * Convert harness history to a pi-ai Context while resolving durable images.
- * Tool result names are recovered from preceding assistant tool calls. When
- * the accumulated base64 image payload exceeds `maxRequestImageBytes`, the
+ * Tool result names are recovered from preceding assistant tool calls; a result
+ * whose call this history never recorded becomes provider-neutral text instead.
+ * When the accumulated base64 image payload exceeds `maxRequestImageBytes`, the
  * oldest images are replaced by text placeholders until the request fits, so
  * an image-heavy session keeps clearing gateway request-size caps.
  * @param options - the harness request; `options.system`, else a leading `system` message, maps to pi-ai's single `systemPrompt` slot.
  * @param images - attachment provider, current path resolver, and request limits.
- * @param onReplayDegrade - forwarded to {@link toPiAssistant} for each assistant message.
+ * @param onReplayDegrade - called for each item this conversion cannot replay natively.
  * @returns the asynchronously resolved pi-ai context.
  */
 export function toPiContext(
@@ -317,14 +336,34 @@ async function toPiContextWithImages(
     }
     for (const result of results) {
       const resultContent = await userContent(result.content, requestImages, resolveImageAccess)
+      const isError = result.isError ?? false
+      const toolName = toolNames.get(result.toolCallId)
+      // Unpaired result (see the text-only path): the fallback text keeps the
+      // result's images after it, because they are still this request's input.
+      if (toolName === undefined) {
+        onReplayDegrade?.(unpairedToolResultReason(result.toolCallId))
+        const parts = typeof resultContent === 'string' ? [] : resultContent
+        const text = typeof resultContent === 'string'
+          ? resultContent
+          : parts.filter(part => part.type === 'text').map(part => part.text).join('')
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: unpairedToolResultText(result.toolCallId, text, isError) },
+            ...parts.filter(part => part.type === 'image'),
+          ],
+          timestamp: 0,
+        })
+        continue
+      }
       messages.push({
         role: 'toolResult',
         toolCallId: result.toolCallId,
-        toolName: toolNames.get(result.toolCallId) ?? 'unknown',
+        toolName,
         content: typeof resultContent === 'string'
           ? [{ type: 'text', text: resultContent || '(no output)' }]
           : resultContent,
-        isError: result.isError ?? false,
+        isError,
         timestamp: 0,
       })
     }

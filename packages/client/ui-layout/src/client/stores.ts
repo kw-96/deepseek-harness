@@ -35,6 +35,7 @@ type LayoutActions = {
   setNarrow: (draft: LayoutState, narrow: boolean) => void
   openDetails: (draft: LayoutState) => void
   closeDetails: (draft: LayoutState) => void
+  toggleDetails: (draft: LayoutState) => void
   openBottom: (draft: LayoutState) => void
   closeBottom: (draft: LayoutState) => void
 }
@@ -71,6 +72,9 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       },
       openDetails: (d) => { if (d.details === 0) d.details = DETAILS_DEFAULT },
       closeDetails: (d) => { d.details = 0 },
+      // Same open/closed line as the two above: an open panel keeps its drag
+      // width, a closed one reopens at the contract default.
+      toggleDetails: (d) => { d.details = d.details === 0 ? DETAILS_DEFAULT : 0 },
       openBottom: (d) => { if (d.bottom === 0) d.bottom = BOTTOM_DEFAULT },
       closeBottom: (d) => { d.bottom = 0 },
     },

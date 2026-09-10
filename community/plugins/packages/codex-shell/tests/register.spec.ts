@@ -109,7 +109,7 @@ function fakeCtx(core: SlotCore): unknown {
           insertSessionBefore: async () => {}, create: async () => ({}),
         },
         connection: { api: { sessions: { history: async () => ({ ok: true, value: { records: [] } }) } } },
-        layout: { openDetails: () => {}, closeDetails: () => {} },
+        layout: { openBottom: () => {}, closeBottom: () => {} },
       }
       return services[name]
     },
@@ -119,7 +119,7 @@ function fakeCtx(core: SlotCore): unknown {
 }
 
 describe('codex-shell registration against the real SlotCore', () => {
-  it('遮蔽原生浏览器、停靠 details 列并注册头部按钮，不抛出', async () => {
+  it('遮蔽原生浏览器、注册头部按钮与底栏，不占用 details 列', async () => {
     const core = new SlotCore()
     seedShippedComposition(core)
     const disposer = await apply(fakeCtx(core) as never)
@@ -130,11 +130,12 @@ describe('codex-shell registration against the real SlotCore', () => {
     expect(browserWinners[0]?.component).not.toBe(dummy)
     expect(browserWinners[0]?.options.priority).toBe(-1)
 
-    // 右侧面板停靠进宿主第三列（不再使用 shell.overlay 浮层）。
+    // 右侧面板交给宿主原生 details 列：本插件不再注册该槽位，原生工具详情面板
+    // 保持胜出（priority 0 的占位实现）。
     const detailsWinners = core.entriesOfSlot('details')
     expect(detailsWinners).toHaveLength(1)
-    expect(detailsWinners[0]?.component).not.toBe(dummy)
-    expect(detailsWinners[0]?.options.priority).toBe(-1)
+    expect(detailsWinners[0]?.component).toBe(dummy)
+    expect(detailsWinners[0]?.options.priority).toBe(0)
     expect(core.entries('shell.overlay').some(entry => entry.options.id === 'codex-panel')).toBe(false)
     expect(core.entries('conversation.session.header.utilities').some(entry => entry.options.id === 'codex-panel-toggle')).toBe(true)
     // 添加工作区弹窗挂在侧栏页脚槽位（承载弹窗与打开器，页脚无可见按钮）。

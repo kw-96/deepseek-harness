@@ -5,6 +5,10 @@
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 16px;
   background: var(--dsw-alias-bg-layer-3);
+  /* The bounded history column scrolls on this elevated card, so its thumb
+     rebinds to the l2 pair instead of rendering the l1 default. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   transition: border-color .16s, background .16s;
 }
 

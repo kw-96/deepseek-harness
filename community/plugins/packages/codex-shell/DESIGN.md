@@ -1,11 +1,11 @@
 # dsh-codex-shell DESIGN.md
 
-Replacement visual world, v5: **Codex 式极简侧栏 + 宿主令牌**。侧栏工作区
-面板参考 Codex 左侧栏的界面排布与 UI 设计 —— 常驻圆角搜索框、细字工作区
-标题、单行会话、悬停才显露的时间与操作，视觉噪声最小化；全部颜色映射
-DeepSeek Harness 的 `--dsw-*` 主题别名（亮/暗自动跟随）。布局上是真正的
-三栏工作区：左栏浏览器填充宿主侧栏浏览区，右栏工作台停靠进宿主 `details`
-第三列，与原生列宽、拖拽手柄、开合动画同构。
+Replacement visual world, v6: **Codex 式极简侧栏 + 底部终端 + 宿主令牌**。侧栏
+工作区面板参考 Codex 左侧栏的界面排布与 UI 设计 —— 常驻圆角搜索框、细字
+工作区标题、单行会话、悬停才显露的操作，视觉噪声最小化；全部颜色映射
+DeepSeek Harness 的 `--dsw-*` 主题别名（亮/暗自动跟随）。左侧栏填充宿主
+侧栏浏览区，底部行停靠多 tab 终端；右侧 `details` 列留给宿主原生面板，
+插件不参与其视觉。
 
 ## 颜色令牌
 
@@ -57,20 +57,30 @@ DeepSeek Harness 的 `--dsw-*` 主题别名（亮/暗自动跟随）。布局上
   无目录副行、无计数；时间与操作仅悬停显露。
 - 行菜单（fork/重命名/归档/复制 cwd/id/深链接/新窗口打开）经 … 按钮
   派发；工作区菜单另含“在此工作区新建会话”。
-- 添加工作区入口停靠侧栏页脚（`sidebar.footer.action`，宽态文字按钮、
-  轨道态圆形图标），打开居中的目录选择弹窗（codexShell `fsList`），
-  不依赖被遮蔽的原生 `sidebar.workspaces.directoryFlow` 槽 —— 该槽的
-  声明始终由原生条目持有，插件既不能重新声明也不能渲染它。
+- 添加工作区入口是居中的目录选择弹窗（codexShell `fsList` 浏览 + 路径输入 +
+  创建），挂在侧栏页脚槽位但页脚不渲染可见按钮；打开入口为标题栏「+」与
+  桌面 File → Open Workspace。不依赖被遮蔽的原生
+  `sidebar.workspaces.directoryFlow` 槽 —— 该槽的声明始终由原生条目持有，
+  插件既不能重新声明也不能渲染它。
 
-## 右侧面板
+## 右侧面板（宿主官方右栏）
 
-- 停靠进宿主 `details` 列（priority -1 遮蔽原生工具详情面板）。列宽
-  （默认 360px，300–520px 钳制）、拖拽手柄、窄屏让步与开合动画全部由宿主
-  布局接管；插件只填充列内部。
-- 结构：44px 竖向活动栏（图标 + 提示 + aria 标签）+ 标题头 + 工作台主体；
-  关闭按钮钉在活动栏底部，同时收起宿主列。
-- 首次激活默认展开；会话切换后自动重新展开（会话作用域条目随切换重挂载，
-  挂载 effect 是列开合的最后一次写入）。用户手动开合写入 localStorage。
+- 本插件不占用 `rightbar` 与 `details`：右栏由 ui-sidebar-right 的
+  RightbarRoot 填充（标签页形态，如 文件 / 指南 / 文档预览），右列关闭时
+  的工具详情由 ui-chat 的 DetailsPanel 填充。两者的宽度、锚定、滑出动画
+  全部由宿主布局决定。
+- Web 的开合入口是右栏自带的会话头角落按钮（展开时它自己隐藏）；桌面独立
+  窗口由顶部栏「切换右侧面板」按钮驱动（装配层接到
+  `ctx.sidebarRight.toggleExpanded()`，组合里没有右栏包时回落到 details 列）。
+- 本插件不渲染任何右侧开合按钮；会话头只保留底部终端按钮，避免第二个按钮
+  打开另一个（工具详情）表面造成混淆。
+
+## 底部终端
+
+- 停靠宿主 `bottom` 行（priority -1）：标题行（终端 + 工作目录 + 关闭）、
+  标签条（新建 `pwsh`/`bash`、切换、关闭）、xterm 视图栈（非活跃标签保持
+  follow，仅隐藏 DOM）。
+- 行高、拖拽手柄与开合动画由宿主布局接管；关闭按钮写回 `ctx.layout.closeBottom`。
 
 ## 动效
 
@@ -80,12 +90,12 @@ DeepSeek Harness 的 `--dsw-*` 主题别名（亮/暗自动跟随）。布局上
 ## 状态
 
 default / hover / active / focus-visible / disabled / loading / error / empty。
-空态教下一步动作；加载用安静骨架屏或共享 spinner。
+空态教下一步动作；加载用安静占位文本（`loading` 文案）。
 
 ## 规则
 
 - 只通过 CSS Modules 与 `--cx-*`（映射 `--dsw-*`）样式；不触碰宿主全局样式
   与宿主 DOM。
-- 永不重新声明 `sidebar.workspaces.directoryFlow`；永不声明
-  `conversation.details.tool`（两者都由被遮蔽的原生条目持有）。
+- 永不重新声明 `sidebar.workspaces.directoryFlow`；永不声明 `details` 或
+  `conversation.details.tool`（原生面板与其工具位始终由宿主包持有）。
 - 图标统一 lucide，单一视觉重量；状态色只用宿主语义令牌。

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Terminal, X } from 'lucide-react'
-import type { CodexApi } from '../RightPanel.js'
+import type { TerminalApi } from './terminal-api.js'
 import type { SelectorHook, SessionListStateLike, TFn } from '../faces.js'
 import css from '../styles.module.css'
 import { BottomTabStrip } from './BottomTabStrip.js'
@@ -10,7 +10,7 @@ import { BottomXtermView } from './BottomXtermView.js'
 import { useBottomTerminals } from './useBottomTerminals.js'
 
 interface BottomTerminalPanelProps {
-  api: CodexApi
+  api: TerminalApi
   useSessions: SelectorHook<SessionListStateLike>
   close: () => void
   t: TFn

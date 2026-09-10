@@ -90,6 +90,16 @@ describe('createLayoutStore', () => {
     expect(store.getSnapshot().details).toBe(0)
   })
 
+  it('toggleDetails flips closed <-> contract default (drag width forgotten)', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.openDetails()
+    expect(store.getSnapshot().details).toBe(DETAILS_DEFAULT)
+    actions.toggleDetails()
+    expect(store.getSnapshot().details).toBe(0)
+    actions.toggleDetails()
+    expect(store.getSnapshot().details).toBe(DETAILS_DEFAULT)
+  })
+
   it('openBottom uses the contract default, preserves an open height, and closeBottom zeroes', () => {
     const { store, actions } = createLayoutStore().create()
     actions.openBottom()

@@ -147,42 +147,52 @@ describe('toPiContext', () => {
     const context = await toPiContext({
       provider: 'openai',
       model: 'gpt-4.1',
-      messages: [createUserMessage({
-        content: [{
-          type: 'tool-result',
-          toolCallId: ToolCallId('outer'),
-          content: [
-            { type: 'tool-result', toolCallId: ToolCallId('empty'), content: [] },
-            { type: 'text', text: 'before' },
-            { type: 'tool-result', toolCallId: ToolCallId('text'), content: [{ type: 'text', text: 'middle' }] },
-            {
-              type: 'tool-result',
-              toolCallId: ToolCallId('inner'),
-              content: [
-                { type: 'image', attachment },
-                { type: 'text', text: 'after' },
-              ],
-            },
-          ],
-        }],
-        source: { kind: 'plugin', plugin: 'test' },
-      })],
+      messages: [
+        createMessage({
+          role: 'assistant',
+          content: [{ type: 'tool-call', id: ToolCallId('outer'), name: 'get_weather', arguments: '{}' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+        createUserMessage({
+          content: [{
+            type: 'tool-result',
+            toolCallId: ToolCallId('outer'),
+            content: [
+              { type: 'tool-result', toolCallId: ToolCallId('empty'), content: [] },
+              { type: 'text', text: 'before' },
+              { type: 'tool-result', toolCallId: ToolCallId('text'), content: [{ type: 'text', text: 'middle' }] },
+              {
+                type: 'tool-result',
+                toolCallId: ToolCallId('inner'),
+                content: [
+                  { type: 'image', attachment },
+                  { type: 'text', text: 'after' },
+                ],
+              },
+            ],
+          }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      ],
     }, imageContext(attachmentStore(readImageRequest)))
 
-    expect(context.messages).toEqual([{
-      role: 'toolResult',
-      toolCallId: 'outer',
-      toolName: 'unknown',
-      content: [
-        { type: 'text', text: 'before' },
-        { type: 'text', text: 'middle' },
-        { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
-        { type: 'image', data: 'AQID', mimeType: 'image/png' },
-        { type: 'text', text: 'after' },
-      ],
-      isError: false,
-      timestamp: 0,
-    }])
+    expect(context.messages).toEqual([
+      expect.objectContaining({ role: 'assistant' }),
+      {
+        role: 'toolResult',
+        toolCallId: 'outer',
+        toolName: 'get_weather',
+        content: [
+          { type: 'text', text: 'before' },
+          { type: 'text', text: 'middle' },
+          { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
+          { type: 'image', data: 'AQID', mimeType: 'image/png' },
+          { type: 'text', text: 'after' },
+        ],
+        isError: false,
+        timestamp: 0,
+      },
+    ])
   })
 
   it('rejects structured image history when no durable resolver is supplied', () => {
@@ -316,7 +326,8 @@ describe('toPiContext', () => {
     })
   })
 
-  it('labels unmatched tool results with toolName unknown and keeps isError', () => {
+  it('degrades an unmatched failed tool result with no output to provider-neutral text', () => {
+    const onReplayDegrade = vi.fn()
     const context = toPiContext({
       provider: 'deepseek',
       model: 'm',
@@ -324,13 +335,35 @@ describe('toPiContext', () => {
         content: [{ type: 'tool-result', toolCallId: ToolCallId('zz'), content: [], isError: true }],
         source: { kind: 'plugin', plugin: 'test' },
       })],
+    }, undefined, onReplayDegrade)
+    expect(context.messages).toEqual([{
+      role: 'user',
+      content: '[earlier failed tool result for call "zz"; its tool call is absent from this transcript]\n(no output)',
+      timestamp: 0,
+    }])
+    expect(onReplayDegrade).toHaveBeenCalledWith(
+      'tool result for call "zz" has no recorded tool call in this history',
+    )
+  })
+
+  it('keeps the unmatched tool result body after the degradation notice', () => {
+    const context = toPiContext({
+      provider: 'deepseek',
+      model: 'm',
+      messages: [createUserMessage({
+        content: [{
+          type: 'tool-result',
+          toolCallId: ToolCallId('gone'),
+          content: [{ type: 'text', text: 'Sunny' }],
+        }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
     })
-    expect(context.messages[0]).toMatchObject({
-      role: 'toolResult',
-      toolName: 'unknown',
-      isError: true,
-      content: [{ type: 'text', text: '(no output)' }],
-    })
+    expect(context.messages).toEqual([{
+      role: 'user',
+      content: '[earlier tool result for call "gone"; its tool call is absent from this transcript]\nSunny',
+      timestamp: 0,
+    }])
   })
 
   it('splits mixed user text + tool results and lifts a leading system message into systemPrompt', () => {
@@ -340,6 +373,11 @@ describe('toPiContext', () => {
       messages: [
         createMessage({
           role: 'system', content: [{ type: 'text', text: 'rule' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+        createMessage({
+          role: 'assistant',
+          content: [{ type: 'tool-call', id: ToolCallId('c1'), name: 'get_weather', arguments: '{}' }],
           source: { kind: 'plugin', plugin: 'test' },
         }),
         createUserMessage({
@@ -352,7 +390,9 @@ describe('toPiContext', () => {
       ],
     })
     expect(context.systemPrompt).toBe('rule')
-    expect(context.messages.map(message => message.role)).toEqual(['user', 'toolResult'])
+    expect(context.messages.map(message => message.role)).toEqual(['assistant', 'user', 'toolResult'])
+    expect(context.messages[1]).toEqual({ role: 'user', content: 'note', timestamp: 0 })
+    expect(context.messages[2]).toMatchObject({ toolCallId: 'c1', toolName: 'get_weather' })
   })
 
   it('skips plugin-added (unknown) blocks in assistant content', () => {
@@ -937,6 +977,10 @@ describe('mapStopReason / mapUsage', () => {
     'OpenAI Responses stream ended before a terminal response event',
     'openrouter stream ended without a terminal event',
     'Stream ended without finish_reason',
+    // A gateway relaying its own upstream's stream failure: the proxy reports the
+    // supplier's body could not be decoded, after the response had started.
+    'server_error: [upstream_stream_error] upstream stream error: error decoding response body',
+    'upstream stream error: error decoding response body',
   ])('maps pi-ai transport wording %j', (errorMessage) => {
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })

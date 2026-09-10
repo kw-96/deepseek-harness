@@ -69,7 +69,7 @@ The plugin serves a `codex-import` settings namespace (one field, `autoSync`, de
 | `imageView` | `tool/call` + `tool/result` as `codex.imageView`, arguments `{ path }` |
 | `reasoning`, `contextCompaction`, unknown | skipped — not transcript material |
 
-Completed Codex turns close as `completed`; every other turn closes as `aborted` with the `legacy` cause, matching the imported-history vocabulary.
+Completed Codex turns close as `completed`; every other turn closes as `aborted` with the `legacy` cause, matching the imported-history vocabulary. Each tool item also emits the assistant message that requested it, carrying that item's own call id, name, and arguments, in the same step as its result, so the imported transcript declares every tool call it answers — the pairing every provider requires.
 
 -----
 
@@ -133,6 +133,7 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 - **Current-thread precedence** — when a current SQLite thread and archived rollout share a Codex session id, the current thread is imported and the archived copy is skipped.
 - **Active-session deferral** — an imported session currently owned by a live Agent is not replaced during a sweep; the settings card reports it as deferred and a later sweep reconciles it.
 - **Simplified fidelity** — Codex `reasoning`, `contextCompaction`, and raw file diffs are not transcribed; agent-message phase metadata is dropped, and each agent message becomes one DSH step rather than Codex's original grouping.
+- **Synthesized tool-call messages** — because Codex records a call and its output in one item, each tool item yields one additional assistant message holding only that item's call id, name, and arguments; the message carries no text of its own.
 - **Bounded tool results** — result text beyond `maxToolResultChars` is truncated to keep the durable log bounded.
 - **Continuation, not migration** — imported sessions resume with the deployment's default preset and model; the Codex model is recorded only as `codex` provenance on the assistant messages.
 

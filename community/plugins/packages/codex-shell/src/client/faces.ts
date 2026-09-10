@@ -7,11 +7,7 @@
  */
 
 import type { ReactNode } from 'react'
-import type {
-  FsContentSearchResponse, FsListResponse, FsNameSearchResponse, FsReadResponse, FsSearchOptions,
-  GitBranchesResponse, GitDiffResponse, GitLogResponse, GitStatusResponse,
-  ProjectAddDirResponse, ProjectDirsResponse, ProjectView,
-} from 'dsh-codex-shell/types'
+import type { FsListResponse, ProjectView } from 'dsh-codex-shell/types'
 
 export type SessionId = string
 export type WorkspaceId = string
@@ -67,24 +63,6 @@ export type RemoteResult<T> = RemoteOk<T> | RemoteErr
 /** codexShell remote namespace face (mounted by this plugin's own contribution). */
 export interface CodexShellRemoteFace {
   fsList(path: string): Promise<RemoteResult<FsListResponse>>
-  fsRead(path: string, maxBytes?: number): Promise<RemoteResult<FsReadResponse>>
-  fsWrite(path: string, content: string): Promise<RemoteResult<{ ok: true }>>
-  fsSearchName(root: string, query: string, options?: FsSearchOptions): Promise<RemoteResult<FsNameSearchResponse>>
-  fsSearchContent(root: string, query: string, options?: FsSearchOptions): Promise<RemoteResult<FsContentSearchResponse>>
-  gitStatus(cwd: string): Promise<RemoteResult<GitStatusResponse>>
-  gitLog(cwd: string, count?: number, path?: string): Promise<RemoteResult<GitLogResponse>>
-  gitDiff(cwd: string, path?: string, staged?: boolean): Promise<RemoteResult<GitDiffResponse>>
-  gitStage(cwd: string, path?: string): Promise<RemoteResult<{ ok: true }>>
-  gitUnstage(cwd: string, path?: string): Promise<RemoteResult<{ ok: true }>>
-  gitDiscard(cwd: string, path: string): Promise<RemoteResult<{ ok: true }>>
-  gitCommit(cwd: string, message: string): Promise<RemoteResult<{ ok: true }>>
-  gitBranches(cwd: string): Promise<RemoteResult<GitBranchesResponse>>
-  gitCheckout(cwd: string, branch: string): Promise<RemoteResult<{ ok: true }>>
-  gitFetch(cwd: string): Promise<RemoteResult<{ ok: true }>>
-  gitPull(cwd: string): Promise<RemoteResult<{ ok: true }>>
-  gitPush(cwd: string): Promise<RemoteResult<{ ok: true }>>
-  gitStageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
-  gitUnstageAll(cwd: string): Promise<RemoteResult<{ ok: true }>>
   terminalOpen(sessionId: string, options?: {
     cwd?: string
     name?: string
@@ -112,9 +90,6 @@ export interface CodexShellRemoteFace {
   terminalResize(sessionId: string, terminalId: string, cols: number, rows: number): Promise<RemoteResult<{ ok: true }>>
   terminalRead(sessionId: string, terminalId: string): Promise<RemoteResult<{ output: string; truncated: boolean }>>
   terminalClose(sessionId: string, terminalId: string): Promise<RemoteResult<{ ok: true }>>
-  projectDirs(workspaceId: string): Promise<RemoteResult<ProjectDirsResponse>>
-  projectSetDirs(workspaceId: string, dirs: readonly string[]): Promise<RemoteResult<ProjectDirsResponse>>
-  projectAddDir(workspaceId: string, path: string): Promise<RemoteResult<ProjectAddDirResponse>>
   projectList(): Promise<RemoteResult<{ projects: readonly ProjectView[] }>>
   projectCreate(request: { name: string; roots?: readonly string[] }): Promise<RemoteResult<{ project: ProjectView }>>
   projectRename(request: { projectId: string; name: string }): Promise<RemoteResult<{ project: ProjectView }>>
@@ -186,10 +161,8 @@ export type RenderSlotFn = (
   options?: { fallback?: ReactNode },
 ) => ReactNode
 
-/** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动 details 第三列开合。 */
+/** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动底部行开合。 */
 export interface LayoutFace {
-  openDetails(): void
-  closeDetails(): void
   openBottom(): void
   closeBottom(): void
 }

@@ -2,10 +2,10 @@
  * dsh-codex-shell 浏览器入口：挂载 codexShell Remote 并注册界面 ——
  * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、隐藏侧栏顶部品牌
  * 文字（DSH 本地构建）、挂在侧栏页脚槽位的添加工作区弹窗（页脚无
- * 可见按钮）、停靠进宿主 details 第三列的右侧工作台面板（文件/Git/
- * 项目/命令/摘要/浏览器）、以及会话头的面板开合按钮。插件/MCP/Skills
- * 统一走宿主「设置 → 插件」，本插件不再注册对应面板。
- * 面板开合通过 ctx.layout 与宿主第三列双向同步。
+ * 可见按钮）、底部多 tab 交互终端，以及会话头的底部终端按钮。
+ * 右侧面板由宿主官方右栏（ui-sidebar-right）提供并与本插件无关；本插件
+ * 不注册 details / rightbar 槽位，也不提供右侧开合按钮。
+ * 插件/MCP/Skills 统一走宿主「设置 → 插件」。
  *
  * 对宿主编译采用本地结构面（faces.ts）而非宿主编排类型线；运行时的
  * 槽位核心仍会对每个名字做加载期强校验。
@@ -17,11 +17,10 @@ import remoteContribution from 'dsh-codex-shell/remote'
 import { SessionMetaStore } from './session-meta.js'
 import { BrowserPrefsStore } from './sidebar/prefs.js'
 import { CodexBrowser, type CodexBrowserInjected } from './WorkspaceBrowser.js'
-import { CodexRightPanel, type CodexPanelInjected, type CommandPrompt } from './RightPanel.js'
 import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
 import { BottomTerminalPanel } from './bottom/BottomTerminalPanel.js'
+import type { TerminalApi } from './bottom/terminal-api.js'
 import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
-import { PanelController } from './panel-controller.js'
 import { en, zh } from './locales.js'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
@@ -148,35 +147,6 @@ async function exportSessionMarkdown(connection: unknown, sessionId: string): Pr
   }
 }
 
-/** 某会话的持久用户指令；传输缺失或失败时返回空列表。 */
-async function readPrompts(connection: unknown, sessionId: string): Promise<readonly CommandPrompt[]> {
-  const probe = connection as ConnectionProbeLike
-  const history = probe.api?.sessions?.history
-  if (history === undefined) return []
-  try {
-    const result = await history({ sessionId, maxMessages: 400 })
-    if (!result.ok) return []
-    const prompts: CommandPrompt[] = []
-    for (const record of result.value.records ?? []) {
-      const event = record as {
-        type?: string
-        seq?: number
-        data?: { content?: readonly { type?: string; text?: string }[]; source?: { kind?: string } }
-      }
-      if (event.type !== 'user/message') continue
-      if (event.data?.source?.kind !== 'user') continue
-      const text = (event.data.content ?? [])
-        .filter(block => block.type === 'text')
-        .map(block => block.text ?? '')
-        .join('')
-      if (text.trim() !== '') prompts.push({ seq: event.seq ?? 0, text })
-    }
-    return prompts.reverse()
-  } catch {
-    return []
-  }
-}
-
 /**
  * 挂载 Remote 并注册全部 codex-shell 界面。
  * @param ctx - 客户端根上下文。
@@ -194,23 +164,15 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeLocale = locale.register('codex-shell', { zh, en } as Record<string, Record<string, string>>)
   const t: TFn = locale.bind('codex-shell')
 
-  const panel = new PanelController()
   const meta = new SessionMetaStore()
   const prefs = new BrowserPrefsStore()
-
-  ctx.effect(() => () => { panel.dispose() }, 'codex-shell: panel controller')
 
   const codexRemote = ctx.get('remote.codexShell') as CodexShellRemoteFace
   const sessionRemote = ctx.get('remote.session') as {
     openWorkspacePath?: (request: { path: string }) => Promise<{ ok: boolean; error?: { message: string } }>
   } | undefined
 
-  /** 面板开合与宿主 details 列同步；布局服务缺失时降级为纯本地状态。 */
-  const setColumnOpen = (open: boolean): void => {
-    if (layout === undefined) return
-    if (open) layout.openDetails()
-    else layout.closeDetails()
-  }
+  /** 底部终端行开合；布局服务缺失时静默降级。 */
   const setBottomOpen = (open: boolean): void => {
     if (layout === undefined) return
     if (open) layout.openBottom()
@@ -285,51 +247,18 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     createWorkspace: input => workspaces.create(input),
   })
 
-  const panelInject = (): CodexPanelInjected => ({
-    panel,
-    meta,
-    api: {
-      fsList: async path => unwrap(await codexRemote.fsList(path)),
-      fsRead: async (path, maxBytes) => unwrap(await codexRemote.fsRead(path, maxBytes)),
-      fsWrite: async (path, content) => unwrap(await codexRemote.fsWrite(path, content)),
-      fsSearchName: async (root, query, options) => unwrap(await codexRemote.fsSearchName(root, query, options)),
-      fsSearchContent: async (root, query, options) => unwrap(await codexRemote.fsSearchContent(root, query, options)),
-      gitStatus: async cwd => unwrap(await codexRemote.gitStatus(cwd)),
-      gitLog: async (cwd, count) => unwrap(await codexRemote.gitLog(cwd, count)),
-      gitDiff: async (cwd, path, staged) => unwrap(await codexRemote.gitDiff(cwd, path, staged)),
-      gitStage: async (cwd, path) => unwrap(await codexRemote.gitStage(cwd, path)),
-      gitUnstage: async (cwd, path) => unwrap(await codexRemote.gitUnstage(cwd, path)),
-      gitDiscard: async (cwd, path) => unwrap(await codexRemote.gitDiscard(cwd, path)),
-      gitCommit: async (cwd, message) => unwrap(await codexRemote.gitCommit(cwd, message)),
-      gitBranches: async cwd => unwrap(await codexRemote.gitBranches(cwd)),
-      gitCheckout: async (cwd, branch) => unwrap(await codexRemote.gitCheckout(cwd, branch)),
-      gitFetch: async cwd => unwrap(await codexRemote.gitFetch(cwd)),
-      gitPull: async cwd => unwrap(await codexRemote.gitPull(cwd)),
-      gitPush: async cwd => unwrap(await codexRemote.gitPush(cwd)),
-      gitStageAll: async cwd => unwrap(await codexRemote.gitStageAll(cwd)),
-      gitUnstageAll: async cwd => unwrap(await codexRemote.gitUnstageAll(cwd)),
-      terminalOpen: async (sessionId, options) => unwrap(await codexRemote.terminalOpen(sessionId, options)),
-      terminalList: async sessionId => unwrap(await codexRemote.terminalList(sessionId)),
-      terminalSend: async (sessionId, terminalId, text) => unwrap(await codexRemote.terminalSend(sessionId, terminalId, text)),
-      terminalFollow: (sessionId, terminalId, signal) => codexRemote.terminalFollow(sessionId, terminalId, signal),
-      terminalWrite: async (sessionId, terminalId, data) => unwrap(await codexRemote.terminalWrite(sessionId, terminalId, data)),
-      terminalResize: async (sessionId, terminalId, cols, rows) => unwrap(await codexRemote.terminalResize(sessionId, terminalId, cols, rows)),
-      terminalRead: async (sessionId, terminalId) => unwrap(await codexRemote.terminalRead(sessionId, terminalId)),
-      terminalClose: async (sessionId, terminalId) => unwrap(await codexRemote.terminalClose(sessionId, terminalId)),
-      projectDirs: async workspaceId => unwrap(await codexRemote.projectDirs(workspaceId)),
-      projectSetDirs: async (workspaceId, dirs) => unwrap(await codexRemote.projectSetDirs(workspaceId, dirs)),
-      projectAddDir: async (workspaceId, path) => unwrap(await codexRemote.projectAddDir(workspaceId, path)),
-      projectList: async () => unwrap(await codexRemote.projectList()),
-      projectCreate: async request => unwrap(await codexRemote.projectCreate(request)),
-      projectRename: async request => unwrap(await codexRemote.projectRename(request)),
-      projectSetRoots: async request => unwrap(await codexRemote.projectSetRoots(request)),
-      projectDelete: async request => unwrap(await codexRemote.projectDelete(request)),
-    },
-    history: sessionId => readPrompts(connection, sessionId),
-    setColumnOpen,
-  })
+  /** 底部终端面板消费的 remote 面。 */
+  const terminalApi: TerminalApi = {
+    terminalOpen: async (sessionId, options) => unwrap(await codexRemote.terminalOpen(sessionId, options)),
+    terminalList: async sessionId => unwrap(await codexRemote.terminalList(sessionId)),
+    terminalFollow: (sessionId, terminalId, signal) => codexRemote.terminalFollow(sessionId, terminalId, signal),
+    terminalWrite: async (sessionId, terminalId, data) => unwrap(await codexRemote.terminalWrite(sessionId, terminalId, data)),
+    terminalResize: async (sessionId, terminalId, cols, rows) => unwrap(await codexRemote.terminalResize(sessionId, terminalId, cols, rows)),
+    terminalRead: async (sessionId, terminalId) => unwrap(await codexRemote.terminalRead(sessionId, terminalId)),
+    terminalClose: async (sessionId, terminalId) => unwrap(await codexRemote.terminalClose(sessionId, terminalId)),
+  }
 
-  const toggleInject = (): PanelToggleInjected => ({ panel, meta, setColumnOpen, setBottomOpen })
+  const toggleInject = (): PanelToggleInjected => ({ setBottomOpen })
 
   // 每处注册都通过 slots.inject 等待宿主声明（apply 顺序不受约束）。
   const disposeBrowser = slots.inject('sidebar.workspaces', () => slots.register({
@@ -356,27 +285,22 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     locale: 'codex-shell',
     inject: addWorkspaceInject,
   }, AddWorkspaceAction))
-  // 停靠进宿主第三列：priority -1 遮蔽原生工具详情面板，列宽/拖拽/动画由宿主布局接管。
-  const disposePanel = slots.inject('details', () => slots.register({
-    name: 'details',
-    priority: -1,
-    locale: 'codex-shell',
-    inject: panelInject,
-  }, CodexRightPanel))
+  // 底栏多 tab 终端占用宿主 bottom 行。
   const disposeBottom = slots.inject('bottom', () => slots.register({
     name: 'bottom', priority: -1, locale: 'codex-shell',
-    inject: () => ({ api: panelInject().api, close: () => { setBottomOpen(false) } }),
+    inject: () => ({ api: terminalApi, close: () => { setBottomOpen(false) } }),
   }, BottomTerminalPanel))
+  // 会话头工具按钮：Web 渲染底部终端按钮；桌面壳渲染空（顶部栏在窗口控制
+  // 按钮左侧提供）。右侧面板由官方右栏自己的角落按钮负责，本插件不重复提供。
   const disposeToggle = slots.inject('conversation.session.header.utilities', () => slots.register({
     name: 'conversation.session.header.utilities', id: 'codex-panel-toggle', order: 20,
-    label: () => t('openRightPanel'), locale: 'codex-shell',
+    label: () => t('bottomTerminal'), locale: 'codex-shell',
     inject: toggleInject,
   }, PanelToggle))
 
   return async () => {
     disposeToggle()
     disposeBottom()
-    disposePanel()
     disposeAddWorkspace()
     disposeBrandMark()
     disposeBrandName()

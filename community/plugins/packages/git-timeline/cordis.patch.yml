@@ -1,0 +1,9 @@
+# dsh-git-timeline bundle patch: insert the Git timeline right-sidebar tab.
+# The plugin ships one Host half (Typert Remote `gitTimeline` over ctx.shell)
+# and one Client half (a right-sidebar tab type: "Git 时间线").
+# Install:
+#   dsh plugin --profile <name> add dsh-git-timeline@<version>
+# or insert this row into the profile's cordis.patch.yml manually.
+- insert:
+    - id: git-timeline
+      name: dsh-git-timeline

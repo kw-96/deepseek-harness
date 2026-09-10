@@ -45,6 +45,7 @@ async function bench(collapsed = false) {
     // 本地四区布局面板动作：面板行测试不触发，桩仅满足 ILayout 契约。
     openDetails: vi.fn(),
     closeDetails: vi.fn(),
+    toggleDetails: vi.fn(),
     openBottom: vi.fn(),
     closeBottom: vi.fn(),
   } satisfies ILayout

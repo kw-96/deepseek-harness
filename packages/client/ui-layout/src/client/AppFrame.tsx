@@ -27,6 +27,11 @@ import css from './AppFrame.module.css'
 export type AppFrameInjected = {
   /** Select a session as current (desktop title-bar history / neighbor nav). */
   openSession: (id: SessionId) => void
+  /**
+   * 右侧面板开合（桌面标题栏按钮与 View 菜单）：装配层把它接到官方右栏
+   * （ui-sidebar-right 的 toggleExpanded），组合里没有该包时回落到 details 列。
+   */
+  toggleRightbar: () => void
 }
 
 /** Full composed props: runtime share + child-slot render share + store share. */
@@ -142,6 +147,7 @@ export function AppFrame({
   renderSlot,
   SessionProvider,
   openSession,
+  toggleRightbar,
   t,
 }: AppFrameProps) {
   const panels = useStore(s => s)
@@ -225,10 +231,6 @@ export function AppFrame({
   const onBottomDrag = useCallback((dy: number) => { actions.setBottom(bottomBase.current - dy) }, [actions])
   const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
   const desktop = isDesktopShell()
-  const toggleDetails = useCallback(() => {
-    if (panels.details === 0) actions.openDetails()
-    else actions.closeDetails()
-  }, [actions, panels.details])
   const toggleBottom = useCallback(() => {
     if (panels.bottom === 0) actions.openBottom()
     else actions.closeBottom()
@@ -305,7 +307,7 @@ export function AppFrame({
         t={t}
         sidebarCollapsed={sidebarCollapsed}
         toggleSidebar={() => { actions.toggleSidebar() }}
-        toggleDetails={toggleDetails}
+        toggleRightbar={toggleRightbar}
         toggleBottom={toggleBottom}
         openBottom={() => { actions.openBottom() }}
         openSession={openSession}

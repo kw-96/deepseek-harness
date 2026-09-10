@@ -206,8 +206,8 @@ export function apply(ctx: Context, config: Config): void {
     ),
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
-        `llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}";`
-        + ` sending that message as provider-neutral content (${reason})`,
+        `llm-pi-ai: history this route cannot replay natively on "${provider}/${model}";`
+        + ` sending that item as provider-neutral content (${reason})`,
       )
     },
   })

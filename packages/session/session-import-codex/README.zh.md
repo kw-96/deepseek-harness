@@ -69,7 +69,7 @@ kind: "package-reference"
 | `imageView` | `tool/call` + `tool/result`,工具名 `codex.imageView`,参数 `{ path }` |
 | `reasoning`、`contextCompaction`、未知类型 | 跳过——不属于对话正文 |
 
-已完成的 Codex 轮次以 `completed` 收尾;其余轮次以 `aborted` + `legacy` 原因收尾,与导入历史的既有词汇一致。
+已完成的 Codex 轮次以 `completed` 收尾;其余轮次以 `aborted` + `legacy` 原因收尾,与导入历史的既有词汇一致。每个工具条目还会在与其结果相同的 step 中发出“发起该调用的 assistant 消息”,携带该条目自己的 call id、名称与参数,因此导入的转录会声明它回答的每一次工具调用——这是每个提供方都要求的配对。
 
 -----
 
@@ -134,6 +134,7 @@ Indirectly, through the imported session logs the agent loop later continues.
 - **当前线程优先** — 当前 SQLite 线程与归档 rollout 共享 Codex 会话 id 时，导入当前线程并跳过归档副本。
 - **活跃会话延后** — 被 live Agent 持有的导入会话不会在扫描中替换；设置卡会报告延后数量，后续扫描会继续对账。
 - **保真度简化** — Codex 的 `reasoning`、`contextCompaction` 与原始文件 diff 不转录;代理消息的 phase 元数据被丢弃,每条代理消息对应一个 DSH step 而非 Codex 原始分组。
+- **合成的工具调用消息** — 由于 Codex 把一次调用与其输出记录在同一个条目里,每个工具条目会多产出一条只包含该条目 call id、名称与参数的 assistant 消息;该消息本身不含文本。
 - **工具结果有界** — 超出 `maxToolResultChars` 的结果文本被截断,以保持持久日志有界。
 - **续接而非迁移** — 导入会话以部署的默认预设与模型续接;Codex 模型只作为助手消息上的 `codex` 来源记录。
 

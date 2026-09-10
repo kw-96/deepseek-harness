@@ -148,7 +148,7 @@ function push<K extends SessionEventType>(
   state.seq += 1
 }
 
-/** Emit one Codex tool item as a paired `tool/call` + `tool/result`. */
+/** Emit one Codex tool item as its requesting assistant message plus a paired `tool/call` + `tool/result`. */
 function pushToolPair(
   events: SessionEvent[],
   state: { seq: number; prevTime: number },
@@ -162,6 +162,22 @@ function pushToolPair(
 ): void {
   const callId = brandString<ToolCallId>(item.itemId)
   const argumentsText = JSON.stringify(argumentRecord)
+  // Codex records a call and its output in ONE item, so without this message
+  // the imported transcript carries a tool result no assistant message ever
+  // declared — history every provider rejects. The call itself is real (id,
+  // name, and arguments all come from the item), so it is emitted as the
+  // assistant message that requested it, in the same step as its result.
+  push(events, state, 'assistant/message', item.createdAtMs, {
+    turn: turn.turn,
+    step: turn.step,
+    message: {
+      id: brandString<MessageId>(`${item.itemId}:tool-call`),
+      role: 'assistant',
+      content: [{ type: 'tool-call', id: callId, name, arguments: argumentsText }],
+      source: { kind: 'model', ...CODEX_PROVENANCE },
+    },
+    stream: [],
+  }, 'append')
   push(events, state, 'tool/call', item.createdAtMs, {
     turn: turn.turn,
     step: turn.step,

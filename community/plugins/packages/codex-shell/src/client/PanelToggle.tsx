@@ -1,20 +1,14 @@
-/** 会话头工具按钮：一键开合底部终端与右侧 Codex 面板。
+/** 会话头工具按钮：一键打开底部终端面板。
  * 桌面独立窗口隐藏（开合按钮由顶部栏在窗口控制按钮左侧提供，参考
- * 左侧栏开合按钮的双模式处理）；Web 保留在会话头，顺序为底部栏、
- * 右侧栏，与顶部栏一致。 */
+ * 左侧栏开合按钮的双模式处理）；右侧面板由官方右栏（ui-sidebar-right）
+ * 自己的会话头角落按钮负责开合，本插件不再渲染第二个右侧开合按钮。 */
 
-import { PanelBottom, PanelRight } from 'lucide-react'
-import type { SessionMetaStore } from './session-meta.js'
-import { PanelController, usePanelState } from './panel-controller.js'
+import { PanelBottom } from 'lucide-react'
 import type { TFn } from './faces.js'
 import css from './styles.module.css'
 
 export interface PanelToggleInjected {
-  panel: PanelController
-  meta: SessionMetaStore
-  /** 同步宿主 details 列开合（layout.openDetails / closeDetails）。 */
-  setColumnOpen: (open: boolean) => void
-  /** 同步宿主 bottom 行开合。 */
+  /** 打开底部终端行（ctx.layout.openBottom）。 */
   setBottomOpen: (open: boolean) => void
 }
 
@@ -29,17 +23,11 @@ function isDesktopShell(): boolean {
   return candidate.__TAURI_INTERNALS__ !== undefined || candidate.__TAURI__ !== undefined
 }
 
-export function PanelToggle({ panel, setColumnOpen, setBottomOpen, t }: PanelToggleProps) {
-  const [state] = usePanelState(panel)
+export function PanelToggle({ setBottomOpen, t }: PanelToggleProps): React.ReactNode {
   // 桌面壳：开合按钮由顶部栏提供（窗口控制按钮左侧），会话头不渲染。
   if (isDesktopShell()) return null
-  const open = state.open
-  const label = open ? t('closeRightPanel') : t('openRightPanel')
-  return <>
+  return (
     <button type="button" className={css.iconButton} title={t('bottomTerminal')}
       aria-label={t('bottomTerminal')} onClick={() => { setBottomOpen(true) }}><PanelBottom size={15} /></button>
-    <button type="button" className={css.iconButton} title={label}
-      aria-label={label} aria-pressed={open}
-      onClick={() => { const next = panel.toggle(); setColumnOpen(next.open) }}><PanelRight size={15} /></button>
-  </>
+  )
 }

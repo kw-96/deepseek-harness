@@ -146,7 +146,8 @@ describe('session-import-codex through a real Loader composition', () => {
     await handle.close()
     expect(stored.map(event => event.type)).toEqual([
       'turn/start', 'user/message', 'session/title', 'step/start', 'assistant/message',
-      'step/end', 'step/start', 'tool/call', 'tool/result', 'step/end', 'turn/end', 'session/end-seed',
+      'step/end', 'step/start', 'assistant/message', 'tool/call', 'tool/result',
+      'step/end', 'turn/end', 'session/end-seed',
     ])
     const title = stored.find(event => event.type === 'session/title')
     if (title === undefined || title.type !== 'session/title') throw new Error('missing title event')

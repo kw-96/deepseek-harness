@@ -1,24 +1,20 @@
 // @vitest-environment jsdom
 /**
- * PanelToggle spec: Web 会话头渲染底部栏、右侧栏两个按钮（顺序固定），
- * 桌面独立窗口渲染 null（开合按钮由顶部栏在窗口控制按钮左侧提供）。
+ * PanelToggle spec：Web 会话头渲染底部终端按钮；右侧面板由官方右栏自己的
+ * 角落按钮负责，本插件不再渲染第二个开合按钮。桌面独立窗口整体渲染 null
+ * （开合按钮由顶部栏在窗口控制按钮左侧提供）。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PanelToggle } from '../src/client/PanelToggle.js'
 import type { PanelToggleProps } from '../src/client/PanelToggle.js'
-import { PanelController } from '../src/client/panel-controller.js'
-import { SessionMetaStore } from '../src/client/session-meta.js'
 
 function props(over: Partial<PanelToggleProps> = {}): PanelToggleProps {
   return {
-    panel: new PanelController(),
-    meta: new SessionMetaStore(),
-    setColumnOpen: vi.fn(),
     setBottomOpen: vi.fn(),
     t: ((key: string) => key),
     ...over,
-  } as PanelToggleProps
+  }
 }
 
 afterEach(() => {
@@ -28,12 +24,11 @@ afterEach(() => {
 })
 
 describe('PanelToggle', () => {
-  it('renders bottom then right panel buttons in the Web shell', () => {
-    const p = props()
-    const { container } = render(<PanelToggle {...p} />)
+  it('renders only the bottom terminal button in the Web shell', () => {
+    const { container } = render(<PanelToggle {...props()} />)
     const labels = [...container.querySelectorAll('button')]
       .map(button => button.getAttribute('aria-label'))
-    expect(labels).toEqual(['bottomTerminal', 'closeRightPanel'])
+    expect(labels).toEqual(['bottomTerminal'])
   })
 
   it('opens the bottom terminal from the bottom button', () => {
@@ -41,16 +36,6 @@ describe('PanelToggle', () => {
     render(<PanelToggle {...p} />)
     fireEvent.click(screen.getByRole('button', { name: 'bottomTerminal' }))
     expect(p.setBottomOpen).toHaveBeenCalledWith(true)
-  })
-
-  it('toggles the right panel and syncs the details column', () => {
-    const panel = new PanelController()
-    const p = props({ panel })
-    render(<PanelToggle {...p} />)
-    expect(panel.getSnapshot().open).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'closeRightPanel' }))
-    expect(panel.getSnapshot().open).toBe(false)
-    expect(p.setColumnOpen).toHaveBeenCalledWith(false)
   })
 
   it('renders nothing in the desktop shell (title bar owns the toggles)', () => {

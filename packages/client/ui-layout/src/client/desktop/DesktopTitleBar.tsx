@@ -20,7 +20,8 @@ export type DesktopTitleBarProps = {
   t: DesktopTitleBarT
   sidebarCollapsed: boolean
   toggleSidebar: () => void
-  toggleDetails: () => void
+  /** 右侧面板开合（官方右栏；组合里无右栏包时由装配层回落到 details 列）。 */
+  toggleRightbar: () => void
   toggleBottom: () => void
   openBottom: () => void
   openSession: (id: SessionId) => void
@@ -33,7 +34,7 @@ export type DesktopTitleBarProps = {
  * @returns the title bar element tree.
  */
 export function DesktopTitleBar(props: DesktopTitleBarProps) {
-  const { t, sidebarCollapsed, toggleSidebar, toggleDetails, toggleBottom, openBottom, openSession, useSessions } = props
+  const { t, sidebarCollapsed, toggleSidebar, toggleRightbar, toggleBottom, openBottom, openSession, useSessions } = props
   const [menu, setMenu] = useState<MenuId | null>(null)
   const [maximized, setMaximized] = useState(false)
   const historyRef = useRef(createSessionHistory())
@@ -124,7 +125,7 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
   const forwardEnabled = canGoForward(history)
   const menus = buildMenus({
     t, win, backEnabled, forwardEnabled, sessionIdsLength: sessionIds.length,
-    toggleSidebar, toggleDetails, toggleBottom, openBottom, walkHistory, neighborSession,
+    toggleSidebar, toggleRightbar, toggleBottom, openBottom, walkHistory, neighborSession,
   })
   const menusRef = useRef(menus)
   menusRef.current = menus
@@ -236,7 +237,7 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
           className={css.iconBtn}
           aria-label={t('desktop.menu.toggleDetails')}
           title={t('desktop.menu.toggleDetails')}
-          onClick={toggleDetails}
+          onClick={toggleRightbar}
         >
           <PanelRightIcon />
         </button>

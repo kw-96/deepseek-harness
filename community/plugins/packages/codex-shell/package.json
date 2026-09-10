@@ -1,7 +1,7 @@
 {
   "name": "dsh-codex-shell",
   "version": "0.6.5",
-  "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, right-edge files/git/projects/commands/summary/browser panel, pinned summary overlay, and session context actions - one bundle plugin",
+  "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, bottom multi-tab terminal, and session context actions - one bundle plugin; the right-hand panel stays with the host's native details column",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
@@ -11,9 +11,7 @@
     "codex",
     "codex-style",
     "sidebar",
-    "file-explorer",
-    "git-panel",
-    "plugin-manager",
+    "terminal",
     "web-ui"
   ],
   "license": "MIT",
@@ -115,7 +113,6 @@
     "@deepseek-ai/dsh-client-ui-workspace": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-fs": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-shell": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-terminal": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",
     "react": ">=18.2.0 <20.0.0"
@@ -127,7 +124,6 @@
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-fs": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-shell": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-terminal": "file:../../tarballs/deepseek-ai-dsh-terminal-0.1.2-rc.3.tgz",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",
     "@testing-library/react": "^16.3.0",

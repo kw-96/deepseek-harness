@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import type { CodexApi } from '../RightPanel.js'
+import type { TerminalApi } from './terminal-api.js'
 import type { TFn } from '../faces.js'
 import css from '../styles.module.css'
 import type { BottomTab } from './useBottomTerminals.js'
 
 interface BottomXtermViewProps {
-  api: CodexApi
+  api: TerminalApi
   sessionId: string
   tab: BottomTab
   active: boolean

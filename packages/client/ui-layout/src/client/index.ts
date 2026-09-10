@@ -198,6 +198,14 @@ export function apply(ctx: ClientContext): void {
           ctx.slots.entries('main').some(entry => entry.options.key === id))
         return {
           openSession: (id) => { ctx.sessions.open(id) },
+          // 右侧面板开合：官方右栏包（ui-sidebar-right）在场时驱动它的
+          // toggleExpanded，缺省回落到本地 details 列。用 ctx.get 惰性读取，
+          // 装配顺序不影响；该包是可选服务，不是本包的依赖。
+          toggleRightbar: () => {
+            const rightbar = ctx.get('sidebarRight') as { toggleExpanded?: () => void } | undefined
+            if (rightbar?.toggleExpanded === undefined) actions.toggleDetails()
+            else rightbar.toggleExpanded()
+          },
         }
       },
     }, AppFrame)

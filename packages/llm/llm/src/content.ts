@@ -1,6 +1,7 @@
 /** Content-block structure helpers. @module @deepseek-ai/dsh-llm/content */
 
 import type { ContentBlock } from './types.ts'
+import type { ToolCallId } from './brand.ts'
 import type { Message } from './message.ts'
 import type {
   AttachmentStore, FileAttachmentRef, ImageAttachmentRef, ImageMediaType, RequestImageAttachment,
@@ -113,6 +114,34 @@ export function offloadedImageText(
     return `[${identity} No local normalized image path is available; ask the user to attach it again if needed.]`
   }
   return `[${identity}${normalizedAccessText(ref, access)}]`
+}
+
+/**
+ * Text sent to a model in place of one tool result whose tool call is absent
+ * from the replayed history. Every provider requires a tool result to follow
+ * the call it answers, so durable history that lost its calls — an imported
+ * transcript, a repaired log — reaches the model as this text instead of
+ * failing the whole request. Shared by every adapter that expands tool results
+ * onto its own wire format, so the fallback reads identically on each route.
+ * @param callId - the tool call id the result cites.
+ * @param text - the result's own flattened text.
+ * @param isError - whether the result records a failed call.
+ * @returns deterministic provider-neutral representation of that result.
+ */
+export function unpairedToolResultText(callId: ToolCallId, text: string, isError: boolean): string {
+  const body = text.length === 0 ? '(no output)' : text
+  const failed = isError ? 'failed ' : ''
+  return `[earlier ${failed}tool result for call "${callId}"; its tool call is absent from this transcript]\n${body}`
+}
+
+/**
+ * Diagnostic reason an adapter reports for one tool result rendered by
+ * {@link unpairedToolResultText}, so every route names the same cause.
+ * @param callId - the tool call id the result cites.
+ * @returns the reason string for the adapter's degrade channel.
+ */
+export function unpairedToolResultReason(callId: ToolCallId): string {
+  return `tool result for call "${callId}" has no recorded tool call in this history`
 }
 
 /**
