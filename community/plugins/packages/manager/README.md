@@ -13,6 +13,8 @@ This is a community project, not an official DeepSeek Harness package.
 - Enable or disable one plugin without deleting its npm package.
 - Expand entries by their automatic official/third-party category, toggle all mutable entries in a group, or manage individual Loader entries by their configured names.
 - Persist desired state in the active profile's `cordis.patch.yml` so it survives restart.
+- Manage MCP servers for the active profile's `mcp-client` rows from the **MCP** settings tab.
+- List skills under the user skills root and toggle per-skill model invocation from the **Skills** settings tab.
 - Protect the manager itself and the Web management surface from accidental shutdown.
 - Use Harness's existing trusted-host transport policy; the plugin does not open another server.
 - English and Simplified Chinese Web UI.
@@ -26,7 +28,7 @@ dsh plugin --profile web add dsh-plugin-manager
 dsh --profile web
 ```
 
-Open **Settings -> Plugins -> Plugin list**. The manager replaces Harness's read-only list while keeping runtime status visible and adding category grouping, search, and enable/disable controls. Removing the package later uses:
+Open **Settings -> Plugins**. The manager adds three tabs: the plugin list (replacing Harness's read-only list while keeping runtime status visible and adding category grouping, search, and enable/disable controls), MCP servers, and Skills. Removing the package later uses:
 
 ```sh
 dsh plugin --profile web remove dsh-plugin-manager

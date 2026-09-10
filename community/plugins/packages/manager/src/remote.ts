@@ -60,10 +60,18 @@ const skillReceipt: z.ZodType<SkillMutationReceipt> = z.object({
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
 const parameter = (name: string, schema: z.ZodType) => ({ name, wire: name, source: 'json' as const, codec: strict(`dsh-plugin-manager/types#${name}`, schema) })
-const descriptor = (method: string, parameters: readonly ReturnType<typeof parameter>[], result: z.ZodType, typeName = 'MutationReceipt') => ({
+const descriptor = (
+  method: string,
+  parameters: readonly ReturnType<typeof parameter>[],
+  result: z.ZodType,
+  typeName = 'MutationReceipt',
+  // 导出名与真实成员名不一致的别名方法：网关按此成员名在服务对象上取方法
+  implementation?: string,
+) => ({
   id: `dsh-plugin-manager#pluginManager/${method}`,
   service: 'pluginManager', namespace: 'pluginManager', method, invocation: { kind: 'direct' as const }, parameters,
   result: strict(`dsh-plugin-manager/types#${typeName}`, result),
+  ...(implementation === undefined ? {} : { implementation }),
 })
 
 const descriptors = [
@@ -71,12 +79,12 @@ const descriptors = [
   descriptor('setEnabled', [parameter('entryId', z.string()), parameter('enabled', z.boolean())], receipt),
   descriptor('setCategoryEnabled', [parameter('category', category), parameter('enabled', z.boolean())], receipt),
   descriptor('setPackageEnabled', [parameter('packageName', z.string()), parameter('enabled', z.boolean())], receipt),
-  descriptor('listMcpServers', [], mcpSnapshot, 'McpServersSnapshot'),
-  descriptor('saveMcpServer', [parameter('input', mcpServerInput), parameter('enabled', z.boolean())], mcpReceipt, 'McpMutationReceipt'),
-  descriptor('removeMcpServer', [parameter('serverName', z.string())], mcpReceipt, 'McpMutationReceipt'),
-  descriptor('setMcpServerEnabled', [parameter('serverName', z.string()), parameter('enabled', z.boolean())], mcpReceipt, 'McpMutationReceipt'),
-  descriptor('listSkills', [], skillsSnapshot, 'SkillsSnapshot'),
-  descriptor('setSkillModelInvocation', [parameter('skillName', z.string()), parameter('enabled', z.boolean())], skillReceipt, 'SkillMutationReceipt'),
+  descriptor('listMcpServers', [], mcpSnapshot, 'McpServersSnapshot', 'listMcpServersRemote'),
+  descriptor('saveMcpServer', [parameter('input', mcpServerInput), parameter('enabled', z.boolean())], mcpReceipt, 'McpMutationReceipt', 'saveMcpServerRemote'),
+  descriptor('removeMcpServer', [parameter('serverName', z.string())], mcpReceipt, 'McpMutationReceipt', 'removeMcpServerRemote'),
+  descriptor('setMcpServerEnabled', [parameter('serverName', z.string()), parameter('enabled', z.boolean())], mcpReceipt, 'McpMutationReceipt', 'setMcpServerEnabledRemote'),
+  descriptor('listSkills', [], skillsSnapshot, 'SkillsSnapshot', 'listSkillsRemote'),
+  descriptor('setSkillModelInvocation', [parameter('skillName', z.string()), parameter('enabled', z.boolean())], skillReceipt, 'SkillMutationReceipt', 'setSkillModelInvocationRemote'),
 ] as const
 
 export const TYPERT_REMOTE: TypertRemoteContribution = { package: 'dsh-plugin-manager', descriptors }

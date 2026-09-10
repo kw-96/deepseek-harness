@@ -59,3 +59,23 @@ export function CloseIcon() {
     </svg>
   )
 }
+
+/** Bottom terminal panel glyph (lucide panel-bottom). */
+export function PanelBottomIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="2" y="2" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 10h12" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
+/** Right panel glyph (lucide panel-right). */
+export function PanelRightIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="2" y="2" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M10 2v12" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}

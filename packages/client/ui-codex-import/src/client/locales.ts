@@ -7,6 +7,8 @@ export const NS = 'settings.codexImport'
 export type CodexImportKey =
   | 'title'
   | 'description'
+  | 'collapse'
+  | 'expand'
   | 'sync'
   | 'run'
   | 'running'
@@ -21,6 +23,8 @@ export type CodexImportKey =
 export const en: Record<CodexImportKey, string> = {
   title: 'Codex import',
   description: 'Import local Codex threads as sessions and keep them in sync.',
+  collapse: 'Collapse',
+  expand: 'Expand',
   sync: 'Keep import in sync',
   run: 'Import now',
   running: 'Importing…',
@@ -36,6 +40,8 @@ export const en: Record<CodexImportKey, string> = {
 export const zh: Record<CodexImportKey, string> = {
   title: 'Codex 导入',
   description: '把本地 Codex 线程导入为会话,并保持同步。',
+  collapse: '收起',
+  expand: '展开',
   sync: '保持导入同步',
   run: '立即导入',
   running: '导入中…',

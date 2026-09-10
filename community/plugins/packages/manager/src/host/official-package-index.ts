@@ -177,6 +177,7 @@ export const OFFICIAL_PACKAGE_INDEX: Readonly<Record<string, OfficialPackageMeta
   "@deepseek-ai/dsh-sdk-protocol": { group: "sdk", description: "Shared wire protocol for the DeepSeek Harness SDK runtime: the newline-delimited JSON-RPC stdio transport and the named request, result, and notification types spoken between the runtime server and SDK clients" },
   "@deepseek-ai/dsh-session": { group: "core", description: "Event-sourced session store for the DeepSeek Harness" },
   "@deepseek-ai/dsh-session-checkpoint-policy": { group: "session", description: "Semantic session durability checkpoints before model requests and tool side effects" },
+  "@deepseek-ai/dsh-session-import-codex": { group: "session", description: "Import local Codex threads into DeepSeek Harness sessions" },
   "@deepseek-ai/dsh-session-log-deepseek": { group: "session", description: "Incremental lossless session-log request extension for the official DeepSeek LLM API" },
   "@deepseek-ai/dsh-session-log-export": { group: "session-query", description: "Web Session-log export command and shared download dialog" },
   "@deepseek-ai/dsh-session-persistence": { group: "session", description: "Abstract durable session persistence seam (ctx.sessionPersistence) for the DeepSeek Harness" },

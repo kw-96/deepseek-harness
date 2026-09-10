@@ -155,3 +155,40 @@ describe('DesktopTitleBar maximize state', () => {
     expect(screen.queryByRole('button', { name: 'desktop.window.restore' })).toBeNull()
   })
 })
+
+describe('DesktopTitleBar panel toggles', () => {
+  it('places bottom then right panel buttons before the window controls and wires them', () => {
+    const win = makeDesktopWindow()
+    installDesktopWindow(win.face)
+    const t = ((key: string) => key) as DesktopTitleBarProps['t']
+    const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
+      sel({ ids: [], current: undefined } as unknown as SessionListState))
+    const toggleBottom = vi.fn()
+    const toggleDetails = vi.fn()
+    const { container } = render(
+      <DesktopTitleBar
+        t={t}
+        sidebarCollapsed={false}
+        toggleSidebar={vi.fn()}
+        toggleDetails={toggleDetails}
+        toggleBottom={toggleBottom}
+        openBottom={vi.fn()}
+        openSession={vi.fn()}
+        useSessions={useSessions}
+      />,
+    )
+    const labels = [...container.querySelectorAll('header button')]
+      .map(button => button.getAttribute('aria-label'))
+    expect(labels.slice(-5)).toEqual([
+      'desktop.menu.toggleBottom',
+      'desktop.menu.toggleDetails',
+      'desktop.window.minimize',
+      'desktop.window.maximize',
+      'close',
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleBottom' }))
+    expect(toggleBottom).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleDetails' }))
+    expect(toggleDetails).toHaveBeenCalledTimes(1)
+  })
+})

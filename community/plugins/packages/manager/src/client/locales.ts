@@ -16,6 +16,8 @@ export const zh = {
   mcpHeaders: '请求头（每行 KEY=VALUE）', mcpEnv: '环境变量（每行 KEY=VALUE）',
   mcpTimeout: '调用超时（毫秒，留空为默认）', mcpEnabled: '启用', mcpManaged: '可编辑', mcpUnmanaged: '只读',
   mcpRemoveConfirm: '确认删除该 MCP 服务？', mcpRestartRequired: '已保存，重启当前配置后生效', mcpSaveFailed: '保存失败',
+  skillsTab: 'Skills', skillsTitle: '技能', skillsRootLabel: '技能目录', skillsEmpty: '技能目录中暂无技能。',
+  skillsInvocable: '允许模型调用', skillsRefresh: '刷新技能', skillsToggleFailed: '操作失败',
 } as const
 
 export type LocaleKey = keyof typeof zh
@@ -38,6 +40,8 @@ export const en: Record<LocaleKey, string> = {
   mcpHeaders: 'Headers (one KEY=VALUE per line)', mcpEnv: 'Environment (one KEY=VALUE per line)',
   mcpTimeout: 'Call timeout (ms, blank for default)', mcpEnabled: 'Enabled', mcpManaged: 'Editable', mcpUnmanaged: 'Read-only',
   mcpRemoveConfirm: 'Remove this MCP server?', mcpRestartRequired: 'Saved; restart the active profile to apply', mcpSaveFailed: 'Save failed',
+  skillsTab: 'Skills', skillsTitle: 'Skills', skillsRootLabel: 'Skills directory', skillsEmpty: 'No skills found in the skills directory.',
+  skillsInvocable: 'Allow model invocation', skillsRefresh: 'Refresh skills', skillsToggleFailed: 'Operation failed',
 }
 
 /** Bilingual functional-group labels keyed by group id. Unknown ids render as-is. */

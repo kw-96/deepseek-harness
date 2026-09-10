@@ -14,4 +14,21 @@ describe('plugin manager Remote contribution', () => {
       for (const parameter of descriptor.parameters) expect(parameter.codec.mode).toBe('strict')
     }
   })
+
+  it('resolves every exported method to the service member the gateway must call', () => {
+    // 别名方法的 descriptor 必须携带真实成员名，否则网关会按导出名取方法导致 method-unavailable
+    const members = Object.fromEntries(TYPERT_REMOTE.descriptors.map(item => [item.method, item.implementation ?? item.method]))
+    expect(members).toEqual({
+      list: 'list',
+      setEnabled: 'setEnabled',
+      setCategoryEnabled: 'setCategoryEnabled',
+      setPackageEnabled: 'setPackageEnabled',
+      listMcpServers: 'listMcpServersRemote',
+      saveMcpServer: 'saveMcpServerRemote',
+      removeMcpServer: 'removeMcpServerRemote',
+      setMcpServerEnabled: 'setMcpServerEnabledRemote',
+      listSkills: 'listSkillsRemote',
+      setSkillModelInvocation: 'setSkillModelInvocationRemote',
+    })
+  })
 })

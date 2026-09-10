@@ -52,6 +52,9 @@ function RunCounts(props: RunCountsProps) {
 export function CodexImportCard(props: CodexImportCardProps) {
   const { t, toggleSync, runImport, openSession } = props
   const state = props.useCodexImportCard(snapshot => snapshot)
+  // Card disclosure: matches the sibling plugin cards, collapsed by default,
+  // so the header names the plugin over its description before any controls.
+  const [open, setOpen] = useState(false)
   // Per-run disclosure is card-local reading state: which runs the user has
   // opened is a viewing gesture nobody outside the card has a stake in. The
   // newest run starts open; an import prepending a newer run opens it too.
@@ -78,89 +81,103 @@ export function CodexImportCard(props: CodexImportCardProps) {
       return next
     })
   }
+  const title = t('title')
   return (
-    <section className={css.card}>
-      <header className={css.header}>
-        <h3 className={css.title}>{t('title')}</h3>
-        <p className={css.description}>{t('description')}</p>
-      </header>
+    <li className={clsx(css.card, open && css.cardOpen)}>
+      <button
+        type="button"
+        className={css.header}
+        aria-expanded={open}
+        aria-label={`${t(open ? 'collapse' : 'expand')}: ${title}`}
+        onClick={() => { setOpen(!open) }}
+      >
+        <span className={css.headText}>
+          <span className={css.name}>{title}</span>
+          <span className={css.description}>{t('description')}</span>
+        </span>
+        <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+      </button>
 
-      <div className={css.controls}>
-        <label className={css.toggle}>
-          <input
-            type="checkbox"
-            checked={state.autoSync}
-            onChange={(event) => { toggleSync(event.target.checked) }}
-          />
-          <span>{t('sync')}</span>
-        </label>
-        <button
-          type="button"
-          className={css.run}
-          disabled={state.running}
-          onClick={() => { runImport() }}
-        >
-          {state.running ? t('running') : t('run')}
-        </button>
-      </div>
+      {open ? (
+        <div className={css.body}>
+          <div className={css.controls}>
+            <label className={css.toggle}>
+              <input
+                type="checkbox"
+                checked={state.autoSync}
+                onChange={(event) => { toggleSync(event.target.checked) }}
+              />
+              <span>{t('sync')}</span>
+            </label>
+            <button
+              type="button"
+              className={css.run}
+              disabled={state.running}
+              onClick={() => { runImport() }}
+            >
+              {state.running ? t('running') : t('run')}
+            </button>
+          </div>
 
-      <div className={css.history}>
-        <h4 className={css.historyTitle}>{t('historyTitle')}</h4>
-        {state.runs.length === 0
-          ? <p className={css.empty}>{t('empty')}</p>
-          : (
-            <ul className={css.runs}>
-              {state.runs.map((run, index) => {
-                const key = runKey(run.at, index)
-                const open = openRuns.has(key)
-                return (
-                  <li key={key} className={css.run}>
-                    {run.sessions.length === 0
-                      ? (
-                        <>
-                          <div className={css.runHead}>
-                            <RunCounts run={run} t={t} />
-                          </div>
-                          <p className={css.none}>{t('noSessions')}</p>
-                        </>
-                      )
-                      : (
-                        <>
-                          <button
-                            type="button"
-                            className={css.runHead}
-                            aria-expanded={open}
-                            onClick={() => { toggleRun(key) }}
-                          >
-                            <RunCounts run={run} t={t} />
-                            <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
-                          </button>
-                          {open && (
-                            <ul className={css.sessions}>
-                              {run.sessions.map(session => (
-                                <li key={session.id} className={css.session}>
-                                  <span className={css.sessionTitle}>
-                                    {session.title === '' ? session.id : session.title}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className={css.open}
-                                    onClick={() => { openSession(session.id) }}
-                                  >
-                                    {t('open')}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
+          <div className={css.history}>
+            <h4 className={css.historyTitle}>{t('historyTitle')}</h4>
+            {state.runs.length === 0
+              ? <p className={css.empty}>{t('empty')}</p>
+              : (
+                <ul className={css.runs}>
+                  {state.runs.map((run, index) => {
+                    const key = runKey(run.at, index)
+                    const isOpen = openRuns.has(key)
+                    return (
+                      <li key={key} className={css.run}>
+                        {run.sessions.length === 0
+                          ? (
+                            <>
+                              <div className={css.runHead}>
+                                <RunCounts run={run} t={t} />
+                              </div>
+                              <p className={css.none}>{t('noSessions')}</p>
+                            </>
+                          )
+                          : (
+                            <>
+                              <button
+                                type="button"
+                                className={css.runHead}
+                                aria-expanded={isOpen}
+                                onClick={() => { toggleRun(key) }}
+                              >
+                                <RunCounts run={run} t={t} />
+                                <IconChevronDownOutline14 className={clsx(css.chevron, isOpen && css.chevronOpen)} />
+                              </button>
+                              {isOpen && (
+                                <ul className={css.sessions}>
+                                  {run.sessions.map(session => (
+                                    <li key={session.id} className={css.session}>
+                                      <span className={css.sessionTitle}>
+                                        {session.title === '' ? session.id : session.title}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className={css.open}
+                                        onClick={() => { openSession(session.id) }}
+                                      >
+                                        {t('open')}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-      </div>
-    </section>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+          </div>
+        </div>
+      ) : null}
+    </li>
   )
 }

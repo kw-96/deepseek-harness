@@ -27,6 +27,7 @@ export const OFFICIAL_M_S = {
   '@deepseek-ai/dsh-sdk-protocol': 'DeepSeek Harness SDK 运行时的共享线协议：换行分隔 JSON-RPC stdio 传输与运行时服务器、SDK 客户端之间使用的命名请求/结果/通知类型',
   '@deepseek-ai/dsh-session': 'DeepSeek Harness 的事件溯源会话存储',
   '@deepseek-ai/dsh-session-checkpoint-policy': '模型请求与工具副作用前的语义会话持久化检查点',
+  '@deepseek-ai/dsh-session-import-codex': '把本地 Codex 线程导入 DeepSeek Harness 会话',
   '@deepseek-ai/dsh-session-log-deepseek': '官方 DeepSeek LLM API 的增量无损会话日志请求扩展',
   '@deepseek-ai/dsh-session-log-export': 'Web 会话日志导出命令与共享下载对话框',
   '@deepseek-ai/dsh-session-persistence': 'DeepSeek Harness 的抽象持久会话存储接口（ctx.sessionPersistence）',

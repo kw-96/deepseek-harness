@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import remoteContribution from 'dsh-plugin-manager/remote'
 import { McpServersPanel, type McpServersPanelApi } from './McpServersPanel.js'
 import { PluginManagerTab, type PluginManagerTabApi } from './PluginManagerTab.js'
+import { SkillsPanel, type SkillsPanelApi } from './skills/SkillsPanel.js'
 import { en, zh, type LocaleKey } from './locales.js'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' { interface LocaleNamespaceMap { 'settings.pluginManager': LocaleKey } }
@@ -30,12 +31,19 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       remove: async (serverName) => unwrap(await scope.remote.pluginManager.removeMcpServer(serverName)),
       setEnabled: async (serverName, enabled) => unwrap(await scope.remote.pluginManager.setMcpServerEnabled(serverName, enabled)),
     }
+    const skillsApi: SkillsPanelApi = {
+      list: async () => unwrap(await scope.remote.pluginManager.listSkills()),
+      setModelInvocation: async (skillName, enabled) => unwrap(await scope.remote.pluginManager.setSkillModelInvocation(skillName, enabled)),
+    }
     scope.slots.inject('settings.plugins.tab', () => scope.slots.register({
       name: 'settings.plugins.tab', id: 'all', order: 10, label: () => t('tab'), locale: 'settings.pluginManager', inject: () => ({ ...api, t, locale: t('localeId') }),
     }, PluginManagerTab))
     scope.slots.inject('settings.plugins.tab', () => scope.slots.register({
       name: 'settings.plugins.tab', id: 'mcp', order: 11, label: () => t('mcpTab'), locale: 'settings.pluginManager', inject: () => ({ ...mcpApi, t, locale: t('localeId') }),
     }, McpServersPanel))
+    scope.slots.inject('settings.plugins.tab', () => scope.slots.register({
+      name: 'settings.plugins.tab', id: 'skills', order: 12, label: () => t('skillsTab'), locale: 'settings.pluginManager', inject: () => ({ ...skillsApi, t, locale: t('localeId') }),
+    }, SkillsPanel))
   })
   return async () => { await feature.dispose(); disposeLocale(); await disposeRemote() }
 }
@@ -49,3 +57,5 @@ export { PluginManagerTab } from './PluginManagerTab.js'
 export type { PluginManagerTabApi, PluginManagerTabProps } from './PluginManagerTab.js'
 export { McpServersPanel } from './McpServersPanel.js'
 export type { McpServersPanelApi, McpServersPanelProps } from './McpServersPanel.js'
+export { SkillsPanel } from './skills/SkillsPanel.js'
+export type { SkillsPanelApi, SkillsPanelProps } from './skills/SkillsPanel.js'

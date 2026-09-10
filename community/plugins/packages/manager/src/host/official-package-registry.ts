@@ -168,6 +168,7 @@ export const OFFICIAL_PACKAGE_REGISTRY = [
   '@deepseek-ai/dsh-sdk-protocol',
   '@deepseek-ai/dsh-session',
   '@deepseek-ai/dsh-session-checkpoint-policy',
+  '@deepseek-ai/dsh-session-import-codex',
   '@deepseek-ai/dsh-session-log-deepseek',
   '@deepseek-ai/dsh-session-log-export',
   '@deepseek-ai/dsh-session-persistence',

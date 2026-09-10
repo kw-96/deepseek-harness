@@ -12,10 +12,8 @@
 
 .left {
   display: flex;
-  align-items: center;
-  gap: 2px;
+  align-items: stretch;
   flex: none;
-  padding: 0 6px;
 }
 
 .drag {
@@ -25,6 +23,7 @@
 
 .controls {
   display: flex;
+  align-items: stretch;
   flex: none;
 }
 
@@ -39,19 +38,29 @@
   cursor: default;
 }
 
+/* 所有按钮统一为 Windows 原生容器：全高 40px、无圆角、紧贴排列。 */
 .iconBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.85;
 }
 
-.iconBtn:hover:not(:disabled) {
+.winBtn {
+  width: 46px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 所有按钮统一悬停高亮为整块灰色；关闭按钮保留语义红色。 */
+.iconBtn:hover:not(:disabled),
+.menuBtn:hover,
+.menuBtnActive,
+.winBtn:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
-  opacity: 1;
 }
 
 .iconBtn:disabled {
@@ -63,16 +72,10 @@
 }
 
 .menuBtn {
-  height: 32px;
+  height: 40px;
   padding: 0 10px;
-  border-radius: 6px;
   font-size: 14px;
   line-height: 1;
-}
-
-.menuBtn:hover,
-.menuBtnActive {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
 }
 
 .dropdown {
@@ -123,17 +126,6 @@
   height: 0.5px;
   margin: 4px 8px;
   background: var(--dsw-alias-border-l3, rgba(255, 255, 255, 0.08));
-}
-
-.winBtn {
-  width: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.winBtn:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
 }
 
 .closeBtn:hover {
