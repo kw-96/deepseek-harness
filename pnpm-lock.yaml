@@ -244,6 +244,9 @@ importers:
       '@deepseek-ai/dsh-sdk-minimal':
         specifier: workspace:^
         version: link:../../packages/bundle/sdk-minimal
+      '@deepseek-ai/dsh-session-import-codex':
+        specifier: workspace:^
+        version: link:../../packages/session/session-import-codex
       '@deepseek-ai/dsh-session-projection':
         specifier: workspace:^
         version: link:../../packages/session/session-projection
