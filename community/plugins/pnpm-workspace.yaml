@@ -2,7 +2,9 @@ packages:
   - packages/*
 
 allowBuilds:
-  better-sqlite3: true
+  # better-sqlite3 自带预编译二进制（prebuilds/win32-x64.node），无需源码编译；
+  # 显式拒绝 node-gyp 构建，避免无 Visual Studio 的机器安装失败。
+  better-sqlite3: false
   esbuild: true
 
 # DeepSeek Harness release candidates are consumed immediately during the pre-release cycle.
