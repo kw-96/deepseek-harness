@@ -3,6 +3,7 @@
 
 mod alert;
 mod bootstrap;
+mod external_links;
 mod resolve;
 mod snapshot;
 
@@ -280,7 +281,8 @@ pub fn run() {
   let extra_args = passthrough_args();
 
   let app = tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![get_boot_logs])
+    .plugin(external_links::navigation_plugin())
+    .invoke_handler(tauri::generate_handler![get_boot_logs, external_links::open_external])
     .setup(move |app| {
       let handle = app.handle().clone();
       let logs: BootLogs = Arc::new(Mutex::new(Vec::new()));

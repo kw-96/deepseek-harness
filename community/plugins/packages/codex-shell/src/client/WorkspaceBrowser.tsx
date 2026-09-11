@@ -304,6 +304,7 @@ export function CodexBrowser(props: CodexBrowserProps) {
             prefs.setProjectPinned(projectId, !prefs.projectPinned(projectId))
             bump(n => n + 1)
           }}
+          onNewSession={workspaceId => { startSession(workspaceId) }}
           onBeginWorkspaceRename={beginWorkspaceRename}
           setRenameDraft={setRenameDraft}
           commitRename={sessionId => { void commitRename(sessionId) }}

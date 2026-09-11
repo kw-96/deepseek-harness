@@ -18,7 +18,7 @@ function database(): WorkorderStore {
 }
 
 const config: AppConfig = {
-  port: 3081, dataDir: '', adminToken: 'admin', webhookToken: 'webhook',
+  port: 3081, dataDir: '', webhookToken: 'webhook',
   projects: { 渠道美术: 7, 回流业务: 2001, AI运营活动: 2004 }, completedStatusId: 6,
   gcp: { url: 'https://example.invalid/mcp', host: 'gcp.example.com', userKey: 'key' },
   popo: { url: 'https://example.invalid/popo' },

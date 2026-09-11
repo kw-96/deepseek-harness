@@ -1,0 +1,10 @@
+# dsh-browser-agent bundle patch: insert the browser automation plugin.
+# The plugin ships one Host half (bsk CLI driver, owned bsk session lifecycle,
+# model tools, and a `browserAgent` Typert Remote) and one Client half (a
+# right-sidebar tab "浏览器" showing session state, tabs, and screenshots).
+# Install:
+#   dsh plugin --profile <name> add dsh-browser-agent@<version>
+# or insert this row into the profile's cordis.patch.yml manually.
+- insert:
+    - id: browser-agent
+      name: dsh-browser-agent

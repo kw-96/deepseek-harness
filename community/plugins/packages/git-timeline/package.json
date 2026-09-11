@@ -1,7 +1,7 @@
 {
   "name": "dsh-git-timeline",
   "version": "0.1.0",
-  "description": "Git timeline for DeepSeek Harness (DSH): a right-sidebar tab showing a file's commit history (VSCode/Cursor IDE timeline style), with changed-file shortcuts",
+  "description": "Full Git panel for the DeepSeek Harness (DSH) right sidebar: changes and staged entries, commit actions (amend/push/sync), a commit graph, remote sync, and commit-message drafting through the session model",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
@@ -9,7 +9,8 @@
     "dsh",
     "cordis",
     "git",
-    "timeline",
+    "git-panel",
+    "commit-graph",
     "sidebar",
     "web-ui"
   ],
@@ -88,6 +89,8 @@
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-shell": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",
     "react": ">=18.2.0 <20.0.0"
@@ -96,6 +99,8 @@
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-shell": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",
     "@testing-library/react": "^16.3.0",

@@ -275,6 +275,11 @@
   display: inline-flex;
 }
 
+/* 已置顶项目的动作按钮常驻（置顶/取消置顶 + 新建会话）。 */
+.actionsPinned {
+  display: inline-flex;
+}
+
 /* ── 单行会话行（Codex 式：固定行高 + 悬停/选中显露操作） ── */
 
 .row,

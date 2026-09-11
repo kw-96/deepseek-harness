@@ -1,0 +1,56 @@
+/** 浏览器面板文案字典。 */
+
+export const zh = {
+  tabTitle: '浏览器',
+  guideTitle: '浏览器自动化',
+  guideDescription: '查看 Agent Window 状态、标签页与最近截图，并可手动结束会话。',
+  refresh: '刷新',
+  stop: '结束会话',
+  stopping: '结束中…',
+  loading: '加载中…',
+  idle: '未开启',
+  open: '运行中',
+  sessionId: '会话',
+  browser: '浏览器',
+  noBrowser: '没有已连接的浏览器',
+  currentPage: '当前页面',
+  noPage: '尚未打开页面',
+  tabs: '标签页',
+  noTabs: 'Agent Window 内没有标签页',
+  screenshot: '最近截图',
+  noScreenshot: '本次会话尚未截图',
+  showPreview: '查看',
+  hidePreview: '收起',
+  previewFailed: '截图不可预览',
+  stopped: '已结束浏览器会话',
+  loadFailed: '读取状态失败',
+} as const
+
+/** 文案键。 */
+export type LocaleKey = keyof typeof zh
+
+export const en: Record<LocaleKey, string> = {
+  tabTitle: 'Browser',
+  guideTitle: 'Browser automation',
+  guideDescription: 'Agent Window state, tabs, and the latest screenshot, plus a manual stop.',
+  refresh: 'Refresh',
+  stop: 'Stop session',
+  stopping: 'Stopping…',
+  loading: 'Loading…',
+  idle: 'Not started',
+  open: 'Running',
+  sessionId: 'Session',
+  browser: 'Browser',
+  noBrowser: 'No connected browser',
+  currentPage: 'Current page',
+  noPage: 'No page opened yet',
+  tabs: 'Tabs',
+  noTabs: 'No tabs in the Agent Window',
+  screenshot: 'Latest screenshot',
+  noScreenshot: 'No screenshot in this session',
+  showPreview: 'Show',
+  hidePreview: 'Hide',
+  previewFailed: 'Screenshot cannot be previewed',
+  stopped: 'Browser session stopped',
+  loadFailed: 'Failed to read state',
+}

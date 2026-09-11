@@ -43,7 +43,6 @@ export async function createApp(
     console.error('管理接口处理失败', error)
     return context.json({ error: error instanceof Error ? error.message : '服务处理请求失败' }, 500)
   })
-  const authorize = (value?: string): boolean => value === `Bearer ${config.adminToken}`
   app.get('/', (context) => context.html(adminPage()))
   app.get('/health', (context) => context.json({ healthy: true }))
   app.get('/readiness', (context) => {
@@ -53,10 +52,6 @@ export async function createApp(
     return context.json({ ready, ...components }, ready ? 200 : 503)
   })
   app.use('/api/admin/*', createRateLimit(30, 60_000))
-  app.use('/api/admin/*', async (context, next) => {
-    if (!authorize(context.req.header('authorization'))) return context.json({ error: '未授权' }, 401)
-    await next()
-  })
   installAdminRoutes(app, { config, store, issues, delivery, workflow, review, stats, agentRouter, writePluginSettings })
   app.post(`/webhooks/gcp/${config.webhookToken}`, async (context) => {
     const length = Number(context.req.header('content-length') ?? 0)

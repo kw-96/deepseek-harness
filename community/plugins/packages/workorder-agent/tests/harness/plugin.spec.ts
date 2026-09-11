@@ -14,7 +14,6 @@ vi.mock('../../src/app.js', () => ({ createApp }))
 const valid: PluginConfig = {
   enabled: true,
   dataDir: '',
-  adminToken: 'admin-token',
   webhookToken: 'webhook-token',
   gcpUserKey: 'user-key',
   gcpUrl: 'https://example.invalid/mcp',
@@ -50,7 +49,6 @@ describe('工单插件配置', () => {
     expect(parsed.completedStatusId).toBe(6)
     expect(parsed.projectIdChannelArt).toBe(7)
     const config = toAppConfig(valid)
-    expect(config.adminToken).toBe('admin-token')
     expect(config.projects).toEqual({ 渠道美术: 7, 回流业务: 2001, AI运营活动: 2004 })
     expect(config.gcp.userKey).toBe('user-key')
     expect(config.popo.url).toBe('https://example.invalid/webhook')
@@ -58,7 +56,7 @@ describe('工单插件配置', () => {
   })
 
   it('缺少令牌时拒绝组装运行配置', () => {
-    expect(() => toAppConfig({ ...valid, adminToken: '  ' })).toThrow('缺少配置：ADMIN_TOKEN')
+    expect(() => toAppConfig({ ...valid, webhookToken: '  ' })).toThrow('缺少配置：WEBHOOK_TOKEN')
   })
 })
 

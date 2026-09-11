@@ -14,10 +14,10 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
+  IconPaperclipOutline16, IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -316,6 +316,16 @@ export const InputBar = memo(function InputBar({
     if (keyboard !== undefined) toggleCommandMenu?.(keyboard.caretSpan())
   }
 
+  // 附件入口：原生文件选择器，图片与通用文件走同一 intake 路径（通用文件由
+  // 附件服务在选取后立即后台上传）；清空 value 以便重复选择同一文件。
+  const attachInput = useRef<HTMLInputElement | null>(null)
+  const onAttachFiles = (event: ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (files.length > 0) intakeFiles(files)
+  }
+  const attachDisabled = locked || addFiles === undefined || subagent !== null
+
   // The no-session Workspace trigger: the resident editable div acts as the
   // picker trigger for keyboard users (no editor is bound in this state).
   const onWorkspaceKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -483,6 +493,25 @@ export const InputBar = memo(function InputBar({
                 onClick={onToggleCommandMenu}
               >
                 <IconPlusOutline16 size={14} />
+              </button>
+            </Tooltip>
+            <input
+              ref={attachInput}
+              type="file"
+              multiple
+              hidden
+              onChange={onAttachFiles}
+            />
+            <Tooltip label={t('file.attach')} side="top" delayMs={500} disabled={attachDisabled}>
+              <button
+                type="button"
+                className={css.add}
+                aria-label={t('file.attach')}
+                disabled={attachDisabled}
+                onMouseDown={keepFocus}
+                onClick={() => { attachInput.current?.click() }}
+              >
+                <IconPaperclipOutline16 size={14} />
               </button>
             </Tooltip>
             <div className={css.modes}>

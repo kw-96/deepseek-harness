@@ -23,7 +23,7 @@ describe('DeepSeek Harness 自研 Bundle', () => {
     expect(host).toMatchObject({ name: 'workorder-agent', inject: ['webServer', 'agents', 'skills'] })
     expect(host?.config).toMatchObject({ enabled: true })
     const configKeys = Object.keys(host?.config ?? {})
-    for (const key of ['dataDir', 'adminToken', 'webhookToken', 'gcpUserKey', 'gcpUrl', 'gcpHost',
+    for (const key of ['dataDir', 'webhookToken', 'gcpUserKey', 'gcpUrl', 'gcpHost',
       'popoWebhookUrl', 'popoWebhookSecret', 'completedStatusId',
       'projectIdChannelArt', 'projectIdReturnBusiness', 'projectIdAiOperations',
       'reviewEnabled', 'reviewProvider', 'reviewModel', 'reviewMaxTokens',

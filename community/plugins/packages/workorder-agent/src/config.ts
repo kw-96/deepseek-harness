@@ -24,7 +24,6 @@ function positiveInt(name: string, value: number): number {
 export interface AppConfigInput {
   port?: number
   dataDir?: string
-  adminToken: string
   webhookToken: string
   gcpUserKey: string
   gcpUrl?: string
@@ -46,7 +45,6 @@ export interface AppConfigInput {
 export interface AppConfig {
   port: number
   dataDir: string
-  adminToken: string
   webhookToken: string
   projects: ProjectMap
   completedStatusId: number
@@ -68,11 +66,9 @@ export interface AppConfig {
  * @returns 校验后的应用配置
  */
 export function buildAppConfig(input: AppConfigInput): AppConfig {
-  const adminToken = input.adminToken.trim()
   const webhookToken = input.webhookToken.trim()
   const gcpUserKey = input.gcpUserKey.trim()
   const popoWebhookUrl = input.popoWebhookUrl.trim()
-  if (!adminToken) throw new Error('缺少配置：ADMIN_TOKEN')
   if (!webhookToken) throw new Error('缺少配置：WEBHOOK_TOKEN')
   if (!gcpUserKey) throw new Error('缺少配置：GCP_USER_KEY')
   if (!popoWebhookUrl) throw new Error('缺少配置：POPO_WEBHOOK_URL')
@@ -83,7 +79,6 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
   return {
     port: input.port ?? 3081,
     dataDir: input.dataDir?.trim() || join(process.cwd(), '.data'),
-    adminToken,
     webhookToken,
     projects: {
       渠道美术: positiveInt('PROJECT_ID_CHANNEL_ART', input.projectIdChannelArt ?? 7),
@@ -112,7 +107,6 @@ export function loadConfig(): AppConfig {
   return buildAppConfig({
     port: Number(process.env.PORT || 3081),
     dataDir: process.env.DATA_DIR?.trim(),
-    adminToken: required('ADMIN_TOKEN'),
     webhookToken: required('WEBHOOK_TOKEN'),
     gcpUserKey: required('GCP_USER_KEY'),
     gcpUrl: process.env.GCP_MCP_URL?.trim(),

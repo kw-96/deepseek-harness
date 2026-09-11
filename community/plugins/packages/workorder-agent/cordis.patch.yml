@@ -9,7 +9,6 @@
       config:
         enabled: true
         dataDir: !!js process.env.DATA_DIR?.trim() || ''
-        adminToken: !!js process.env.ADMIN_TOKEN?.trim() || ''
         webhookToken: !!js process.env.WEBHOOK_TOKEN?.trim() || ''
         gcpUserKey: !!js process.env.GCP_USER_KEY?.trim() || ''
         gcpUrl: !!js process.env.GCP_MCP_URL?.trim() || 'https://mcp.netease.com/servers/gcp/mcp'

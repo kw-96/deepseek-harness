@@ -411,6 +411,27 @@ describe('image draft rail', () => {
     expect(attachmentOwner(result.slotCalls).dropLimits).toEqual({ count: 20, size: '5MB' })
   })
 
+  it('attaches picked files through the composer attach button', () => {
+    const addFiles = vi.fn(() => null)
+    const { view } = bench({ addFiles })
+    const attach = view.getByLabelText('添加附件') as HTMLButtonElement
+    expect(attach.disabled).toBe(false)
+    const fileInput = view.container.querySelector<HTMLInputElement>('input[type="file"]')!
+    expect(fileInput.multiple).toBe(true)
+    const png = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
+    const doc = new File([Uint8Array.of(2)], 'notes.txt', { type: 'text/plain' })
+    fireEvent.click(attach)
+    Object.defineProperty(fileInput, 'files', { value: [png, doc] })
+    fireEvent.change(fileInput)
+    // 图片与通用文件进入同一 intake 路径（通用文件的限制由附件服务处理）。
+    expect(addFiles).toHaveBeenCalledWith([png, doc])
+  })
+
+  it('disables the composer attach button while the composer is locked', () => {
+    const { view } = bench({ inert: true })
+    expect((view.getByLabelText('添加附件') as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('announces server attachment rejections as product copy, other codes as developer text', () => {
     const attachmentError = (reason: string): SessionSnapshot['promptError'] => ({
       op: 'send',
@@ -950,10 +971,9 @@ describe('running and lock semantics', () => {
     expect(button.getAttribute('aria-label')).toBe('排队发送')
     expect(interruptButton).not.toBeNull()
     expect(textarea.getAttribute('aria-disabled')).not.toBe('true')
-    // 本地定制：输入框不提供回形针/文件选择按钮（仅粘贴与拖放），
-    // 子代理运行中拖放摄入关闭。
-    expect(view.queryByLabelText('添加附件')).toBeNull()
-    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).toBeNull()
+    // 附件入口与拖放同步：子代理运行中两者都关闭。
+    expect((view.getByLabelText('添加附件') as HTMLButtonElement).disabled).toBe(true)
+    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).not.toBeNull()
     expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(false)
     fireEvent.click(button)
     expect(sink).toHaveBeenCalledWith('后续消息', [], 'queue', expect.any(AbortSignal))
@@ -988,10 +1008,9 @@ describe('running and lock semantics', () => {
   ])('%s keeps ordinary generic-file intake enabled', (_name, projection) => {
     const added = vi.fn(() => null)
     const { view, slotCalls } = bench({ ...projection, addFiles: added })
-    // 本地定制：输入框不提供回形针/文件选择按钮（仅粘贴与拖放），
-    // 通用文件摄入在计划/目标进行中仍通过拖放启用。
-    expect(view.queryByLabelText('添加附件')).toBeNull()
-    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).toBeNull()
+    // 计划/目标进行中不关闭附件入口：按钮与拖放都保持可用。
+    expect((view.getByLabelText('添加附件') as HTMLButtonElement).disabled).toBe(false)
+    expect(view.container.querySelector<HTMLInputElement>('input[type="file"]')).not.toBeNull()
     expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(true)
   })
 

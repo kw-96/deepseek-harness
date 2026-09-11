@@ -49,7 +49,6 @@ button:disabled{opacity:.5;cursor:default}
 <h1>工单巡检插件</h1>
 <p class="sub">首次使用请填写连接与鉴权配置，保存后会自动加载工单控制面。</p>
 <form id="form">
-  ${field('管理令牌', 'adminToken', '', 'password', true)}
   ${field('Webhook 令牌', 'webhookToken', '', 'password', true)}
   ${field('易协作 GCP 用户 Key', 'gcpUserKey', '', 'password', true)}
   ${field('POPO 群机器人地址', 'popoWebhookUrl', '', 'text', true)}
@@ -78,7 +77,7 @@ document.getElementById('form').addEventListener('submit',async(event)=>{
   const msg=document.getElementById('msg');
   button.disabled=true;msg.className='';msg.textContent='正在保存…';
   const patch={};
-  for(const id of ['adminToken','webhookToken','gcpUserKey','popoWebhookUrl','gcpUrl','gcpHost','popoWebhookSecret','dataDir','reviewProvider','reviewModel','reviewKnowledgeBase',...numbers]){
+  for(const id of ['webhookToken','gcpUserKey','popoWebhookUrl','gcpUrl','gcpHost','popoWebhookSecret','dataDir','reviewProvider','reviewModel','reviewKnowledgeBase',...numbers]){
     const value=document.getElementById(id).value;
     patch[id]=numbers.includes(id)?Number(value):value.trim();
   }
@@ -103,7 +102,7 @@ export function bootstrapRoute(config: PluginConfig, write: BootstrapWrite): Hon
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       return context.json({ ok: false, error: '请求内容无效' }, 400)
     }
-    const required = ['adminToken', 'webhookToken', 'gcpUserKey', 'popoWebhookUrl']
+    const required = ['webhookToken', 'gcpUserKey', 'popoWebhookUrl']
     const missing = required.filter((key) => typeof body[key] !== 'string' || body[key].trim() === '')
     if (missing.length > 0) {
       return context.json({ ok: false, error: `缺少必填项：${missing.join('、')}` }, 400)

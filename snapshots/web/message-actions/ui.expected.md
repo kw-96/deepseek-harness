@@ -19,6 +19,9 @@
 - button "Copy":
   - img
 - tooltip "Copy"
+- button "2 tool calls":
+  - text: 2 tool calls
+  - img
 - button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
@@ -37,16 +40,6 @@
   - img
   - text: Ran for {{duration}}
 - text: {{clock}}
-- button "Read a.txt":
-  - img
-  - img
-  - text: Read
-  - button "a.txt"
-- button "Read b.txt":
-  - img
-  - img
-  - text: Read
-  - button "b.txt"
 - button "System prompt":
   - img
   - img

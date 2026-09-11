@@ -38,7 +38,7 @@ function reviewSettings(config: AppConfig): Record<string, unknown> {
   }
 }
 
-/** 注册工单控制面的鉴权后管理 API。 */
+/** 注册工单控制面的管理 API。 */
 export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependencies): void {
   const { config, store, issues, delivery, workflow, review, stats, writePluginSettings } = dependencies
   const actionLimit = createRateLimit(5, 60_000)
@@ -51,7 +51,7 @@ export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependenci
     },
     configured: {
       gcpUserKey: Boolean(config.gcp.userKey), popoWebhook: Boolean(config.popo.url),
-      webhookEntry: Boolean(config.webhookToken), adminToken: Boolean(config.adminToken),
+      webhookEntry: Boolean(config.webhookToken),
     },
     review: { enabled: config.review.enabled, notificationEnabled: config.review.notificationEnabled,
       model: config.review.provider && config.review.model ? `${config.review.provider}/${config.review.model}` : '继承 Harness 默认模型' },

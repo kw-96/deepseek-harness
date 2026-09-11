@@ -1,6 +1,7 @@
 # Agent Note: 输入区图片入口仅保留粘贴与拖放
 
 Status: implemented
+Archived: 2026-09-11
 
 [English](2026-09-08-composer-image-intake-paste-drop.md) | 中文
 

@@ -1,16 +1,43 @@
 # dsh-git-timeline
 
-DeepSeek Harness（DSH）的 **Git 时间线**右栏标签：在官方右侧边栏（`ui-sidebar-right`）里查看某个文件的提交历史——VSCode / Cursor 的 IDE 时间线那种形态。
+DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 面板**：变更提交、提交图（Graph）、远程同步，以及用当前会话模型一键生成提交信息。
 
-A Git timeline tab for the DSH official right sidebar: commit history for one file, IDE-timeline style.
+A full Git panel tab for the DSH right sidebar: changes and commits, a commit graph, remote sync, and commit-message drafting through the session's own model.
 
-## 功能 / Features
+> 包名沿用历史命名 `dsh-git-timeline`；面板本身已从「时间线」扩展为完整 Git 面板（标签名 **Git**，tab kind `git`）。
 
-- **右栏标签类型**（`ctx.sidebarRightTabs` 注册，kind = `git-timeline`）：在右栏的「指南」页出现「Git 时间线」入口胶囊，点开即成为一个右栏标签页；与「文件」「文档预览」等标签并列，互不干扰。
-- **路径筛选**：输入框按**仓库根相对路径**过滤（留空 = 整个仓库）；输入停止 300 毫秒后自动应用，回车立即应用。
-- **变更文件快捷选择**：顶部列出当前工作区有改动的文件（`git status`，最多 12 个，带单字母状态），点一下即把时间线切到该文件。
-- **时间线**：每条提交显示主题、短哈希、作者、相对时间与分支/标签引用；空仓库、非 Git 仓库、读取失败都有对应空态。
-- **只读**：宿主侧只跑 `git rev-parse` / `git log` / `git status`，没有任何写操作。
+## 布局
+
+```
+┌ Changes（固定占面板一半高度，内部滚动） ─────────────┐
+│  提交信息输入框                                    ✨ │  ← ✨ 用当前会话模型生成提交信息
+│  [ 提交            ][▾]                             │  ← ▾ 切换：提交 / 提交(修改) / 提交和推送 / 提交和同步
+│  已暂存 (n)   全部取消暂存                           │
+│    M  GitBody.tsx   src/client/            hover: −  │
+│  更改 (n)     全部暂存                               │
+│    U  notes.md      docs/                  hover: +  │
+├ Graph（内部滚动） ─────────────────────────────────┤
+│  Graph          ⌖  ☁︎  ↓  ↑  ⟳                      │  ← 定位/抓取/拉取/推送/刷新
+│  ●─┐  整理 Git 面板        [dev]                     │  ← 泳道 + 提交标题 + 分支/标签徽标
+│  │ ●  修复别名冲突         [tag: v0.2.0]             │
+├ 底部栏（固定） ────────────────────────────────────┤
+│  ⎇ dev ↑1 ⟳            工作区 repo     dev·dev@x.cn  │  ← 分支/刷新/工作区名/Git 账号
+└──────────────────────────────────────────────────┘
+```
+
+## 功能
+
+- **Changes 区**（高度固定为面板一半，容器内滚动）
+  - 提交信息输入框，右上角图标按钮调用**当前会话正在使用的模型**（取自会话日志最后一条 `request/header` 的 provider/model）生成描述并填入；`Ctrl+Enter` 直接提交
+  - 提交按钮 + 右侧下拉：`提交` / `提交(修改)`（`--amend`）/ `提交和推送` / `提交和同步`（提交 → 拉取 → 推送），选择即切换按钮绑定
+  - 变更文件列表：`已暂存` 与 `更改` 两组，每行显示状态字母（M/A/D/U）、文件名、目录路径；行悬停出现 `+`（暂存）/ `−`（取消暂存），组头可一键全部暂存/取消暂存
+- **Graph 区**（内部滚动）
+  - 泳道图：由父指针推导泳道与贯穿列，合并提交画空心节点
+  - 每行：提交标题 + 短哈希/作者/相对时间 + 分支与标签徽标（当前分支高亮）
+  - 工具栏：跳转到当前历史记录项（滚动到最新并高亮）、从所有远程存储库中抓取、拉取、推送、刷新
+- **底部栏**（固定）：当前分支（含 ahead/behind）、刷新、当前工作区名称、Git 账号（`user.name · user.email`）
+- 顶部**没有**路径栏与搜索框（按要求精简）
+- 只读读取与显式写操作分开：写操作只有暂存/取消暂存/提交/推送/拉取/抓取，没有丢弃改动（危险操作留待后续）
 
 ## 安装 / Install
 
@@ -29,38 +56,41 @@ dsh plugin --profile web remove dsh-git-timeline
 
 ## 开发 / Develop（源码 link + 热替换）
 
-保持 `dsh web` 运行，然后执行：
-
 ```sh
-node community/plugins/dev.mjs git-timeline
-```
-
-脚本把插件以 junction 挂载进 web profile、在 `cordis.patch.yml` 启用 Cordis HMR 并指向源码目录，随后启动 host/client 双面 watch 构建：改源码后 host 侧热替换、client 侧推送到浏览器。
-
-单独构建与测试：
-
-```sh
+node community/plugins/dev.mjs git-timeline     # junction 挂载 + Cordis HMR + watch 构建
 cd community/plugins/packages/git-timeline
 pnpm run build     # tsc + tsdown（host/client 双面）
-pnpm test          # vitest
+pnpm test          # vitest（22 项）
 ```
+
+注意：**改动 `src/remote.ts`（Remote 方法面）后必须重启 `dsh web`** —— typert-loader 按包名缓存插件 manifest 且永不过期，HMR 不会重新导入它；只改界面/文案时热替换即可。
 
 ## 宿主 Remote / Host Remote
 
-`ctx.remote.gitTimeline`（Typert，命名空间 `gitTimeline`）：
+`ctx.remote.gitPanel`（Typert，命名空间 `gitPanel`）：
 
-- `log(cwd, path?, count?)` → `{ repo, root, error, entries[] }`：`cwd` 为会话工作目录，`path` 为仓库根相对（或绝对）路径，`count` 默认 50、上限 200。
-- `changed(cwd)` → `{ repo, root, error, files[] }`：`files[]` 为 `git status --porcelain=v1 -z` 的投影（`path` / `origPath` / `status`），上限 500 条。
+| 方法 | 说明 |
+|---|---|
+| `status(cwd)` | 分支/上下游/ahead-behind + `staged[]` + `changes[]`（porcelain-v2 投影） |
+| `log(cwd, limit?)` | 提交历史（含父提交，供泳道图使用），最多 400 条 |
+| `stage(cwd, paths)` / `unstage(cwd, paths)` | 按路径暂存 / 取消暂存 |
+| `stageAll(cwd)` / `unstageAll(cwd)` | 全部暂存 / 取消暂存 |
+| `commit(cwd, message, amend)` | 提交（`amend` 为真时 `--amend`），返回新短哈希 |
+| `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | 推送 / 拉取（`--no-edit`）/ 抓取全部远程并清理 |
+| `identity(cwd)` | `user.name` / `user.email` |
+| `message(sessionId, cwd)` | 用该会话的模型路由生成提交信息 |
 
-两条都在 `ctx.shell` 上执行 git（超时 30 秒），失败以 `error` 字段回传而不是抛给界面。
+所有命令经 `ctx.shell` 执行 git（普通 30 秒、网络类 120 秒超时）；可省参数在描述符里显式声明 `acceptsUndefined`。
 
-## 依赖的宿主能力 / Host requirements
+## 提交信息生成的工作方式
 
-- 宿主需挂载 `@deepseek-ai/dsh-client-ui-sidebar-right`（提供 `sidebarRightTabs` 注册表与 `sidebar.right.pane.tab` 席位）；缺失时本插件保持待命，不报错。
-- 右栏的开合入口由官方右栏自己的会话头角落按钮负责（Web）/ 桌面顶栏按钮（独立窗口）。
+1. 取会话最后一条 `request/header` 的 `config.provider/model`（即「当前会话使用的模型」）；没有记录时给出明确提示。
+2. 组装输入：分支、改动文件清单、以及暂存侧（没有暂存则未暂存）的 diff（上限 24 KB，超出标注截断）。
+3. 经 `ctx.llm.stream()` 发一次**一次性辅助请求**（`system` 要求简体中文、主题 ≤72 字符、必要时补要点），用 `BlockAssembler` 拼出文本回填输入框。
 
 ## Known Limitations and Deferred Work
 
-- 只会读**当前会话工作区所属**仓库；跨仓库或多仓库工作区不做切换。
-- 时间线按路径筛选提交，不展示每次提交的文件清单与差异（点开差异属后续工作）。
-- 提交条数上限 200、变更文件上限 500，超出的部分不提示截断。
+- 提交信息生成是插件侧的一次性辅助调用，**不写回会话转写**（与 UI 自身的摘要同级，不是 agent loop 的请求）。
+- 没有逐文件差异视图与「丢弃改动」；点文件只在列表内暂存/取消暂存。
+- 一次拉取历史上限 400 条；Graph 泳道绘制上限 5 列，超出归并展示。
+- 多仓库工作区只服务当前会话工作区所属仓库。

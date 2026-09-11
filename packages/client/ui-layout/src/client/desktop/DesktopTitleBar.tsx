@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelBottomIcon, PanelIcon, PanelRightIcon, RestoreIcon } from './icons.tsx'
+import { installExternalLinkHandler } from './external-links.ts'
 import { buildMenus, navigateDropdownKey, tryRunMenuShortcut, type DesktopTitleBarT, type MenuId } from './menus.ts'
 import {
   canGoBack, canGoForward, createSessionHistory, goBack, goForward, pushSessionVisit,
@@ -52,6 +53,9 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
     pushSessionVisit(historyRef.current, current)
     refreshHistory()
   }, [current, refreshHistory])
+
+  // 外链出口随标题栏生命周期安装：壳内 http(s) 链接交给系统默认浏览器。
+  useEffect(() => installExternalLinkHandler(), [])
 
   // Track the desktop window's maximized state so the button reflects it.
   useEffect(() => {

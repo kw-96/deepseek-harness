@@ -3,7 +3,7 @@
  * 状态与动作来自 WorkspaceBrowser。
  */
 
-import { Archive, Folder, FolderOpen, Inbox, Pin } from 'lucide-react'
+import { Archive, Folder, FolderOpen, Inbox, MessageSquarePlus, Pin } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import type { BrowserPrefsStore, OrganizeMode, SortMode } from './sidebar/prefs.js'
 import { orderProjects, sortSessionIds, type GroupsModel } from './sidebar/groups.js'
@@ -35,6 +35,8 @@ export interface BrowserTreeProps {
   onArchiveSession: (sessionId: SessionId) => void
   onToggleWorkspacePin: (workspaceId: string) => void
   onToggleProjectPin: (projectId: string) => void
+  /** 在项目所属工作区中新建会话。 */
+  onNewSession: (workspaceId: string) => void
   onBeginWorkspaceRename: (workspaceId: string, title: string) => void
   setRenameDraft: (value: string) => void
   commitRename: (sessionId: SessionId) => void
@@ -77,8 +79,8 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const {
     groups, list, collapsed, searching, searchItems, searchLoading,
     renaming, renameDraft, organize, sort, prefs, projects, onToggleGroup, onOpen, onWorkspaceMenu,
-    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onToggleProjectPin, onBeginWorkspaceRename,
-    setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
+    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onToggleProjectPin, onNewSession,
+    onBeginWorkspaceRename, setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
     sessionWorkspaceId, meta, t,
   } = props
   const manual = sort === 'manual'
@@ -164,7 +166,11 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     )
   }
 
-  const renderProject = (project: ProjectView, sessionRows: React.ReactNode[]): React.ReactNode => {
+  const renderProject = (
+    project: ProjectView,
+    sessionRows: React.ReactNode[],
+    workspaceId: string | undefined,
+  ): React.ReactNode => {
     const key = `project:${project.projectId}`
     const isCollapsed = collapsed.has(key)
     const pinned = prefs.projectPinned(project.projectId)
@@ -188,37 +194,36 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
             ? <Folder size={13} className={css.workspaceIcon} />
             : <FolderOpen size={13} className={css.workspaceIcon} />}
           <span className={css.workspaceLabel}>{project.name}</span>
-          {pinned
-            ? (
+          {/* 置顶与新建会话共用同一动作容器：悬停或键盘聚焦时显示，
+              已置顶项目的动作常驻。 */}
+          <span className={pinned ? `${css.workspaceActions} ${css.actionsPinned}` : css.workspaceActions}>
+            <button
+              type="button"
+              className={css.iconButton}
+              title={pinned ? t('unpin') : t('pin')}
+              aria-label={pinned ? t('unpin') : t('pin')}
+              onClick={event => {
+                event.stopPropagation()
+                onToggleProjectPin(project.projectId)
+              }}
+            >
+              <Pin size={12} {...pinned ? { fill: 'currentColor' } : {}} />
+            </button>
+            {workspaceId !== undefined && (
               <button
                 type="button"
                 className={css.iconButton}
-                title={t('unpin')}
-                aria-label={t('unpin')}
+                title={t('newSessionInProject')}
+                aria-label={t('newSessionInProject')}
                 onClick={event => {
                   event.stopPropagation()
-                  onToggleProjectPin(project.projectId)
+                  onNewSession(workspaceId)
                 }}
               >
-                <Pin size={12} fill="currentColor" />
+                <MessageSquarePlus size={12} />
               </button>
-            )
-            : (
-              <span className={css.workspaceActions}>
-                <button
-                  type="button"
-                  className={css.iconButton}
-                  title={t('pin')}
-                  aria-label={t('pin')}
-                  onClick={event => {
-                    event.stopPropagation()
-                    onToggleProjectPin(project.projectId)
-                  }}
-                >
-                  <Pin size={12} />
-                </button>
-              </span>
             )}
+          </span>
         </div>
         {!isCollapsed && sessionRows}
       </div>
@@ -227,12 +232,17 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
 
   const renderByProject = (): React.ReactNode => {
     const byProject = new Map<string, SessionId[]>()
+    // 项目 → 首个归属工作区：新建会话按钮在该工作区中开会话。
+    const workspaceByProject = new Map<string, string>()
     const ungrouped: SessionId[] = []
     for (const { workspace, sessions } of groups.grouped) {
       const project = projectForPath(workspace.path, projects)
       if (project === undefined) {
         ungrouped.push(...sessions)
         continue
+      }
+      if (!workspaceByProject.has(project.projectId)) {
+        workspaceByProject.set(project.projectId, workspace.workspaceId)
       }
       const list = byProject.get(project.projectId)
       if (list === undefined) byProject.set(project.projectId, [...sessions])
@@ -246,7 +256,11 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     const ordered = orderProjects(projects, prefs, sort)
     return (
       <>
-        {ordered.map(project => renderProject(project, sortList(byProject.get(project.projectId) ?? []).map(id => sessionRow(id))))}
+        {ordered.map(project => renderProject(
+          project,
+          sortList(byProject.get(project.projectId) ?? []).map(id => sessionRow(id)),
+          workspaceByProject.get(project.projectId),
+        ))}
         {sortList(ungrouped).map(id => sessionRow(id))}
       </>
     )

@@ -5,7 +5,6 @@ import { buildAppConfig, DEFAULT_REVIEW_KNOWLEDGE_BASE, type AppConfig } from '.
 export interface PluginConfig {
   enabled: boolean
   dataDir: string
-  adminToken: string
   webhookToken: string
   gcpUserKey: string
   gcpUrl: string
@@ -28,7 +27,6 @@ export interface PluginConfig {
 export const Config = z.object({
   enabled: z.boolean().default(true).description('启用工单巡检运行时'),
   dataDir: z.string().default('').description('数据目录，空则使用工作目录下 .data'),
-  adminToken: z.string().role('secret').default('').description('管理接口鉴权令牌'),
   webhookToken: z.string().role('secret').default('').description('Webhook 入口令牌'),
   gcpUserKey: z.string().role('secret').default('').description('易协作 GCP 用户 Key'),
   gcpUrl: z.string().default('https://mcp.netease.com/servers/gcp/mcp').description('GCP MCP 地址'),
@@ -55,7 +53,6 @@ export const Config = z.object({
 export function toAppConfig(plugin: PluginConfig): AppConfig {
   return buildAppConfig({
     dataDir: plugin.dataDir,
-    adminToken: plugin.adminToken,
     webhookToken: plugin.webhookToken,
     gcpUserKey: plugin.gcpUserKey,
     gcpUrl: plugin.gcpUrl,

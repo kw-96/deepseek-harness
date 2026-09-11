@@ -1,61 +1,89 @@
-/** gitTimeline Remote 的线上数据形态与本地类型。 */
+/** gitPanel Remote 的线上数据形态与本地类型。 */
 
 import { z } from 'zod'
 
-/** 一条提交：`git log` 的紧凑投影。 */
+/** 一条 porcelain-v2 状态条目（重命名带原路径）。 */
+export const gitEntryValue = z.object({
+  path: z.string(),
+  origPath: z.string().nullable(),
+  /** 两字符 XY 状态码。 */
+  xy: z.string(),
+}).readonly()
+
+/** 一条提交（图视图需要的父提交一并带出）。 */
 export const gitCommitValue = z.object({
   hash: z.string(),
+  shortHash: z.string(),
+  /** 父提交哈希；合并提交有多个。 */
+  parents: z.array(z.string()).readonly(),
   subject: z.string(),
   author: z.string(),
-  /** `%ai` 格式的提交时间（含时区）。 */
+  /** `%ai` 格式的提交时间。 */
   date: z.string(),
-  /** `%D` 装饰（分支/标签），无引用时为空串。 */
+  /** `%D` 装饰（分支/标签）。 */
   refs: z.string(),
 }).readonly()
 
-/** 一个工作区变更文件。 */
-export const changedFileValue = z.object({
-  path: z.string(),
-  /** 重命名/复制的原路径；其余为 null。 */
-  origPath: z.string().nullable(),
-  /** porcelain 的两字符 XY 状态码。 */
-  status: z.string(),
+export const gitStatusValue = z.object({
+  repo: z.boolean(),
+  root: z.string().nullable(),
+  error: z.string().nullable(),
+  /** 当前分支名（detached HEAD 时为 null）。 */
+  branch: z.string().nullable(),
+  upstream: z.string().nullable(),
+  ahead: z.number(),
+  behind: z.number(),
+  staged: z.array(gitEntryValue).readonly(),
+  changes: z.array(gitEntryValue).readonly(),
 }).readonly()
 
 export const gitLogValue = z.object({
-  /** 目标目录是否位于 Git 仓库内。 */
   repo: z.boolean(),
-  /** 仓库根（绝对路径，`/` 分隔）；非仓库时为 null。 */
   root: z.string().nullable(),
-  /** 读取失败的原因（例如仓库尚无提交）；成功时为 null。 */
   error: z.string().nullable(),
   entries: z.array(gitCommitValue).readonly(),
 }).readonly()
 
-export const changedValue = z.object({
-  repo: z.boolean(),
-  root: z.string().nullable(),
-  error: z.string().nullable(),
-  files: z.array(changedFileValue).readonly(),
+export const gitDiffValue = z.object({ text: z.string(), truncated: z.boolean() }).readonly()
+export const gitIdentityValue = z.object({ name: z.string().nullable(), email: z.string().nullable() }).readonly()
+export const gitActionValue = z.object({ detail: z.string() }).readonly()
+export const gitCommitResultValue = z.object({ shortHash: z.string().nullable(), detail: z.string() }).readonly()
+export const gitMessageValue = z.object({
+  message: z.string(),
+  provider: z.string(),
+  model: z.string(),
 }).readonly()
 
-/** 一条提交记录。 */
+/** 一条工作区状态条目。 */
+export interface GitEntry {
+  path: string
+  origPath: string | null
+  xy: string
+}
+
+/** 一条提交记录（含父提交，供泳道图使用）。 */
 export interface GitCommit {
   hash: string
+  shortHash: string
+  parents: readonly string[]
   subject: string
   author: string
   date: string
   refs: string
 }
 
-/** 一个变更文件。 */
-export interface ChangedFile {
-  path: string
-  origPath: string | null
-  status: string
+export interface GitStatusResponse {
+  repo: boolean
+  root: string | null
+  error: string | null
+  branch: string | null
+  upstream: string | null
+  ahead: number
+  behind: number
+  staged: readonly GitEntry[]
+  changes: readonly GitEntry[]
 }
 
-/** `log` 的响应：仓库识别 + 提交列表（或失败说明）。 */
 export interface GitLogResponse {
   repo: boolean
   root: string | null
@@ -63,10 +91,14 @@ export interface GitLogResponse {
   entries: readonly GitCommit[]
 }
 
-/** `changed` 的响应：仓库识别 + 变更文件列表。 */
-export interface ChangedResponse {
-  repo: boolean
-  root: string | null
-  error: string | null
-  files: readonly ChangedFile[]
-}
+export interface GitDiffResponse { text: string; truncated: boolean }
+
+export interface GitIdentity { name: string | null; email: string | null }
+
+/** 写操作回执：`detail` 是给界面用的简短说明（多为 git 输出的尾行）。 */
+export interface GitActionResponse { detail: string }
+
+export interface GitCommitResponse { shortHash: string | null; detail: string }
+
+/** 模型生成的提交信息与它使用的路由。 */
+export interface GitMessageResponse { message: string; provider: string; model: string }

@@ -1,10 +1,12 @@
 /**
  * 宿主服务的本地结构面：社区插件按结构类型对接宿主 seam，不依赖其编排
- * 类型线；运行时的槽位核心与 Right 栏注册表仍会对每个名字做加载期校验。
+ * 类型线；运行时的槽位核心与右栏注册表仍会对每个名字做加载期校验。
  */
 
-import type { ComponentType, ReactNode } from 'react'
-import type { ChangedResponse, GitLogResponse } from '../types.js'
+import type { ComponentType } from 'react'
+import type {
+  GitActionResponse, GitCommitResponse, GitIdentity, GitLogResponse, GitMessageResponse, GitStatusResponse,
+} from '../types.js'
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string
 
@@ -28,13 +30,38 @@ export interface RemoteFace {
 export type RemoteResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 
 /** 本插件自己的 Remote 命名空间面。 */
-export interface GitTimelineRemoteFace {
-  log(cwd: string, path?: string, count?: number): Promise<RemoteResult<GitLogResponse>>
-  changed(cwd: string): Promise<RemoteResult<ChangedResponse>>
+export interface GitPanelRemoteFace {
+  status(cwd: string): Promise<RemoteResult<GitStatusResponse>>
+  log(cwd: string, limit?: number): Promise<RemoteResult<GitLogResponse>>
+  stage(cwd: string, paths: readonly string[]): Promise<RemoteResult<GitActionResponse>>
+  unstage(cwd: string, paths: readonly string[]): Promise<RemoteResult<GitActionResponse>>
+  stageAll(cwd: string): Promise<RemoteResult<GitActionResponse>>
+  unstageAll(cwd: string): Promise<RemoteResult<GitActionResponse>>
+  commit(cwd: string, message: string, amend: boolean): Promise<RemoteResult<GitCommitResponse>>
+  push(cwd: string): Promise<RemoteResult<GitActionResponse>>
+  pull(cwd: string): Promise<RemoteResult<GitActionResponse>>
+  fetch(cwd: string): Promise<RemoteResult<GitActionResponse>>
+  identity(cwd: string): Promise<RemoteResult<GitIdentity>>
+  message(sessionId: string, cwd: string): Promise<RemoteResult<GitMessageResponse>>
 }
 
-/** 引导页入口胶囊（右栏注册表的 guide 条目）。 */
-export interface GuideEntryFace {
+/** 解包后的面板 API：组件直接消费的形态（RemoteResult 已在装配层解开）。 */
+export interface GitPanelApi {
+  status(cwd: string): Promise<GitStatusResponse>
+  log(cwd: string, limit?: number): Promise<GitLogResponse>
+  stage(cwd: string, paths: readonly string[]): Promise<GitActionResponse>
+  unstage(cwd: string, paths: readonly string[]): Promise<GitActionResponse>
+  stageAll(cwd: string): Promise<GitActionResponse>
+  unstageAll(cwd: string): Promise<GitActionResponse>
+  commit(cwd: string, message: string, amend: boolean): Promise<GitCommitResponse>
+  push(cwd: string): Promise<GitActionResponse>
+  pull(cwd: string): Promise<GitActionResponse>
+  fetch(cwd: string): Promise<GitActionResponse>
+  identity(cwd: string): Promise<GitIdentity>
+  message(sessionId: string, cwd: string): Promise<GitMessageResponse>
+}
+
+/** 引导页入口胶囊（右栏注册表的 guide 条目）。 */export interface GuideEntryFace {
   order: number
   title: () => string
   description?: () => string
@@ -72,11 +99,8 @@ export interface SelectorHook<T> {
   <S>(selector: (state: T) => S): S
 }
 
-/** 标签体渲染时框架注入的标准 props（locale 座位给的 t 由注册声明补齐）。 */
-export interface TimelineBodyRuntimeProps {
+/** 标签体渲染时框架注入的标准 props。 */
+export interface GitBodyRuntimeProps {
   sessionId: string
   useSessions: SelectorHook<SessionListStateLike>
 }
-
-/** 渲染一个只读文本节点集合的小工具类型别名。 */
-export type Renderable = ReactNode

@@ -5,7 +5,6 @@ import { GcpIssueService } from '../../src/plugins/gcp/service.js'
 import { issueDetailResponse, issueListItem, issueListResponse } from '../fixtures/gcpResponses.js'
 
 function stubRequiredConfig(): void {
-  vi.stubEnv('ADMIN_TOKEN', 'admin-token')
   vi.stubEnv('WEBHOOK_TOKEN', 'webhook-token')
   vi.stubEnv('GCP_USER_KEY', 'user-key')
   vi.stubEnv('POPO_WEBHOOK_URL', 'https://example.invalid/webhook')
