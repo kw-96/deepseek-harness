@@ -617,6 +617,53 @@ describe('healProfilesModuleFallback', () => {
     expect(lstatSync(join(fallback, 'bundle-a')).isSymbolicLink()).toBe(true)
   })
 
+  it('removes a dangling link for a declared dependency that is no longer installed', async () => {
+    const anchor = stageInstallation({})
+    const appManifest = JSON.parse(readFileSync(anchor, 'utf8')) as { dependencies: Record<string, string> }
+    appManifest.dependencies['ghost-dep'] = '0.0.0'
+    writeFileSync(anchor, JSON.stringify(appManifest))
+    const home = tmp()
+    const fallback = join(home, 'profiles', 'node_modules')
+    mkdirSync(fallback, { recursive: true })
+    // A generation that linked these before their packages were uninstalled:
+    // the target directory is gone, so the links dangle.
+    const seal = (name: string): string => {
+      const link = join(fallback, name)
+      const target = join(tmp(), 'gone')
+      mkdirSync(target, { recursive: true })
+      symlinkSync(target, link, 'junction')
+      rmSync(target, { recursive: true, force: true })
+      return link
+    }
+    const ghost = seal('ghost-dep')
+    // A name outside the installation closure is not this healer's to remove.
+    const foreign = seal('not-declared')
+
+    await healProfilesModuleFallback({ installAnchor: anchor, home })
+
+    expect(() => lstatSync(ghost)).toThrow()
+    expect(lstatSync(foreign).isSymbolicLink()).toBe(true)
+    // Idempotent: the cleaned generation is not re-created.
+    await healProfilesModuleFallback({ installAnchor: anchor, home })
+    expect(() => lstatSync(ghost)).toThrow()
+    expect(lstatSync(join(fallback, 'dsh-app')).isSymbolicLink()).toBe(true)
+  })
+
+  it('re-points a dangling link for a declared dependency that is still installed', async () => {
+    const anchor = stageInstallation({})
+    const home = tmp()
+    const fallback = join(home, 'profiles', 'node_modules')
+    mkdirSync(fallback, { recursive: true })
+    const target = join(tmp(), 'gone')
+    mkdirSync(target, { recursive: true })
+    symlinkSync(target, join(fallback, 'dsh-app'), 'junction')
+    rmSync(target, { recursive: true, force: true })
+
+    await healProfilesModuleFallback({ installAnchor: anchor, home })
+
+    expect(readlinkSync(join(fallback, 'dsh-app'))).toContain('app')
+  })
+
   it('serializes concurrent healers and retains the identical link', async () => {
     const anchor = stageInstallation({})
     const home = tmp()

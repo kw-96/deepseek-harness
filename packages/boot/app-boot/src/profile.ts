@@ -469,9 +469,10 @@ function profileDependencyNames(manifest: ProfileManifest): string[] {
 /** Resolve the installation generation that every profile must find through the fallback directory. */
 function resolveModuleFallbackEntries(
   installAnchor: string,
-): { entries: ModuleFallbackEntry[]; packageNames: ReadonlySet<string> } {
+): { entries: ModuleFallbackEntry[]; packageNames: ReadonlySet<string>; unresolvedNames: ReadonlySet<string> } {
   const appManifest = readModuleFallbackManifest(installAnchor)
   const links = new Map<string, string>()
+  const unresolved = new Set<string>()
   /* v8 ignore next -- a real app manifest always declares its name */
   if (appManifest.name !== undefined) links.set(appManifest.name, dirname(installAnchor))
   // BFS over the resolvable dependency graph; the visited set is the link
@@ -486,8 +487,12 @@ function resolveModuleFallbackEntries(
       if (links.has(dep)) continue
       const dir = packageDirFromAnchor(next.anchor, dep)
       // A declared-but-uninstalled dependency cannot be a loader-visible
-      // plugin; skip it rather than fail the whole boot.
-      if (dir === undefined) continue
+      // plugin; skip it rather than fail the whole boot, but remember it so a
+      // fallback link left over from an older generation cannot dangle forever.
+      if (dir === undefined) {
+        unresolved.add(dep)
+        continue
+      }
       links.set(dep, dir)
       const manifestPath = join(dir, 'package.json')
       queue.push({ anchor: manifestPath, manifest: readModuleFallbackManifest(manifestPath) })
@@ -501,7 +506,12 @@ function resolveModuleFallbackEntries(
         ? []
         : [{ kind: 'proxy' as const, packageName, version: source.version, targets: source.targets }]
     })
-  return { entries, packageNames: new Set(links.keys()) }
+  return {
+    entries,
+    packageNames: new Set(links.keys()),
+    // An anchor skipped a name earlier in the BFS; a later one may still resolve it.
+    unresolvedNames: new Set([...unresolved].filter(name => !links.has(name))),
+  }
 }
 
 /** Return whether one existing fallback entry already matches its resolved installation generation. */
@@ -510,7 +520,12 @@ function moduleFallbackEntryCurrent(modulesDir: string, entry: ModuleFallbackEnt
   try {
     const stat = lstatSync(link)
     if (entry.kind === 'symlink') {
-      return stat.isSymbolicLink() && readlinkSync(link) === entry.packageDir
+      if (!stat.isSymbolicLink() || readlinkSync(link) !== entry.packageDir) return false
+      // A target that vanished since the resolution pass cannot serve the
+      // loader; only a host-filesystem race reaches this, so it stays a guard
+      // on top of the link comparison rather than a repair path.
+      /* v8 ignore next -- see the host-filesystem race note above */
+      return existsSync(join(link, 'package.json'))
     }
     if (!stat.isDirectory()) return false
     const existing = readModuleProxyRecord(link)
@@ -525,6 +540,36 @@ function moduleFallbackEntryCurrent(modulesDir: string, entry: ModuleFallbackEnt
 /** Return whether every required fallback entry is already ready for this installation. */
 function moduleFallbackCurrent(modulesDir: string, entries: readonly ModuleFallbackEntry[]): boolean {
   return entries.every(entry => moduleFallbackEntryCurrent(modulesDir, entry))
+}
+
+/**
+ * Links this directory owns for a declared dependency that is no longer
+ * installed. The name still belongs to the installation closure, so the
+ * dangling link is stale fallback state rather than a pnpm-managed entry: a
+ * link that still resolves is left alone, and an absent one is not state.
+ * @param modulesDir - shared `$DSH_HOME/profiles/node_modules` directory.
+ * @param unresolvedNames - declared dependency names with no resolvable package.
+ * @returns absolute link paths to remove.
+ */
+function danglingFallbackLinks(modulesDir: string, unresolvedNames: ReadonlySet<string>): string[] {
+  const links: string[] = []
+  for (const packageName of unresolvedNames) {
+    const link = join(modulesDir, packageName)
+    try {
+      if (lstatSync(link).isSymbolicLink() && !existsSync(link)) links.push(link)
+    } catch {
+      // Missing link (never created or already removed) — nothing to clean.
+    }
+  }
+  return links
+}
+
+/** Return whether the shared fallback directory needs a locked healing pass. */
+function moduleFallbackStale(
+  modulesDir: string, entries: readonly ModuleFallbackEntry[], unresolvedNames: ReadonlySet<string>,
+): boolean {
+  return !moduleFallbackCurrent(modulesDir, entries)
+    || danglingFallbackLinks(modulesDir, unresolvedNames).length > 0
 }
 
 /** Inputs for {@link healProfilesModuleFallback}. */
@@ -545,7 +590,8 @@ export interface ProfileModuleFallbackOptions {
  * enter pkg's virtual filesystem. Missing packages carried only by selected
  * bundles are linked through a profile-owned directory into that profile's
  * `node_modules`; pnpm-managed entries remain authoritative, and another
- * profile's links cannot change its resolution.
+ * profile's links cannot change its resolution. Links left behind for a
+ * declared dependency that is no longer installed are removed.
  * @param options - installation anchor, optional loaded profile, and Harness home.
  * @returns settlement after the shared fallback and profile-local links are current.
  */
@@ -554,10 +600,12 @@ export async function healProfilesModuleFallback(options: ProfileModuleFallbackO
   const profilesDir = join(home, PROFILES_DIR)
   const modulesDir = join(profilesDir, 'node_modules')
   mkdirSync(modulesDir, { recursive: true })
-  const { entries, packageNames } = resolveModuleFallbackEntries(installAnchor)
-  if (!moduleFallbackCurrent(modulesDir, entries)) {
+  const { entries, packageNames, unresolvedNames } = resolveModuleFallbackEntries(installAnchor)
+  if (moduleFallbackStale(modulesDir, entries, unresolvedNames)) {
     await withFileLock(modulesDir, () => {
-      if (!moduleFallbackCurrent(modulesDir, entries)) healProfilesModuleFallbackLocked(entries, modulesDir)
+      if (moduleFallbackStale(modulesDir, entries, unresolvedNames)) {
+        healProfilesModuleFallbackLocked(entries, unresolvedNames, modulesDir)
+      }
       return Promise.resolve()
     })
   }
@@ -565,7 +613,9 @@ export async function healProfilesModuleFallback(options: ProfileModuleFallbackO
 }
 
 /** Heal one module-fallback generation while the cross-process writer lock is held. */
-function healProfilesModuleFallbackLocked(entries: readonly ModuleFallbackEntry[], modulesDir: string): void {
+function healProfilesModuleFallbackLocked(
+  entries: readonly ModuleFallbackEntry[], unresolvedNames: ReadonlySet<string>, modulesDir: string,
+): void {
   for (const entry of entries) {
     const link = join(modulesDir, entry.packageName)
     mkdirSync(dirname(link), { recursive: true })
@@ -575,6 +625,7 @@ function healProfilesModuleFallbackLocked(entries: readonly ModuleFallbackEntry[
       ensureSymlink(link, entry.packageDir)
     }
   }
+  for (const link of danglingFallbackLinks(modulesDir, unresolvedNames)) unlinkSync(link)
 }
 
 /** Collect the first resolvable package directory for each dependency name. */
