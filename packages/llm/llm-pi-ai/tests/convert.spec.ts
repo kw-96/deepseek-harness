@@ -981,6 +981,10 @@ describe('mapStopReason / mapUsage', () => {
     // supplier's body could not be decoded, after the response had started.
     'server_error: [upstream_stream_error] upstream stream error: error decoding response body',
     'upstream stream error: error decoding response body',
+    // A payload JSON.parse rejected, from whichever hop in the chain returned it.
+    'Bad control character in string literal in JSON at position 13437 (line 1 column 13438)',
+    'Unexpected token < in JSON at position 0',
+    'Unexpected end of JSON input',
   ])('maps pi-ai transport wording %j', (errorMessage) => {
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })

@@ -63,6 +63,14 @@ function classifyPiAiError(message: string): string {
   // response began and then broke upstream, so it is the same mid-response
   // truncation as the wire closures below, not a model-level failure.
   if (/upstream[ _]stream[ _]error|error decoding response body/i.test(message)) return 'TRANSPORT'
+  // A payload JSON.parse rejected: a provider, a gateway, or a local proxy in the
+  // chain returned a body or stream chunk carrying a raw control character, a
+  // truncated tail, or non-JSON content where JSON was promised (V8 words these
+  // `… in JSON at position <n>` or `Unexpected end of JSON input`). The request
+  // produced no model output, so the payload was unusable rather than refused,
+  // and resending it is the recovery — the same transport family as a wire that
+  // closed mid-response.
+  if (/in JSON at position \d+|unexpected end of JSON input/i.test(message)) return 'TRANSPORT'
   if (/\b(?:network|connection|socket|fetch)\b|\bECONN[A-Z]+\b/i.test(message)
     || /\b(?:other side closed|HTTP2 request did not get a response|WebSocket closed unexpectedly)\b/i.test(message)
     // undici renders a mid-stream socket drop as a bare `terminated` (its
