@@ -1,14 +1,14 @@
 //! Ensure and snapshot `apps/web/dist` for one desktop session.
 
-use crate::bootstrap::{ensure_dependencies, run_corepack_pnpm};
+use crate::bootstrap::{ensure_dependencies, file_mtime, run_corepack_pnpm};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Rebuild the Web frontend (`pnpm run build:web`) when a checkout root is known.
+/// 在构建输入比产物新时重建 Web 前端（`pnpm run build:web`）。
 ///
-/// Skipped when `DSH_DESKTOP_SKIP_WEB_BUILD` is set. Uses repo-bundled Node +
-/// corepack pnpm so peer hosts need no global pnpm.
+/// 设置 `DSH_DESKTOP_SKIP_WEB_BUILD` 时跳过。使用仓库内 `.runtime` Node +
+/// corepack pnpm，使对端主机无需全局 pnpm。
 pub fn ensure_web_frontend(
   repo_root: &Path,
   on_line: &mut dyn FnMut(&str),
@@ -16,7 +16,91 @@ pub fn ensure_web_frontend(
   if std::env::var_os("DSH_DESKTOP_SKIP_WEB_BUILD").is_some() {
     return Ok(());
   }
+  if !needs_web_build(repo_root) {
+    return Ok(());
+  }
   run_corepack_pnpm(repo_root, &["run", "build:web"], on_line)
+}
+
+/// 前端构建输入的路径集合。
+///
+/// 前端以**已构建的 `lib/` 产物**消费 workspace 包，因此 `packages/` 下每个
+/// 包的 `lib/` 都算输入。社区插件的前端 bundle 经客户端模块系统在运行时到达，
+/// 刻意排除：正是这一点让源码 HMR 循环不会每次都触发前端重建。
+fn web_build_inputs(repo_root: &Path) -> Vec<PathBuf> {
+  let web = repo_root.join("apps").join("web");
+  let mut inputs = vec![
+    web.join("src"),
+    web.join("public"),
+    web.join("index.html"),
+    web.join("vite.config.ts"),
+    web.join("tsconfig.json"),
+    web.join("package.json"),
+    repo_root.join("pnpm-lock.yaml"),
+  ];
+  push_workspace_libs(repo_root, &mut inputs);
+  inputs
+}
+
+/// 追加 `packages/<组>/<包>/lib` 中已存在的目录。
+fn push_workspace_libs(repo_root: &Path, inputs: &mut Vec<PathBuf>) {
+  let Ok(groups) = fs::read_dir(repo_root.join("packages")) else {
+    return;
+  };
+  for group in groups.flatten() {
+    let Ok(packages) = fs::read_dir(group.path()) else {
+      continue;
+    };
+    for package in packages.flatten() {
+      let lib = package.path().join("lib");
+      if lib.is_dir() {
+        inputs.push(lib);
+      }
+    }
+  }
+}
+
+/// 目录树中最新的一条修改时间；路径不存在时为 `None`。
+///
+/// 读取失败的条目跳过：单个被占用的构建产物不应让新鲜度判定失败。
+fn newest_mtime(path: &Path) -> Option<SystemTime> {
+  let metadata = fs::metadata(path).ok()?;
+  let mut newest = metadata.modified().ok();
+  if !metadata.is_dir() {
+    return newest;
+  }
+  if let Ok(entries) = fs::read_dir(path) {
+    for entry in entries.flatten() {
+      if let Some(inner) = newest_mtime(&entry.path()) {
+        newest = Some(match newest {
+          Some(current) if current > inner => current,
+          _ => inner,
+        });
+      }
+    }
+  }
+  newest
+}
+
+/// 一组输入路径中最新的修改时间；全部不存在时为 `None`。
+fn newest_input_mtime(inputs: &[PathBuf]) -> Option<SystemTime> {
+  inputs.iter().filter_map(|path| newest_mtime(path)).max()
+}
+
+/// 是否需要重建 Web 前端：没有产物页，或存在比产物页更新的输入。
+pub fn needs_web_build(repo_root: &Path) -> bool {
+  let index = repo_root
+    .join("apps")
+    .join("web")
+    .join("dist")
+    .join("index.html");
+  let Some(built) = file_mtime(&index) else {
+    return true;
+  };
+  match newest_input_mtime(&web_build_inputs(repo_root)) {
+    Some(input) => input > built,
+    None => false,
+  }
 }
 
 /// Install if needed, rebuild the frontend, then snapshot dist for this session.

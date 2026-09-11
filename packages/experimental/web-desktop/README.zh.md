@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 摘要
 
-这是一个以 Windows 为先的私有 Tauri 壳：无控制台窗口拉起 `dsh web --no-open`，先显示启动页，待带鉴权的 `dsh web: http://…` 就绪行到达后导航 WebView2。若 `dsh web` 在就绪行之前退出，等待会以退出状态和子进程输出末尾结束，让启动页报告真实原因（例如端口已被另一个 `dsh web` 占用），而不是只报超时。仓库跟踪根目录 `DeepSeek Harness.exe`，其他 Windows 主机 `git pull` 后即可双击使用。每次启动在需要时用 checkout 内 `.runtime` Node + corepack 执行 `pnpm install`（`node_modules` 缺失或旧于 `pnpm-lock.yaml`），并执行 `pnpm run build:web`（可用 `DSH_DESKTOP_SKIP_INSTALL` / `DSH_DESKTOP_SKIP_WEB_BUILD` 跳过），再快照 `apps/web/dist`（`DSH_WEB_DIST_INDEX`），使运行中会话不受后续重建影响。壳本身不挂载 Cordis；Node 应用仍只通过 `dsh` CLI 与 `web` profile 启动（[应用启动](../../../docs/architecture.zh.md#application-launch)）。
+这是一个以 Windows 为先的私有 Tauri 壳：无控制台窗口拉起 `dsh web --no-open`，先显示启动页，待带鉴权的 `dsh web: http://…` 就绪行到达后导航 WebView2。若 `dsh web` 在就绪行之前退出，等待会以退出状态和子进程输出末尾结束，让启动页报告真实原因（例如端口已被另一个 `dsh web` 占用），而不是只报超时。仓库跟踪根目录 `DeepSeek Harness.exe`，其他 Windows 主机 `git pull` 后即可双击使用。每次启动在需要时用 checkout 内 `.runtime` Node + corepack 执行 `pnpm install`（`node_modules` 缺失或旧于 `pnpm-lock.yaml`），并仅在前端已过期时才执行 `pnpm run build:web`——没有 `apps/web/dist/index.html`，或存在比它更新的构建输入（`apps/web/{src,public,index.html,vite.config.ts,tsconfig.json,package.json}`、`pnpm-lock.yaml`，以及每个 `packages/*/*/lib`，因为前端以已构建的 `lib/` 消费 workspace 包；社区插件 bundle 在运行时到达，刻意排除，这正是源码 HMR 不会每次触发前端重建的原因）。两者可分别用 `DSH_DESKTOP_SKIP_INSTALL` / `DSH_DESKTOP_SKIP_WEB_BUILD` 跳过；随后壳快照 `apps/web/dist`（`DSH_WEB_DIST_INDEX`），使运行中会话不受后续重建影响。壳本身不挂载 Cordis；Node 应用仍只通过 `dsh` CLI 与 `web` profile 启动（[应用启动](../../../docs/architecture.zh.md#application-launch)）。
 
 ## 目录
 

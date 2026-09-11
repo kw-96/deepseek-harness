@@ -202,7 +202,8 @@ pub fn run_corepack_pnpm(
   ))
 }
 
-fn file_mtime(path: &Path) -> Option<SystemTime> {
+/// 路径的修改时间；不存在或不可读时为 `None`。
+pub(crate) fn file_mtime(path: &Path) -> Option<SystemTime> {
   fs::metadata(path).ok()?.modified().ok()
 }
 
