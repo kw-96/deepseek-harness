@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 
 interface ColumnRow { name: string }
 
-export const LATEST_SCHEMA_VERSION = 5
+export const LATEST_SCHEMA_VERSION = 6
 
 function addColumn(db: Database.Database, table: string, definition: string): void {
   const name = definition.split(' ')[0] ?? ''
@@ -84,6 +84,22 @@ export function migrateSchema(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_issue_reviews_trace ON issue_reviews(trace_id);
     `)
     db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(5, ?)').run(new Date().toISOString())
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS vivo_runs (
+        id TEXT PRIMARY KEY, collected_at TEXT NOT NULL, site TEXT NOT NULL, targets_json TEXT NOT NULL,
+        status TEXT NOT NULL, error TEXT, case_count INTEGER NOT NULL, scanned_count INTEGER NOT NULL,
+        failed_count INTEGER NOT NULL, output_dir TEXT NOT NULL, synced_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS vivo_cases (
+        run_id TEXT NOT NULL, seq INTEGER NOT NULL, game TEXT NOT NULL, name TEXT NOT NULL,
+        ctr REAL NOT NULL, ctr_text TEXT NOT NULL, tab TEXT NOT NULL, category TEXT NOT NULL,
+        position TEXT NOT NULL, case_date TEXT NOT NULL, rank INTEGER NOT NULL, image_url TEXT NOT NULL,
+        screenshot TEXT NOT NULL, collected_at TEXT NOT NULL, PRIMARY KEY(run_id, seq)
+      );
+      CREATE INDEX IF NOT EXISTS idx_vivo_cases_run ON vivo_cases(run_id, ctr);
+      CREATE INDEX IF NOT EXISTS idx_vivo_cases_game ON vivo_cases(game, position);
+    `)
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(6, ?)').run(new Date().toISOString())
   })
   migrate()
 }

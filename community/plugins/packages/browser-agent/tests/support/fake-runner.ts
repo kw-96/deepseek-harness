@@ -99,6 +99,12 @@ export function defaultOutcome(args: readonly string[]): BskOutcome {
   if (head === 'get-html') {
     return ok({ html: '<html><body>hi</body></html>' })
   }
+  if (head === 'hover') {
+    return ok({ tab_id: 7, used_ref: 'e1', x: 240, y: 192 })
+  }
+  if (head === 'evaluate') {
+    return ok({ ok: true, tab_id: 7, value: 'BUTTON' })
+  }
   return ok({})
 }
 

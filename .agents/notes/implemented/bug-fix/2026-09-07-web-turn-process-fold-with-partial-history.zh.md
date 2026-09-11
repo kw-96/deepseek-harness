@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[Web 轮次过程折叠](../feature/2026-08-14-web-turn-process-folding.zh.md) 在会话仍提供「加载更早」时一律禁用 Compact disclosure。长会话几乎总会保留该控件，因此即使偏好已是 `compact`、已加载轮次也已有最终正文，工具与推理也不会收起。用户会把设置当成失效。
+[Web 轮次过程折叠](../../archived/feature/2026-08-14-web-turn-process-folding.md) 在会话仍提供「加载更早」时一律禁用 Compact disclosure。长会话几乎总会保留该控件，因此即使偏好已是 `compact`、已加载轮次也已有最终正文，工具与推理也不会收起。用户会把设置当成失效。
 
 ## 决策
 

@@ -2,8 +2,12 @@
 
 .root {
   display: flex;
+  /* 面板由 dockkit 渲染，容器给的是确定高度：显式 height:100% 同时兼容
+     内容盒与弹性盒两种父级，保证「上半固定一半 + 内部滚动」成立。 */
+  height: 100%;
   min-height: 0;
-  flex: 1;
+  box-sizing: border-box;
+  flex: 1 1 auto;
   flex-direction: column;
   color: var(--dsw-alias-label-primary, #0f1115);
   font-size: 12px;
@@ -344,6 +348,87 @@
   animation: gitPanelFlash 1.2s ease-out;
 }
 
+.commitOpen {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.commitMain {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  flex: 1;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── 提交详情（Graph 列表内展开） ───────────────────── */
+
+.detail {
+  margin: 0 8px 4px 26px;
+  border-left: 2px solid var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: var(--dsw-alias-bg-module-platform, #f5f6f7);
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.detailHash {
+  color: var(--dsw-alias-label-primary, #0f1115);
+  font-family: var(--dsw-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+}
+
+.detailAuthor {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #818589);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailMeta {
+  color: var(--dsw-alias-state-warn-primary, #f59e0b);
+  font-size: 10.5px;
+}
+
+.detailFiles {
+  margin-top: 2px;
+}
+
+.detailFilesHead {
+  color: var(--dsw-alias-label-tertiary, #818589);
+  font-size: 10.5px;
+}
+
+.detailFile {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+}
+
+.detailFile .fileName {
+  font-size: 11px;
+}
+
+.detailFile .fileDir {
+  font-size: 10px;
+}
+
 @keyframes gitPanelFlash {
   from { background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14)); }
   to { background: transparent; }
@@ -434,6 +519,7 @@
 /* ── 底部栏 ────────────────────────────────────────── */
 
 .bottomBar {
+  position: relative;
   display: flex;
   min-height: 26px;
   align-items: center;
@@ -524,4 +610,262 @@
 .notice {
   background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
   color: var(--dsw-alias-label-secondary, #61656b);
+}
+
+.statusConflict { color: var(--dsw-alias-state-error-primary, #ec1313); }
+
+/* ── 变更行：主区按钮 / 展开态 / 丢弃确认 ───────────── */
+
+.fileMain {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  flex: 1;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fileRowOpen {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.fileConfirm {
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+  font: inherit;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+}
+
+/* ── 行内差异视图 ──────────────────────────────────── */
+
+.diff {
+  border-top: 0.5px dashed var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  border-bottom: 0.5px dashed var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  background: var(--dsw-alias-bg-module-platform, #f5f6f7);
+}
+
+.diffHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+}
+
+.diffScope {
+  flex: none;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  color: var(--dsw-alias-label-secondary, #61656b);
+  font-size: 10px;
+}
+
+.diffPath {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #61656b);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffClose {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #61656b);
+  cursor: pointer;
+  flex: none;
+}
+
+.diffClose:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-primary, #0f1115);
+}
+
+.diffBody {
+  max-height: 220px;
+  overflow: auto;
+  padding: 0 0 6px;
+  font-family: var(--dsw-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+
+.diffAdd,
+.diffDel,
+.diffHunk,
+.diffMeta,
+.diffContext {
+  padding: 0 8px;
+  white-space: pre;
+}
+
+.diffAdd {
+  background: var(--dsw-alias-state-success-primary-a10, rgba(34, 197, 94, 0.12));
+  color: var(--dsw-alias-state-success-primary, #16a34a);
+}
+
+.diffDel {
+  background: var(--dsw-alias-state-error-primary-a10, rgba(236, 19, 19, 0.1));
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+}
+
+.diffHunk {
+  color: var(--dsw-alias-state-business-primary, #4d90fe);
+}
+
+.diffMeta {
+  color: var(--dsw-alias-label-tertiary, #818589);
+}
+
+.diffContext {
+  color: var(--dsw-alias-label-secondary, #61656b);
+}
+
+/* ── 底部栏分支切换器 ──────────────────────────────── */
+
+.branchButton {
+  display: inline-flex;
+  max-width: 160px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.branchButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.branchButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.branchMenu {
+  position: absolute;
+  bottom: 30px;
+  left: 6px;
+  z-index: 30;
+  min-width: 220px;
+  max-width: 300px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 4px;
+  background: var(--dsw-alias-bg-overlay, #ffffff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  scrollbar-width: thin;
+}
+
+.branchMenuHead {
+  padding: 3px 8px;
+  color: var(--dsw-alias-label-tertiary, #818589);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.menuItemSpacer {
+  display: inline-block;
+  width: 12px;
+  flex: none;
+}
+
+.branchName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branchCreate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  border-top: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  padding: 5px 6px 2px;
+  color: var(--dsw-alias-label-tertiary, #818589);
+}
+
+.branchInput {
+  min-width: 0;
+  flex: 1;
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: var(--dsw-alias-bg-module-platform, #f5f6f7);
+  color: var(--dsw-alias-label-primary, #0f1115);
+  font: inherit;
+  font-size: 11px;
+  outline: 0;
+}
+
+.branchInput:focus {
+  border-color: var(--dsw-alias-state-business-primary, #4d90fe);
+}
+
+.branchCreateButton {
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 7px;
+  background: var(--dsw-alias-brand-primary, #0f1115);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  flex: none;
+}
+
+.branchCreateButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* 提交详情里的文件行按钮 */
+.detailFileButton {
+  display: flex;
+  width: 100%;
+  min-height: 18px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.detailFileButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
 }

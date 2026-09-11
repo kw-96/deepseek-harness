@@ -1,6 +1,6 @@
 ---
 description: "Experimental Tauri desktop shell that opens DeepSeek Harness Web in an independent native window."
-kind: "package-library"
+kind: "package-reference"
 ---
 
 # `@deepseek-ai/dsh-experimental-web-desktop`
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-A private Windows-first Tauri shell that spawns `dsh web --no-open` without a console window, shows a starting splash until the authenticated `dsh web: http://…` line arrives, then navigates WebView2 to that URL. A harness that exits before that line closes the wait with its exit status and the tail of the harness output, so the splash reports the real cause — for example another `dsh web` already holding the port — instead of a bare timeout. The repository tracks root `DeepSeek Harness.exe`, so another Windows host can `git pull` and double-click it. Each launch may run `pnpm install` (when `node_modules` is missing or older than `pnpm-lock.yaml`) and runs `pnpm run build:web` only when the frontend is stale — no `apps/web/dist/index.html`, or a build input newer than it (`apps/web/{src,public,index.html,vite.config.ts,tsconfig.json,package.json}`, `pnpm-lock.yaml`, and every `packages/*/*/lib`, since the frontend consumes workspace packages as built `lib/`; community plugin bundles arrive at runtime and are deliberately excluded, which is what keeps source HMR from forcing a frontend rebuild). Both skip with `DSH_DESKTOP_SKIP_INSTALL` / `DSH_DESKTOP_SKIP_WEB_BUILD`, then the shell snapshots `apps/web/dist` (`DSH_WEB_DIST_INDEX`) so an open session ignores later rebuilds. The shell never mounts Cordis itself; the Node application still starts only through the `dsh` CLI and the `web` profile ([application launch](../../../docs/architecture.md#application-launch)).
+A private Windows-first Tauri shell that opens `dsh web` in its own native window: it spawns the CLI without a console, shows a splash until the authenticated `dsh web: http://…` line arrives, then navigates WebView2 there. It also watches the harness, restarting an exited one so the window reconnects, and gives up after three consecutive startup failures with the real cause instead of a timeout. The repository tracks root `DeepSeek Harness.exe`. The shell never mounts Cordis; the Node application still starts only through the `dsh` CLI and the `web` profile ([application launch](../../../docs/architecture.md#application-launch)).
 
 ## Table of Contents
 
@@ -54,6 +54,12 @@ pnpm --filter @deepseek-ai/dsh-experimental-web-desktop dev
 
 CLI resolution order: `DSH_DESKTOP_CLI` → walk upward from this exe → walk from the process cwd → walk from the compile-time crate path → bare `dsh.cmd` / `dsh` on `PATH`. When a checkout CLI is found, that directory is the spawn working directory. Dependency commands use the bundled `.runtime` Node directory (same tree as `dsh.cmd`).
 
+### Startup watch and rebuilds
+
+A harness that exits before printing its ready line closes the wait with its exit status and the tail of its output, so the splash names the real cause — for example another `dsh web` holding the port — instead of a bare timeout. Three consecutive startup failures give up with the same diagnostic instead of looping.
+
+Each launch runs `pnpm install` when `node_modules` is missing or older than `pnpm-lock.yaml`, and `pnpm run build:web` only when the frontend is stale: no `apps/web/dist/index.html`, or a build input newer than it (`apps/web/{src,public,index.html,vite.config.ts,tsconfig.json,package.json}`, `pnpm-lock.yaml`, and every `packages/*/*/lib`). Community plugin bundles arrive at runtime and are deliberately excluded, which keeps source HMR from forcing a frontend rebuild. `DSH_DESKTOP_SKIP_INSTALL` and `DSH_DESKTOP_SKIP_WEB_BUILD` skip both steps; the shell then snapshots `apps/web/dist` (`DSH_WEB_DIST_INDEX`) so an open session ignores later rebuilds.
+
 -----
 
 <a id="dev-note"></a>
@@ -84,3 +90,4 @@ None; the shell neither assembles nor sends a provider request.
 - **No theme-switching .exe file icon** — Windows Explorer does not recolor PE icons from system light/dark mode; the shipped icon uses a dark tile and white mark so both themes stay readable.
 - **Custom title bar needs Tauri IPC** — with system decorations off, the splash and Web title bar call minimize / maximize / close through `withGlobalTauri` and the remote capability; the same Web UI in a normal browser does not show that chrome.
 - **Frontend freeze is dist-only** — Host still launches through checkout `dsh` (source); only the Web asset tree is rebuilt and snapshotted for the session.
+- **A restarted backend does not reload the window** — the shell navigates once, so recovery depends on the Web client's own reconnect loop; if that loop ever stopped retrying, the window would keep the notice until it is reloaded or relaunched.

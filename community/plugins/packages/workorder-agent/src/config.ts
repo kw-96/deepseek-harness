@@ -25,6 +25,9 @@ export interface AppConfigInput {
   port?: number
   dataDir?: string
   webhookToken: string
+  webhookIngressEnabled?: boolean
+  webhookIngressHost?: string
+  webhookIngressPort?: number
   gcpUserKey: string
   gcpUrl?: string
   gcpHost?: string
@@ -40,12 +43,18 @@ export interface AppConfigInput {
   reviewMaxTokens?: number
   reviewKnowledgeBase?: string
   reviewNotificationEnabled?: boolean
+  vivoProjectDir?: string
+  vivoPython?: string
+  vivoScript?: string
+  vivoTargets?: string
 }
 
 export interface AppConfig {
   port: number
   dataDir: string
   webhookToken: string
+  /** 独立事件入口：供内网中的易协作网关回调，关闭时只保留宿主前缀内的入口。 */
+  webhookIngress: { enabled: boolean; host: string; port: number }
   projects: ProjectMap
   completedStatusId: number
   gcp: { url: string; host: string; userKey: string }
@@ -58,6 +67,8 @@ export interface AppConfig {
     knowledgeBase: string
     notificationEnabled: boolean
   }
+  /** vivo 优秀案例集成：项目目录、采集解释器与默认采集目标。 */
+  vivo: { projectDir: string; python: string; script: string; defaultTargets: string }
 }
 
 /**
@@ -80,6 +91,11 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
     port: input.port ?? 3081,
     dataDir: input.dataDir?.trim() || join(process.cwd(), '.data'),
     webhookToken,
+    webhookIngress: {
+      enabled: input.webhookIngressEnabled ?? false,
+      host: input.webhookIngressHost?.trim() || '127.0.0.1',
+      port: positiveInt('WEBHOOK_INGRESS_PORT', input.webhookIngressPort ?? 3091),
+    },
     projects: {
       渠道美术: positiveInt('PROJECT_ID_CHANNEL_ART', input.projectIdChannelArt ?? 7),
       回流业务: positiveInt('PROJECT_ID_RETURN_BUSINESS', input.projectIdReturnBusiness ?? 2001),
@@ -98,6 +114,12 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
       maxTokens: positiveInt('REVIEW_MAX_TOKENS', input.reviewMaxTokens ?? 800),
       knowledgeBase,
       notificationEnabled: input.reviewNotificationEnabled ?? true,
+    },
+    vivo: {
+      projectDir: input.vivoProjectDir?.trim() || '',
+      python: input.vivoPython?.trim() || 'python',
+      script: input.vivoScript?.trim() || 'save_egg_party.py',
+      defaultTargets: input.vivoTargets?.trim() || '蛋仔派对',
     },
   }
 }
@@ -131,5 +153,9 @@ export function loadConfig(): AppConfig {
     reviewMaxTokens: process.env.REVIEW_MAX_TOKENS ? Number(process.env.REVIEW_MAX_TOKENS) : 800,
     reviewKnowledgeBase: process.env.REVIEW_KNOWLEDGE_BASE?.trim(),
     reviewNotificationEnabled: process.env.REVIEW_NOTIFICATION_ENABLED !== 'false',
+    vivoProjectDir: process.env.VIVO_DATA_DIR?.trim(),
+    vivoPython: process.env.VIVO_PYTHON?.trim(),
+    vivoScript: process.env.VIVO_SCRIPT?.trim(),
+    vivoTargets: process.env.VIVO_TARGETS?.trim(),
   })
 }

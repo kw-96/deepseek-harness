@@ -10,6 +10,9 @@
         enabled: true
         dataDir: !!js process.env.DATA_DIR?.trim() || ''
         webhookToken: !!js process.env.WEBHOOK_TOKEN?.trim() || ''
+        webhookIngressEnabled: !!js process.env.WEBHOOK_INGRESS_ENABLED === 'true'
+        webhookIngressHost: !!js process.env.WEBHOOK_INGRESS_HOST?.trim() || '127.0.0.1'
+        webhookIngressPort: !!js Number(process.env.WEBHOOK_INGRESS_PORT) || 3091
         gcpUserKey: !!js process.env.GCP_USER_KEY?.trim() || ''
         gcpUrl: !!js process.env.GCP_MCP_URL?.trim() || 'https://mcp.netease.com/servers/gcp/mcp'
         gcpHost: !!js process.env.GCP_HOST?.trim() || 'promoteart.pm.netease.com'
@@ -25,3 +28,7 @@
         reviewMaxTokens: !!js Number(process.env.REVIEW_MAX_TOKENS) || 800
         reviewKnowledgeBase: ''
         reviewNotificationEnabled: !!js process.env.REVIEW_NOTIFICATION_ENABLED !== 'false'
+        vivoProjectDir: !!js process.env.VIVO_DATA_DIR?.trim() || ''
+        vivoPython: !!js process.env.VIVO_PYTHON?.trim() || 'python'
+        vivoScript: !!js process.env.VIVO_SCRIPT?.trim() || 'save_egg_party.py'
+        vivoTargets: !!js process.env.VIVO_TARGETS?.trim() || '蛋仔派对'

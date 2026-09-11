@@ -65,3 +65,19 @@ export const statsQuerySchema = z.object({
   startDate: DATE_QUERY,
   endDate: DATE_QUERY,
 }).refine((value) => !value.startDate || !value.endDate || value.startDate <= value.endDate, '开始日期不能晚于结束日期')
+
+const RUN_ID = z.string().regex(/^\d{8}_\d{6}$/, '轮次标识无效')
+
+/** vivo 采集请求：可选的目标游戏名列表。 */
+export const vivoCollectSchema = z.object({
+  targets: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+})
+
+/** vivo 推送请求：可选的采集轮次。 */
+export const vivoRunSchema = z.object({ runId: RUN_ID.optional() })
+
+/** vivo 截图请求：轮次与文件名，文件名仅允许单段。 */
+export const vivoShotSchema = z.object({
+  runId: RUN_ID,
+  file: z.string().trim().min(1).max(200).refine((value) => !value.includes('/') && !value.includes('\\') && value.endsWith('.png'), '截图文件名无效'),
+})

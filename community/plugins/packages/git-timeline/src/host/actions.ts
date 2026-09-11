@@ -52,6 +52,22 @@ export async function unstageAll(shell: ShellExecutor, cwd: string): Promise<Git
 }
 
 /**
+ * 丢弃工作区改动（恢复为 HEAD 内容）。
+ *
+ * 只作用于已跟踪路径：未跟踪文件不会被删除（界面也不给它入口），
+ * 避免误删刚生成、还没纳入版本控制的文件。
+ * @param shell shell 执行器
+ * @param cwd 会话工作目录
+ * @param paths 仓库根相对路径
+ */
+export async function discard(shell: ShellExecutor, cwd: string, paths: readonly string[]): Promise<GitActionResponse> {
+  const root = await requireRoot(shell, cwd)
+  if (paths.length === 0) return { detail: '' }
+  const out = await git(shell, root, ['restore', '--worktree', '--', ...paths])
+  return { detail: lastLine(out.stdout) || lastLine(out.stderr) }
+}
+
+/**
  * 提交暂存内容；`amend` 为真时修补上一条提交。
  * @param shell shell 执行器
  * @param cwd 会话工作目录

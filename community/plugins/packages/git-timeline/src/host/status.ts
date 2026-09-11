@@ -144,8 +144,34 @@ export async function readDiff(
   const paths = (options.paths ?? []).map(path => path.trim()).filter(path => path !== '')
   if (paths.length > 0) args.push('--', ...paths)
   const out = await git(shell, root, args)
-  if (Buffer.byteLength(out.stdout, 'utf8') <= maxBytes) return { text: out.stdout, truncated: false }
-  return { text: Buffer.from(out.stdout, 'utf8').subarray(0, maxBytes).toString('utf8'), truncated: true }
+  return capText(out.stdout, maxBytes)
+}
+
+/** 按字节上限截断文本。 */
+function capText(text: string, maxBytes: number): GitDiffResponse {
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return { text, truncated: false }
+  return { text: Buffer.from(text, 'utf8').subarray(0, maxBytes).toString('utf8'), truncated: true }
+}
+
+/**
+ * 读取一条提交里某个文件的差异（`git show --patch`，首个提交也适用）。
+ * @param shell shell 执行器
+ * @param cwd 会话工作目录
+ * @param hash 提交哈希
+ * @param path 仓库根相对路径
+ * @param maxBytes 字节上限
+ */
+export async function readCommitDiff(
+  shell: ShellExecutor,
+  cwd: string,
+  hash: string,
+  path: string,
+  maxBytes = 256 * 1024,
+): Promise<GitDiffResponse> {
+  const root = await repoRoot(shell, cwd)
+  if (root === null) return { text: '', truncated: false }
+  const out = await git(shell, root, ['show', '--no-color', '--format=', '--patch', hash, '--', path])
+  return capText(out.stdout, maxBytes)
 }
 
 /**

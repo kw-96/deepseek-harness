@@ -1,6 +1,6 @@
 # dsh-browser-agent
 
-[简体中文](README.zh-CN.md)
+English | [中文](README.zh.md)
 
 Browser automation for DeepSeek Harness: model tools plus a Web panel that drive the user's **real Chromium
 browser** through the [`bsk`](https://github.com/) CLI of browser-skill.
@@ -14,8 +14,11 @@ reclaimed by the plugin instead of by the model's memory.
 - Registers 12 model tools: `browser_open`, `browser_observe`, `browser_click`, `browser_fill`, `browser_press`,
   `browser_select`, `browser_history`, `browser_tabs`, `browser_ask_human`, `browser_evaluate`, `browser_status`,
   `browser_stop`.
-- Owns the `bsk` session for every DSH session: lazy start on first use, and reclamation through four paths —
-  explicit `browser_stop`, DSH session disposal (`agent/disposed`), plugin unload, and an idle sweep.
+- Owns the `bsk` session for every DSH session: lazy start on first use, and reclamation through five paths —
+  explicit `browser_stop`, DSH session disposal (`agent/disposed`), plugin unload, orphan reaping for a host session
+  that no longer exists (a restarted plugin cannot `browser_stop` a record whose session id changed), and an idle sweep.
+  A failure inside the periodic sweep is logged rather than thrown: one failing `bsk` command must not terminate the
+  `dsh web` backend that carries every session.
 - Picks the target browser: with one connected instance it starts directly, with several it refuses and lists the
   candidates so the deployment can pin one through `browserInstance`, and with none it says exactly what to fix.
 - Recovers from an externally killed session: a `session not registered` failure drops the stale record and tells
@@ -28,9 +31,26 @@ reclaimed by the plugin instead of by the model's memory.
 
 ## Requirements
 
-1. `bsk` on `PATH` (browser-skill CLI, tested with 0.1.6).
+1. `bsk` on `PATH` (browser-skill CLI; tested with 0.2.1 against daemon protocol 1.1).
 2. A Chromium-family browser with the browser-skill extension loaded and connected (`bsk doctor` should be green).
 3. DeepSeek Harness 0.1.5-rc.1 or later.
+
+## Machine setup
+
+The full, agent-executable procedure (acceptance criteria and known traps included) is in
+[`docs/new-machine-setup.md`](docs/new-machine-setup.md). `scripts/setup-browser-skill.ps1` provisions and
+verifies the runtime (Windows; works on Windows PowerShell 5.1):
+
+| Command | Effect |
+| --- | --- |
+| `.\setup-browser-skill.ps1` | Check only: CLI version, daemon, extension connection, protocol skew, plus fixes (changes nothing) |
+| `... -Mode install` | Upgrade the CLI (official `bsk update --yes` when present, otherwise the upstream installer with sha256 + PATH setup), then `bsk install-skill --yes` |
+| `... -Mode extension -ExtensionMode store` | Open the store page (recommended; it keeps itself updated) |
+| `... -Mode extension -ExtensionMode unpacked -ExtensionVersion 0.2.1` | Offline: download the extension zip into `~/.local/share/bsk-extension/<version>` |
+| `-WriteEdgePolicy` / `-RemoveEdgePolicy` | Add or remove a per-user Edge force-install policy for the store extension |
+
+Exit code `0` means usable (possibly with an upgrade warning); `1` means a `fail` row needs attention.
+Installing the extension itself is a human step by upstream design; the script only prepares and verifies it.
 
 ## Install
 
@@ -94,9 +114,12 @@ profile; `tests/client-panel.spec.tsx` covers the right-sidebar panel under jsdo
 
 ## Known limitations
 
-- **Full-tab screenshots fail on some Windows/Edge builds** (`cdp_failed: image readback failed`). The plugin
-  detects this and retries with the root snapshot ref, which yields a viewport-equivalent PNG; the result's
-  `note` reports the fallback.
+- **Full-tab screenshots**: with the 0.1.x extension this failed on some Windows/Edge builds
+  (`cdp_failed: image readback failed`); the plugin retries once and then falls back to the root snapshot ref —
+  an affordance only the old aria snapshot format has — reporting it in `note`. Since 0.2.1 full-tab capture
+  works, so the fallback is a last resort.
+- **0.2.1 observation format**: `snapshot`/`observe` now return VOM text (`@vom/@view/@layers`, refs only on
+  interactive elements) where 0.1.x returned an aria tree with a ref on every node; the plugin handles both.
 - The panel polls on demand (mount + Refresh); it does not stream.
 - **Development loop:** do not run `pnpm run build` while `dev.mjs` watches: its `clean` step empties `lib/` and
   races the incremental watcher builds (`UNRESOLVED_ENTRY` / `MISSING_EXPORT`, and the client bundle can go

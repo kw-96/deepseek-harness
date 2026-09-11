@@ -4,8 +4,11 @@ packages:
 allowBuilds:
   # better-sqlite3 自带预编译二进制（prebuilds/win32-x64.node），无需源码编译；
   # 显式拒绝 node-gyp 构建，避免无 Visual Studio 的机器安装失败。
+  '@deepseek-ai/dsh-subprocess-local': set this to true or false
   better-sqlite3: false
   esbuild: true
+  koffi: set this to true or false
+  node-pty: set this to true or false
 
 # DeepSeek Harness release candidates are consumed immediately during the pre-release cycle.
 minimumReleaseAge: 0

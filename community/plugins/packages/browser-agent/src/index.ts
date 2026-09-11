@@ -1,8 +1,8 @@
 /**
  * dsh-browser-agent Host 半：把 browser-skill 的 bsk CLI 包装成模型工具，
- * 并托管每个 DSH 会话的 bsk 会话。会话回收有三条路径——模型显式调用
- * browser_stop、DSH 会话结束（agent/disposed）、插件卸载——另有空闲巡检
- * 兜底，因此不会留下无人关闭的 Agent Window。
+ * 并托管每个 DSH 会话的 bsk 会话。会话回收有四条路径——模型显式调用
+ * browser_stop、DSH 会话结束（agent/disposed）、宿主会话不存在时的孤儿回收、
+ * 插件卸载——另有空闲巡检兜底，因此不会留下无人关闭的 Agent Window。
  */
 
 import { readFile } from 'node:fs/promises'
@@ -10,15 +10,22 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { BskRunner, errorText } from './host/bsk.js'
+import { createImageSaver } from './host/attachment.js'
+import { BskRunner } from './host/bsk.js'
+import { errorText } from './host/parse.js'
 import type { BrowserAgentConfig } from './host/config.js'
 import { BrowserAgentConfigSchema, resolveConfig } from './host/config.js'
-import { parseBrowsers, parseTabs } from './host/parse.js'
+import { activeTabUrl, parseBrowsers, parseTabs } from './host/parse.js'
 import { BrowserPolicy } from './host/policy.js'
 import { BskSessionStore } from './host/store.js'
+import { runSweep } from './host/sweep.js'
 import type { ApprovalFace } from './tools/shared.js'
-import { registerBrowserTools } from './tools/register.js'
+import { registerControlTools } from './tools/control.js'
+import { registerInteractTools } from './tools/interact.js'
+import { registerNavigateTools } from './tools/navigate.js'
+import { registerObserveTools } from './tools/observe.js'
 import type { BrowserPanelSnapshot, BrowserPreviewResult, BrowserSessionView, BrowserStopResult } from './types.js'
 
 export type * from './types.js'
@@ -30,7 +37,9 @@ const PREVIEW_MAX_BYTES = 1_500_000
 
 /** BrowserAgent Remote：右侧面板的状态读取、截图预览与会话结束。 */
 export class BrowserAgent extends TypertRemoteService {
-  static inject = ['tools', 'subprocess']
+  // `isOwnerAlive` 经 `ctx.agents` 判定宿主会话是否还在，因此必须声明该注入；
+  // 未声明的属性访问会抛 `cannot get property "agents" without inject`。
+  static inject = ['agents', 'tools', 'subprocess']
   static Config = BrowserAgentConfigSchema
 
   private readonly config: BrowserAgentConfig
@@ -58,6 +67,8 @@ export class BrowserAgent extends TypertRemoteService {
       idleTimeoutMs: resolved.idleTimeoutMs,
       snapshotMaxChars: resolved.snapshotMaxChars,
       browserInstance: resolved.browserInstance,
+      // 宿主里查不到该会话即视为孤儿：宿主重启后会话 id 会变，旧记录再没人能 stop。
+      isOwnerAlive: sessionId => ctx.agents.get(SessionId(sessionId)) !== undefined,
       log: message => { ctx.logger.info(message) },
     })
     registerBrowserTools(ctx, {
@@ -69,8 +80,10 @@ export class BrowserAgent extends TypertRemoteService {
         navigationTimeoutMs: resolved.navigationTimeoutMs,
         screenshotDir: resolved.screenshotDir,
         requireApprovalForBorrow: resolved.requireApprovalForBorrow,
+        clickMode: resolved.clickMode,
       },
       approval: ctx.get('approval') as ApprovalFace | undefined,
+      saveImage: createImageSaver(ctx),
     })
     ctx.on('agent/disposed', ({ agent }) => {
       void this.store.stop(String(agent.session.id), 'DSH 会话结束')
@@ -78,9 +91,11 @@ export class BrowserAgent extends TypertRemoteService {
     const timer = ctx.get('timer')
     if (timer !== undefined) {
       ctx.effect(() => {
-        const dispose = timer.interval(() => { void this.store.sweepIdle(Date.now()) }, SWEEP_INTERVAL_MS)
+        const dispose = timer.interval(() => {
+          void runSweep(this.store, Date.now(), message => { ctx.logger.warn(message) })
+        }, SWEEP_INTERVAL_MS)
         return () => { dispose() }
-      }, 'browser-agent idle sweep')
+      }, 'browser-agent session sweep')
     }
     ctx.effect(() => async () => { await this.store.stopAll('插件卸载') }, 'browser-agent sessions')
   }
@@ -102,7 +117,8 @@ export class BrowserAgent extends TypertRemoteService {
         { allowFailure: true },
       )
       tabs = parseTabs(listed.json)
-      this.store.update(sessionId, { tabCount: tabs.length })
+      const url = activeTabUrl(listed.json)
+      this.store.update(sessionId, { tabCount: tabs.length, ...(url !== undefined ? { currentUrl: url } : {}) })
       screenshotPath = this.store.get(sessionId)?.lastScreenshotPath ?? screenshotPath
     }
     return {
@@ -176,6 +192,18 @@ export class BrowserAgent extends TypertRemoteService {
       lastError: record.lastError,
     }
   }
+}
+
+/**
+ * 注册本插件的全部模型工具。
+ * @param ctx - 宿主上下文（提供 tools 注册表）
+ * @param deps - 工具依赖
+ */
+function registerBrowserTools(ctx: Context, deps: Parameters<typeof registerObserveTools>[1]): void {
+  registerObserveTools(ctx, deps)
+  registerInteractTools(ctx, deps)
+  registerNavigateTools(ctx, deps)
+  registerControlTools(ctx, deps)
 }
 
 export default BrowserAgent

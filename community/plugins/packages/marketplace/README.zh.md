@@ -1,6 +1,6 @@
 # DSH 插件市场
 
-[English](README.md)
+[English](README.md) | 中文
 
 这是一个独立的 DeepSeek Harness 市场插件：读取自动生成的统一插件目录，并通过官方 `dsh plugin` 命令边界安装精确的 npm 版本。
 

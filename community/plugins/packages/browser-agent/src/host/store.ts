@@ -5,36 +5,11 @@
  */
 
 import type { BskCommandRunner } from './bsk.js'
+import type { BskSessionRecord, SessionStoreOptions } from './config.js'
 import { NAVIGATION_TIMEOUT_MS } from './bsk.js'
 import { parseBrowsers } from './parse.js'
 import type { SnapshotPayload } from './snapshot.js'
 import { countRefs, extractTitle, truncateText } from './snapshot.js'
-
-/** 一个活跃 bsk 会话的运行态。 */
-export interface BskSessionRecord {
-  bskSessionId: string
-  windowId: string | null
-  startedAtMs: number
-  lastActionAtMs: number
-  currentUrl: string | null
-  pageTitle: string | null
-  /** 上一次快照的引用是否已失效（导航或 DOM 变化后置位）。 */
-  refsStale: boolean
-  tabCount: number
-  lastScreenshotPath: string | null
-  lastError: string | null
-}
-
-/** 会话托管配置。 */
-export interface SessionStoreOptions {
-  /** 空闲多久后自动结束会话（毫秒）。 */
-  idleTimeoutMs: number
-  /** 快照输出字符上限。 */
-  snapshotMaxChars: number
-  /** 目标浏览器实例（id 或 label）；空串表示要求唯一实例。 */
-  browserInstance: string
-  log: (message: string) => void
-}
 
 /** 会话托管器。 */
 export class BskSessionStore {
@@ -171,6 +146,21 @@ export class BskSessionStore {
       .map(([sessionId]) => sessionId)
     for (const sessionId of expired) await this.stop(sessionId, '空闲超时自动回收')
     return expired
+  }
+
+  /**
+   * 回收宿主会话已不存在的记录。
+   *
+   * 会话 id 一旦失效（宿主重启后换 id、会话被销毁等），就再没有任何调用能替它
+   * `browser_stop`；不回收就会留下孤儿 Agent Window 直到空闲巡检。
+   * @returns 被结束的 DSH 会话 id
+   */
+  async reapOrphaned(): Promise<string[]> {
+    const isAlive = this.options.isOwnerAlive
+    if (isAlive === undefined) return []
+    const orphaned = [...this.records.keys()].filter(sessionId => !isAlive(sessionId))
+    for (const sessionId of orphaned) await this.stop(sessionId, '宿主会话已不存在')
+    return orphaned
   }
 
   /**

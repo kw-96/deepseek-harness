@@ -1,13 +1,17 @@
 import { Hono } from 'hono'
+import { readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
 import type { AppConfig } from '../../config.js'
 import type { WorkorderAgentRouter } from '../../harness/agent.js'
 import { toAdminIssue } from './issues.js'
 import { createRateLimit } from './rateLimit.js'
-import { dateRangeSchema, issueIdSchema, messageIdSchema, previewIdSchema, resendPreviewSchema, resumeMessageSchema, reviewSettingsSchema, runtimeSettingsSchema, sendPreviewSchema, statsQuerySchema } from './validation.js'
+import { dateRangeSchema, issueIdSchema, messageIdSchema, previewIdSchema, resendPreviewSchema, resumeMessageSchema, reviewSettingsSchema, runtimeSettingsSchema, sendPreviewSchema, statsQuerySchema, vivoCollectSchema, vivoRunSchema, vivoShotSchema } from './validation.js'
 import type { GcpIssueService } from '../gcp/service.js'
 import type { PopoDeliveryService } from '../popo/delivery.js'
 import type { WorkorderStatsService } from '../stats/service.js'
 import type { WorkorderStore } from '../store/store.js'
+import type { VivoService } from '../vivo/service.js'
+import type { WebhookRequestLog } from '../webhook/log.js'
 import type { InspectionWorkflow } from '../workflow/service.js'
 import type { IssueReviewWorkflow } from '../workflow/review.js'
 import { todayInShanghai } from '../../domain/dates.js'
@@ -23,6 +27,8 @@ export interface AdminRouteDependencies {
   workflow: InspectionWorkflow
   review: IssueReviewWorkflow
   stats: WorkorderStatsService
+  vivo: VivoService
+  webhookLog: WebhookRequestLog
   agentRouter?: WorkorderAgentRouter
   writePluginSettings?: PluginSettingsWrite
 }
@@ -38,9 +44,9 @@ function reviewSettings(config: AppConfig): Record<string, unknown> {
   }
 }
 
-/** 注册工单控制面的管理 API。 */
+/** 注册 Ticket Hub 控制面的管理 API。 */
 export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependencies): void {
-  const { config, store, issues, delivery, workflow, review, stats, writePluginSettings } = dependencies
+  const { config, store, issues, delivery, workflow, review, stats, vivo, webhookLog, writePluginSettings } = dependencies
   const actionLimit = createRateLimit(5, 60_000)
   app.get('/api/admin/status', (context) => context.json({
     healthy: store.health().ready,
@@ -56,7 +62,9 @@ export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependenci
     review: { enabled: config.review.enabled, notificationEnabled: config.review.notificationEnabled,
       model: config.review.provider && config.review.model ? `${config.review.provider}/${config.review.model}` : '继承 Harness 默认模型' },
     projects: config.projects, completedStatusId: config.completedStatusId,
+    ingress: { enabled: config.webhookIngress.enabled, host: config.webhookIngress.host, port: config.webhookIngress.port },
     runs: store.listRuns(), webhooks: store.listWebhooks(), previews: store.listPreviews(),
+    webhookRequests: webhookLog.list(),
   }))
   app.get('/api/admin/previews/:id', (context) => {
     const parsed = previewIdSchema.safeParse(context.req.param('id'))
@@ -116,6 +124,54 @@ export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependenci
     const parsed = statsQuerySchema.safeParse({ startDate: context.req.query('startDate'), endDate: context.req.query('endDate') })
     if (!parsed.success) return context.json({ error: parsed.error.issues[0]?.message ?? '统计查询参数无效' }, 400)
     return context.json(stats.compute(parsed.data.startDate, parsed.data.endDate))
+  })
+  app.get('/api/admin/vivo', (context) => {
+    const filter = { game: context.req.query('game') || undefined, position: context.req.query('position') || undefined }
+    const runId = context.req.query('runId') || undefined
+    return context.json({ ...vivo.overview(filter), cases: vivo.compare(runId, filter), state: vivo.collectState() })
+  })
+  app.post('/api/admin/vivo/sync', actionLimit, (context) => {
+    const result = vivo.sync()
+    return context.json({
+      message: `已同步 ${result.runs} 轮、${result.cases} 条案例`,
+      ...vivo.overview(), state: vivo.collectState(),
+    })
+  })
+  app.get('/api/admin/vivo/collect', (context) => context.json(vivo.collectState()))
+  app.post('/api/admin/vivo/collect', actionLimit, async (context) => {
+    const parsed = vivoCollectSchema.safeParse(await context.req.json().catch(() => ({})))
+    if (!parsed.success) return context.json({ error: parsed.error.issues[0]?.message ?? '采集参数无效' }, 400)
+    const result = vivo.collect(parsed.data.targets)
+    if (!result.started) return context.json({ error: result.reason ?? '无法启动采集' }, 409)
+    return context.json({ message: `已启动采集：${result.state.targets.join('、')}`, state: result.state })
+  })
+  app.post('/api/admin/vivo/collect/stop', actionLimit, (context) => {
+    const result = vivo.stopCollect()
+    return context.json({
+      message: result.stopped ? '已请求停止采集' : '当前没有正在运行的采集',
+      state: result.state,
+    })
+  })
+  app.post('/api/admin/vivo/notify', actionLimit, async (context) => {
+    const parsed = vivoRunSchema.safeParse(await context.req.json().catch(() => ({})))
+    if (!parsed.success) return context.json({ error: '轮次标识无效' }, 400)
+    try {
+      const result = await vivo.notify(parsed.data.runId)
+      return context.json({ message: 'vivo 案例已推送至 POPO', taskId: result.taskId })
+    } catch (error) {
+      return context.json({ error: error instanceof Error ? error.message : String(error) }, 409)
+    }
+  })
+  app.get('/api/admin/vivo/shot', (context) => {
+    const parsed = vivoShotSchema.safeParse({ runId: context.req.query('runId'), file: context.req.query('file') })
+    if (!parsed.success) return context.json({ error: '截图参数无效' }, 400)
+    try {
+      const image = readFileSync(join(config.vivo.projectDir, 'output', parsed.data.runId, basename(parsed.data.file)))
+      const body = image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength) as ArrayBuffer
+      return context.body(body, 200, { 'content-type': 'image/png', 'cache-control': 'private, max-age=3600' })
+    } catch {
+      return context.json({ error: '截图不存在' }, 404)
+    }
   })
   app.get('/api/admin/popo/capabilities', (context) => context.json({
     configured: Boolean(config.popo.url), signed: Boolean(config.popo.secret), available: store.health().ready,

@@ -147,6 +147,8 @@ export interface WorkspacesFace {
   delete(workspaceId: WorkspaceId): Promise<void>
   insertBefore(workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId): Promise<void>
   archiveSession(sessionId: SessionId): Promise<void>
+  /** 取消归档：把会话恢复到分组面（工作区归属从未改变，位置原样回来）。 */
+  unarchiveSession(sessionId: SessionId): Promise<void>
   insertSessionBefore(workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>
   attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
   moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>

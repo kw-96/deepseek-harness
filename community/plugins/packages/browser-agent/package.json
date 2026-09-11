@@ -55,6 +55,8 @@
     "lib/types/**/*.d.ts",
     "lib/remote.js",
     "cordis.patch.yml",
+    "scripts/**/*.ps1",
+    "docs/**/*.md",
     "README.md",
     "README.zh-CN.md",
     "LICENSE"

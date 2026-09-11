@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-10-tool-call-pairing-in-imported-history.md
-2026-09-10-tool-call-pairing-in-imported-history.md: 898659c6dacec046b39dfe9d1f78d6efce54e3e3
-2026-09-10-tool-call-pairing-in-imported-history.zh.md: 8844779fa938a96e498cecff118ca6bb75b1d39f
+2026-09-10-tool-call-pairing-in-imported-history.md: 9adfe51a1891654d9707fc36a40d5cc7ad493e66
+2026-09-10-tool-call-pairing-in-imported-history.zh.md: 996d1c101a9a6e8533a5fd877beefbfb2122eff6

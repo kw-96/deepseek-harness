@@ -2,7 +2,7 @@
 
 Status: implemented
 
-中文 | [English](2026-09-07-workspace-explicit-membership.md)
+[English](2026-09-07-workspace-explicit-membership.md) | 中文
 
 ## 问题
 

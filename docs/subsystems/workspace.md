@@ -25,9 +25,10 @@ Consumers see only the `Workspace` interface; the implementation stays package-p
 ```ts type-equiv
 /**
  * One workspace: a stable id over an existing directory, a display title, and
- * an ordered candidate account of sessions. Membership requires both an id in
- * that account and a session header whose canonical cwd equals the workspace
- * path. Consumers only see this interface; the implementation stays private.
+ * an ordered account of sessions. The directory is the default location for
+ * new sessions and the Explorer target; membership is an explicit, durable
+ * account and does not require a session's cwd to equal {@link path}.
+ * Consumers only see this interface; the implementation stays private.
  */
 interface Workspace {
   /** Stable record id (generated uuid). */
@@ -50,12 +51,10 @@ interface Workspace {
   readonly updatedAt: string
 
   /**
-   * Header-validated sessions in manually owned order: a new session is
+   * Explicitly accounted sessions in manually owned order: a new session is
    * prepended at attach, explicit reordering goes through
-   * `insertSessionBefore`, and activity never reorders. The durable candidate
-   * account is filtered synchronously: missing headers, invalid cwd values,
-   * and canonical cwd mismatches are never returned. A subsequent workspace
-   * mutation prunes those filtered candidates durably.
+   * `insertSessionBefore`, and activity never reorders. The account is not
+   * filtered by cwd; a session may be moved across workspaces freely.
    */
   readonly sessionIds: readonly SessionId[]
 
@@ -67,13 +66,9 @@ interface Workspace {
   setTitle(title: string): Promise<void>
 
   /**
-   * Prepend a session to this workspace's candidate account. An already
-   * accounted id resolves without writing, aside from the durable
-   * filtered-candidate prune every accepted mutation performs. A new id's
-   * live or persisted
-   * header cwd must resolve to an existing directory equal to {@link path};
-   * unknown ids, missing or invalid cwd values, and mismatches reject without
-   * writing.
+   * Prepend a session to this workspace's account. An already accounted id
+   * resolves without writing. A new id must exist in the session store or
+   * persistence; unknown ids reject without writing.
    * @param sessionId - The session to record.
    * @returns resolution after durability.
    */
@@ -84,9 +79,7 @@ interface Workspace {
    * with an anchor the session lands before it, without one it appends to the
    * end. Only the moved id changes position. A session or anchor absent from
    * the account rejects without writing; a move to the current position
-   * resolves without writing, aside from the durable filtered-candidate
-   * prune every accepted mutation performs; decided on the domain write
-   * chain.
+   * resolves without writing; decided on the domain write chain.
    * @param sessionId - The accounted session to move.
    * @param beforeSessionId - Accounted anchor to insert before; omitted appends.
    * @returns resolution after durability.
@@ -95,9 +88,8 @@ interface Workspace {
 
   /**
    * Remove a session from this workspace's account. Idempotent: an id not on
-   * the account resolves without writing, aside from the durable
-   * filtered-candidate prune every accepted mutation performs; decided on
-   * the domain write chain like attach. Never touches the session's own stored log.
+   * the account resolves without writing; decided on the domain write chain
+   * like attach. Never touches the session's own stored log.
    * @param sessionId - The session to remove.
    * @returns resolution after durability.
    */
@@ -247,6 +239,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('archiveSession') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
+ * Return one archived Session to Workspace grouping surfaces.
+ * @param request - Session identity to restore.
+ * @returns the complete resulting archive set.
+ */
+@Remote('unarchiveSession') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>
+
+/**
  * Stream a complete Workspace baseline followed by ordered increments.
  * @param signal - generation cancellation.
  * @returns baseline followed by ordered Workspace increments.
@@ -371,6 +370,25 @@ get(id: WorkspaceId): Workspace | undefined
 list(): Workspace[]
 
 /**
+ * Delete one workspace registration while retaining its directory and every
+ * session log. The durable order is updated before the table deletion; a
+ * failed table write restores the prior order and keeps the entity
+ * published. Unknown ids are an idempotent no-op for domain callers.
+ * @param id - Workspace registration to remove.
+ * @returns `true` when a record was deleted, `false` when it was unknown.
+ */
+delete(id: WorkspaceId): Promise<boolean>
+
+/**
+ * Move one workspace within the durable display order, DOM-insertBefore-like.
+ * With an anchor it lands before that workspace; without one it appends.
+ * @param id - Workspace to move.
+ * @param beforeId - Workspace anchor; omitted appends.
+ * @returns the complete committed workspace order.
+ */
+insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly WorkspaceId[]>
+
+/**
  * Create a project grouping over ordered directory roots.
  * @param name - Display tier name.
  * @param roots - Ordered directory roots whose prefix matches workspaces.
@@ -418,25 +436,6 @@ deleteProject(id: ProjectId): Promise<boolean>
 insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>
 
 /**
- * Delete one workspace registration while retaining its directory and every
- * session log. The durable order is updated before the table deletion; a
- * failed table write restores the prior order and keeps the entity
- * published. Unknown ids are an idempotent no-op for domain callers.
- * @param id - Workspace registration to remove.
- * @returns `true` when a record was deleted, `false` when it was unknown.
- */
-delete(id: WorkspaceId): Promise<boolean>
-
-/**
- * Move one workspace within the durable display order, DOM-insertBefore-like.
- * With an anchor it lands before that workspace; without one it appends.
- * @param id - Workspace to move.
- * @param beforeId - Workspace anchor; omitted appends.
- * @returns the complete committed workspace order.
- */
-insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly WorkspaceId[]>
-
-/**
  * Archive one session durably. The session must exist (live or in session
  * persistence); its workspace accounting — or lack of one — is irrelevant.
  * An already archived id resolves without writing.
@@ -444,6 +443,16 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
  * @returns resolution after durability.
  */
 archiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Restore one archived session to every grouping surface. Workspace
+ * accounting was never touched by archiving, so the session returns to its
+ * original position; a session that is not archived resolves without writing
+ * and needs no existence check.
+ * @param sessionId - The session to restore.
+ * @returns resolution after durability.
+ */
+unarchiveSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a

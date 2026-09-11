@@ -19,7 +19,8 @@ const MAX_OUTPUT_TOKENS = 512
 
 /** 本插件读取的 Agent / Session / LLM 结构面。 */
 interface SessionFace {
-  readonly id: unknown
+  /** 会话标识：直接沿用 GenerateOptions 要求的品牌类型，避免跨包品牌转换。 */
+  readonly id: NonNullable<GenerateOptions['sessionId']>
   requestHeader(): { readonly config?: { readonly provider?: string; readonly model?: string } } | undefined
 }
 interface AgentsFace { get(id: SessionId): { readonly session: SessionFace } | undefined }
@@ -102,7 +103,7 @@ export async function generateCommitMessage(
     messages,
     system: SYSTEM_PROMPT,
     maxTokens: MAX_OUTPUT_TOKENS,
-    sessionId: session.id as SessionId,
+    sessionId: session.id,
   }
   const llm = ctx.get('llm') as LlmFace | undefined
   if (llm === undefined) throw new Error('宿主未挂载 llm 服务')

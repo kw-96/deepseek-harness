@@ -1,12 +1,12 @@
 /**
  * 会话「更多」嵌套菜单：重命名/置顶/未读/归档，以及项目/复制/分叉/打开方式子菜单。
- * 项目归属经 Host attach/detach；跨目录项禁用并附原因。
+ * 项目归属经 Host attach/detach；归并目标只列**项目**，由浏览器解析到项目下的工作区。
  */
 
 import {
   Archive, Copy, ExternalLink, Folder, GitFork, Link2, Pencil, Pin, Terminal,
 } from 'lucide-react'
-import type { TFn, WorkspaceViewLike } from '../faces.js'
+import type { ProjectView, TFn } from '../faces.js'
 import { MenuItem, MenuSep, Submenu } from './menu-flyout.js'
 import css from '../styles.module.css'
 
@@ -16,7 +16,7 @@ export interface SessionMenuActions {
   togglePin(): void
   toggleUnread(): void
   archive(): void
-  moveToWorkspace(workspaceId: string): void
+  moveToProject(projectId: string): void
   moveToUngrouped(): void
   canMoveToUngrouped: boolean
   copyCwd(): void
@@ -34,16 +34,16 @@ export interface SessionMenuActions {
 
 export interface SessionMenuProps {
   actions: SessionMenuActions
-  workspaces: readonly WorkspaceViewLike[]
-  currentWorkspaceId?: string | undefined
+  projects: readonly ProjectView[]
+  currentProjectId?: string | undefined
   t: TFn
 }
 
 /** 渲染会话嵌套菜单内容（不含定位外壳）。 */
 export function SessionMenuBody(props: SessionMenuProps): React.ReactNode {
-  const { actions, workspaces, currentWorkspaceId, t } = props
-  // 所有其他项目都可作为迁移目标；项目归属不再受会话 cwd 约束。
-  const targets = workspaces.filter(ws => ws.workspaceId !== currentWorkspaceId)
+  const { actions, projects, currentProjectId, t } = props
+  // 归并目标＝除当前所属项目之外的所有项目；项目下没有工作区时由浏览器以会话目录补建。
+  const targets = projects.filter(project => project.projectId !== currentProjectId)
   const empty = targets.length === 0 && !actions.canMoveToUngrouped
 
   return (
@@ -67,11 +67,11 @@ export function SessionMenuBody(props: SessionMenuProps): React.ReactNode {
         {actions.canMoveToUngrouped && (
           <MenuItem label={t('menuMoveToUngrouped')} onClick={actions.moveToUngrouped} />
         )}
-        {targets.map(ws => (
+        {targets.map(project => (
           <MenuItem
-            key={ws.workspaceId}
-            label={ws.title}
-            onClick={() => { actions.moveToWorkspace(ws.workspaceId) }}
+            key={project.projectId}
+            label={project.name}
+            onClick={() => { actions.moveToProject(project.projectId) }}
           />
         ))}
       </Submenu>

@@ -21,6 +21,7 @@ import { PanelToggle, type PanelToggleInjected } from './PanelToggle.js'
 import { BottomTerminalPanel } from './bottom/BottomTerminalPanel.js'
 import type { TerminalApi } from './bottom/terminal-api.js'
 import { AddWorkspaceAction, type AddWorkspaceInjected } from './workspace-picker.js'
+import { ProjectPicker, type ProjectPickerInjected } from './hero/ProjectPicker.js'
 import { en, zh } from './locales.js'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
@@ -205,10 +206,15 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     },
     renameWorkspace: async (workspaceId, title) => { await workspaces.rename(workspaceId, title) },
     deleteWorkspace: async (workspaceId) => { await workspaces.delete(workspaceId) },
+    createWorkspace: async (input) => {
+      const workspace = await workspaces.create(input)
+      return { workspaceId: workspace.workspaceId, path: workspace.path }
+    },
     insertWorkspaceBefore: async (workspaceId, beforeWorkspaceId) => {
       await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
     archiveSession: async (sessionId) => { await workspaces.archiveSession(sessionId) },
+    unarchiveSession: async (sessionId) => { await workspaces.unarchiveSession(sessionId) },
     insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
       await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
@@ -238,6 +244,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     },
     exportSessionMarkdown: (sessionId) => exportSessionMarkdown(connection, sessionId),
     canExportMarkdown: (connection as ConnectionProbeLike).api?.sessions?.history !== undefined,
+    fsList: async path => unwrap(await codexRemote.fsList(path)),
     meta,
     prefs,
   })
@@ -245,6 +252,20 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const addWorkspaceInject = (): AddWorkspaceInjected => ({
     fsList: async path => unwrap(await codexRemote.fsList(path)),
     createWorkspace: input => workspaces.create(input),
+  })
+
+  /** 新建会话页的项目选择器：项目注册表 + 工作区创建/复用 + 目录列举。 */
+  const heroInject = (): ProjectPickerInjected => ({
+    listProjects: async () => unwrap(await codexRemote.projectList()),
+    prefs,
+    createWorkspace: async (input) => {
+      const workspace = await workspaces.create(input)
+      return { workspaceId: workspace.workspaceId, path: workspace.path }
+    },
+    createProject: async (name, roots) => unwrap(await codexRemote.projectCreate({
+      name, ...(roots === undefined ? {} : { roots }),
+    })),
+    fsList: async path => unwrap(await codexRemote.fsList(path)),
   })
 
   /** 底部终端面板消费的 remote 面。 */
@@ -285,6 +306,12 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     locale: 'codex-shell',
     inject: addWorkspaceInject,
   }, AddWorkspaceAction))
+  // 新建会话页的项目选择器：遮蔽宿主自带的工作区选择器（priority -1），
+  // 列表选「项目」；多工作区项目再展开工作树让用户选一个。
+  const disposeHeroPicker = slots.inject('conversation.hero.workspace', () => slots.register({
+    name: 'conversation.hero.workspace', priority: -1, locale: 'codex-shell',
+    inject: heroInject,
+  }, ProjectPicker))
   // 底栏多 tab 终端占用宿主 bottom 行。
   const disposeBottom = slots.inject('bottom', () => slots.register({
     name: 'bottom', priority: -1, locale: 'codex-shell',
@@ -301,6 +328,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   return async () => {
     disposeToggle()
     disposeBottom()
+    disposeHeroPicker()
     disposeAddWorkspace()
     disposeBrandMark()
     disposeBrandName()

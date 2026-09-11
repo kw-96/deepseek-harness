@@ -412,6 +412,26 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * Restore one archived session to every grouping surface. Workspace
+   * accounting was never touched by archiving, so the session returns to its
+   * original position; a session that is not archived resolves without writing
+   * and needs no existence check.
+   * @param sessionId - The session to restore.
+   * @returns resolution after durability.
+   */
+  unarchiveSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      if (!state.archivedSessionIds.includes(sessionId)) return
+      await this.setState({
+        ...state,
+        archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+        projectIds: state.projectIds,
+      })
+    })
+  }
+
+  /**
    * Whether a session is live, header-indexed, or present in a fresh
    * persistence listing. Only a definite miss returns false — a failing
    * `sessionPersistence.list()` propagates so storage faults never

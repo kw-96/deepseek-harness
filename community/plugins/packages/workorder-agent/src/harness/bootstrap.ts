@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { PRODUCT_NAME } from '../brand.js'
 import type { PluginConfig } from './pluginConfig.js'
 
 /** 写入工单设置并等待运行时重载。 */
@@ -13,7 +14,7 @@ function escape(value: string): string {
     .replaceAll('"', '&quot;')
 }
 
-/** 生成工单插件首次配置页。 */
+/** 生成 Ticket Hub 首次配置页。 */
 function bootstrapPage(config: PluginConfig): string {
   const field = (label: string, id: string, value: string, type = 'text', required = false): string => `
     <label class="field">
@@ -26,7 +27,7 @@ function bootstrapPage(config: PluginConfig): string {
     <label class="check"><input id="${id}" type="checkbox" ${checked ? 'checked' : ''}><span>${label}</span></label>`
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>工单插件配置</title>
+<title>${PRODUCT_NAME} 配置</title>
 <style>
 :root{color-scheme:light dark}
 body{margin:0;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;background:#f6f8fb;color:#1f2329}
@@ -46,8 +47,8 @@ button:disabled{opacity:.5;cursor:default}
 #msg.error{color:#c0392b}
 @media (prefers-color-scheme:dark){body{background:#17191d;color:#e8eaed}form,input{background:#202329;border-color:#3a4048;color:#e8eaed}}
 </style></head><body><div class="wrap">
-<h1>工单巡检插件</h1>
-<p class="sub">首次使用请填写连接与鉴权配置，保存后会自动加载工单控制面。</p>
+<h1>${PRODUCT_NAME}</h1>
+<p class="sub">首次使用请填写连接与鉴权配置，保存后会自动加载控制面。</p>
 <form id="form">
   ${field('Webhook 令牌', 'webhookToken', '', 'password', true)}
   ${field('易协作 GCP 用户 Key', 'gcpUserKey', '', 'password', true)}

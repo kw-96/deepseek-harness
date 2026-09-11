@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | [中文](2026-09-07-workspace-attach-detach-remote.zh.md)
+[English](2026-09-07-workspace-attach-detach-remote.md) | 中文
 
 ## 问题
 

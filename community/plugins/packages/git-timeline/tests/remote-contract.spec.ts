@@ -11,7 +11,8 @@ const descriptors = TYPERT_REMOTE.descriptors
 describe('gitPanel descriptors', () => {
   it('exposes exactly the panel operations', () => {
     expect(descriptors.map(descriptor => descriptor.method)).toEqual([
-      'status', 'log', 'stage', 'unstage', 'stageAll', 'unstageAll',
+      'status', 'log', 'diff', 'show', 'showFile', 'branches', 'checkout', 'createBranch',
+      'lastMessage', 'discard', 'stage', 'unstage', 'stageAll', 'unstageAll',
       'commit', 'push', 'pull', 'fetch', 'identity', 'message',
     ])
   })

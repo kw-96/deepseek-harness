@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { GitCommit } from '../src/types.js'
-import { computeGraph } from '../src/client/graph-lanes.js'
+import { computeGraph } from '../src/client/lib/graph-lanes.js'
 
 function commit(hash: string, parents: readonly string[]): GitCommit {
   return { hash, shortHash: hash.slice(0, 4), parents, subject: hash, author: 'dev', date: '2026-09-11 10:00:00 +0800', refs: '' }

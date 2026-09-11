@@ -51,6 +51,24 @@ interface TerminalBackendSession {
   signal(signal: TerminalSignal): Promise<TerminalSignalResult>
   /** Observe top-level process status. */
   status(): TerminalSessionStatus
+  /**
+   * Write raw text to the PTY without Enter or send exclusivity.
+   * Must fail loud while a {@link startSend} is active.
+   * @param data - UTF-8 text delivered without implicit newline conversion.
+   */
+  write(data: string): Promise<void>
+  /**
+   * Resize the live PTY window.
+   * @param cols - positive column count.
+   * @param rows - positive row count.
+   */
+  resize(cols: number, rows: number): Promise<void>
+  /**
+   * Subscribe to decoded PTY output with CSI preserved for UI rendering.
+   * @param signal - cancels the subscription.
+   * @returns frames in delivery order, including a bounded recent raw buffer first.
+   */
+  followOutput(signal: AbortSignal): AsyncIterable<TerminalFollowFrame>
   /** Idempotently close the captured owned process tree and await quiescence. */
   close(reason: string): Promise<void>
 }

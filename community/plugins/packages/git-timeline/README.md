@@ -1,12 +1,12 @@
 # dsh-git-timeline
 
-DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 面板**：变更提交、提交图（Graph）、远程同步，以及用当前会话模型一键生成提交信息。
+English | [中文](README.zh.md)
 
-A full Git panel tab for the DSH right sidebar: changes and commits, a commit graph, remote sync, and commit-message drafting through the session's own model.
+The official full Git panel tab in the DeepSeek Harness (DSH) right sidebar (`ui-sidebar-right`): changes and commits, a commit graph, remote sync, and commit-message drafting through the session's own model.
 
-> 包名沿用历史命名 `dsh-git-timeline`；面板本身已从「时间线」扩展为完整 Git 面板（标签名 **Git**，tab kind `git`）。
+> The package keeps its historical name `dsh-git-timeline`; the panel itself has grown from a timeline into a full Git panel (tab label **Git**, tab kind `git`).
 
-## 布局
+## Layout
 
 ```
 ┌ Changes（固定占面板一半高度，内部滚动） ─────────────┐
@@ -25,28 +25,32 @@ A full Git panel tab for the DSH right sidebar: changes and commits, a commit gr
 └──────────────────────────────────────────────────┘
 ```
 
-## 功能
+## Features
 
-- **Changes 区**（高度固定为面板一半，容器内滚动）
-  - 提交信息输入框，右上角图标按钮调用**当前会话正在使用的模型**（取自会话日志最后一条 `request/header` 的 provider/model）生成描述并填入；`Ctrl+Enter` 直接提交
-  - 提交按钮 + 右侧下拉：`提交` / `提交(修改)`（`--amend`）/ `提交和推送` / `提交和同步`（提交 → 拉取 → 推送），选择即切换按钮绑定
-  - 变更文件列表：`已暂存` 与 `更改` 两组，每行显示状态字母（M/A/D/U）、文件名、目录路径；行悬停出现 `+`（暂存）/ `−`（取消暂存），组头可一键全部暂存/取消暂存
-- **Graph 区**（内部滚动）
-  - 泳道图：由父指针推导泳道与贯穿列，合并提交画空心节点
-  - 每行：提交标题 + 短哈希/作者/相对时间 + 分支与标签徽标（当前分支高亮）
-  - 工具栏：跳转到当前历史记录项（滚动到最新并高亮）、从所有远程存储库中抓取、拉取、推送、刷新
-- **底部栏**（固定）：当前分支（含 ahead/behind）、刷新、当前工作区名称、Git 账号（`user.name · user.email`）
-- 顶部**没有**路径栏与搜索框（按要求精简）
-- 只读读取与显式写操作分开：写操作只有暂存/取消暂存/提交/推送/拉取/抓取，没有丢弃改动（危险操作留待后续）
+- **Changes area** (fixed at half the panel height, scrolls inside its container)
+  - Commit-message input; the icon button in its top-right corner calls the **model the current session is using** (the provider/model of the last `request/header` in the session log) to generate a description and fill it in; `Ctrl+Enter` commits directly
+  - Commit button plus a drop-down to its right: `Commit` / `Commit (Amend)` (`--amend`) / `Commit and Push` / `Commit and Sync` (commit, then pull, then push); choosing one rebinds the button; switching to `Commit (Amend)` with an empty input prefills the previous commit message
+  - Changed-file list in two groups, `Staged` and `Changes`; each row shows the status letter (M/A/D/U, `!` for conflicts), the file name, and the directory path; the group header stages or unstages everything in one click
+  - Inline actions: hovering reveals `+` (stage) and `−` (unstage) plus `⟲` (discard changes, with a confirmation step; untracked files get no such entry point)
+  - **Inline diff**: clicking a file row expands that file's worktree-side or index-side diff in place, colored by added, removed, and context lines; click the row again or use the close control in the top-right corner to collapse it
+- **Graph area** (scrolls internally)
+  - Lane graph: lanes and pass-through columns are derived from parent pointers; merge commits are drawn as hollow nodes
+  - Each row: commit title, short hash, author, relative time, and branch and tag badges (the current branch is highlighted)
+  - Toolbar: jump to the current history entry (scroll to the newest commit and highlight it), fetch from all remotes, pull, push, and refresh
+  - **Commit details**: clicking a commit row expands that commit's hash, author and time, parent count for merges, and changed-file list (A/M/D/R) in place; clicking a file row then expands **that file's diff within the commit**, also in place
+- **Bottom bar** (fixed): the **branch switcher** (click to expand the local branch list, with the current branch checked; clicking a branch runs `git checkout`; the input at the bottom creates and switches to a new branch after its name passes `git check-ref-format`), the current branch (with ahead/behind), refresh, the current workspace name, and the Git account (`user.name` / `user.email`)
+- **Automatic refresh**: subscribes to the official `remote.workspaceFiles.changes` session file-change stream and, 400 milliseconds after a write (debounced), re-reads the workspace status without re-fetching the commit history; diffs that are expanded refresh in step
+- The top has **no** path bar or search box (trimmed as required)
+- Read-only reads are kept separate from explicit write operations: the only write operations are stage, unstage, discard, commit, push, pull, fetch, switch branch, and create branch
 
-## 安装 / Install
+## Install
 
 ```sh
 dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-git-timeline-0.1.0.tgz
 dsh plugin --profile web remove dsh-git-timeline
 ```
 
-或手动在 profile 的 `cordis.patch.yml` 里 insert：
+Or insert it manually into the profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
@@ -54,43 +58,51 @@ dsh plugin --profile web remove dsh-git-timeline
       name: dsh-git-timeline
 ```
 
-## 开发 / Develop（源码 link + 热替换）
+## Develop (source link + hot swap)
 
 ```sh
 node community/plugins/dev.mjs git-timeline     # junction 挂载 + Cordis HMR + watch 构建
 cd community/plugins/packages/git-timeline
 pnpm run build     # tsc + tsdown（host/client 双面）
-pnpm test          # vitest（22 项）
+pnpm test          # vitest（36 项）
 ```
 
-注意：**改动 `src/remote.ts`（Remote 方法面）后必须重启 `dsh web`** —— typert-loader 按包名缓存插件 manifest 且永不过期，HMR 不会重新导入它；只改界面/文案时热替换即可。
+Note: **after changing `src/remote.ts` (the Remote method surface) you must restart `dsh web`**; typert-loader caches plugin manifests by package name and never expires them, so HMR does not re-import it. When you only change the interface or copy, hot swap is enough.
 
-## 宿主 Remote / Host Remote
+## Host Remote
 
-`ctx.remote.gitPanel`（Typert，命名空间 `gitPanel`）：
+`ctx.remote.gitPanel` (Typert, namespace `gitPanel`):
 
-| 方法 | 说明 |
+| Method | Description |
 |---|---|
-| `status(cwd)` | 分支/上下游/ahead-behind + `staged[]` + `changes[]`（porcelain-v2 投影） |
-| `log(cwd, limit?)` | 提交历史（含父提交，供泳道图使用），最多 400 条 |
-| `stage(cwd, paths)` / `unstage(cwd, paths)` | 按路径暂存 / 取消暂存 |
-| `stageAll(cwd)` / `unstageAll(cwd)` | 全部暂存 / 取消暂存 |
-| `commit(cwd, message, amend)` | 提交（`amend` 为真时 `--amend`），返回新短哈希 |
-| `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | 推送 / 拉取（`--no-edit`）/ 抓取全部远程并清理 |
+| `status(cwd)` | Branch, upstream, and ahead/behind plus `staged[]` and `changes[]` (a porcelain-v2 projection) |
+| `log(cwd, limit?)` | Commit history (including parents, for the lane graph), at most 400 entries |
+| `diff(cwd, path, staged)` | Single-file diff (index side or worktree side), capped at 256 KB |
+| `show(cwd, hash)` | One commit's metadata plus its changed-file list (`diff-tree --name-status -z`) |
+| `showFile(cwd, hash, path)` | The diff of one file within one commit (`git show --patch`) |
+| `branches(cwd)` | Local branch names, most recent commit first |
+| `checkout(cwd, branch)` / `createBranch(cwd, name)` | Switch branch / create and switch to a branch (the name is validated with `check-ref-format` first) |
+| `lastMessage(cwd)` | The previous commit message (prefills `Commit (Amend)`) |
+| `discard(cwd, paths)` | Discard worktree changes for tracked paths (`git restore --worktree`) |
+| `stage(cwd, paths)` / `unstage(cwd, paths)` | Stage / unstage by path |
+| `stageAll(cwd)` / `unstageAll(cwd)` | Stage / unstage everything |
+| `commit(cwd, message, amend)` | Commit (`--amend` when `amend` is true); returns the new short hash |
+| `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | Push / pull (`--no-edit`) / fetch all remotes and prune |
 | `identity(cwd)` | `user.name` / `user.email` |
-| `message(sessionId, cwd)` | 用该会话的模型路由生成提交信息 |
+| `message(sessionId, cwd)` | Generate a commit message with that session's model route |
 
-所有命令经 `ctx.shell` 执行 git（普通 30 秒、网络类 120 秒超时）；可省参数在描述符里显式声明 `acceptsUndefined`。
+Every command runs git through `ctx.shell` (a 30-second timeout normally, 120 seconds for network operations); optional parameters are declared explicitly with `acceptsUndefined` in the descriptor.
 
-## 提交信息生成的工作方式
+## How commit-message generation works
 
-1. 取会话最后一条 `request/header` 的 `config.provider/model`（即「当前会话使用的模型」）；没有记录时给出明确提示。
-2. 组装输入：分支、改动文件清单、以及暂存侧（没有暂存则未暂存）的 diff（上限 24 KB，超出标注截断）。
-3. 经 `ctx.llm.stream()` 发一次**一次性辅助请求**（`system` 要求简体中文、主题 ≤72 字符、必要时补要点），用 `BlockAssembler` 拼出文本回填输入框。
+1. Read `config.provider/model` from the session's last `request/header` (that is, the model the current session is using); when there is no such record, show an explicit notice.
+2. Assemble the input: the branch, the changed-file list, and the staged-side diff (the unstaged side when nothing is staged), capped at 24 KB and marked as truncated beyond that.
+3. Send one **one-shot auxiliary request** through `ctx.llm.stream()` (the `system` prompt asks for Simplified Chinese, a subject of at most 72 characters, and bullet points when needed), then assemble the text with `BlockAssembler` and fill it back into the input box.
 
 ## Known Limitations and Deferred Work
 
-- 提交信息生成是插件侧的一次性辅助调用，**不写回会话转写**（与 UI 自身的摘要同级，不是 agent loop 的请求）。
-- 没有逐文件差异视图与「丢弃改动」；点文件只在列表内暂存/取消暂存。
-- 一次拉取历史上限 400 条；Graph 泳道绘制上限 5 列，超出归并展示。
-- 多仓库工作区只服务当前会话工作区所属仓库。
+- Commit-message generation is a one-shot auxiliary call made by the plugin, and it is **not written back to the session transcript** (it ranks alongside the UI's own summaries and is not an agent-loop request).
+- Discarding changes covers tracked paths only; untracked files get no delete entry point, so files that are not yet under version control cannot be removed by mistake.
+- Commit details list the changed files only and do not embed that commit's diff (matching the worktree diff view is deferred work).
+- A single history fetch returns at most 400 entries; the Graph draws at most 5 lanes and merges anything beyond that into one.
+- In a multi-repository workspace, only the repository that owns the current session workspace is served.

@@ -4,12 +4,15 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { ImageRefLike } from '../host/attachment.js'
 import { captureScreenshot, observationRender, observationSchema, observationValue } from './observation.js'
 import type { BrowserToolDeps } from './shared.js'
 import {
-  durationArg, navigationTimeout, recordNavigation, registerTool, requireSessionId, runFor, takeSnapshot, textBlock, valueSchema,
-} from './shared.js'
+  durationArg, navigationTimeout, recordNavigation, registerTool, runFor, takeSnapshot,
+} from './actions.js'
+import { requireSessionId, textBlock, valueSchema } from './shared.js'
 
 /** 观测模式。 */
 const OBSERVE_MODES = ['snapshot', 'html', 'screenshot'] as const
@@ -31,6 +34,19 @@ const observeSchema = valueSchema({
     screenshotPath: { type: 'string', required: true },
     screenshotBytes: { type: 'integer', required: true },
     screenshotSize: { type: 'string', required: true },
+    // 只有在宿主挂了附件库且当前模型路由接受图像输入时才出现；
+    // 出现时 render 会额外追加一个 image 内容块，模型可直接看图。
+    image: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        attachmentId: { type: 'string', required: true },
+        mediaType: { type: 'string', required: true, enum: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] },
+        bytes: { type: 'integer', required: true },
+        width: { type: 'integer', required: true },
+        height: { type: 'integer', required: true },
+      },
+    },
   },
 })
 
@@ -98,14 +114,37 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
     output: {
       schema: observeSchema,
       render: (_args, value) => {
-        const seen = value as { mode: string; note: string; content: string; screenshotPath: string; screenshotSize: string }
+        const seen = value as {
+          mode: string, note: string, content: string, screenshotPath: string, screenshotSize: string
+          image?: ImageRefLike | undefined
+        }
         if (seen.mode === 'screenshot') {
-          return textBlock([
-            `screenshot: ${seen.screenshotPath}`,
-            seen.screenshotSize === '' ? '' : `size: ${seen.screenshotSize}`,
-            ...(seen.note === '' ? [] : [`note: ${seen.note}`]),
-            '请用图片读取工具查看该 PNG（当前模型本身不解析图像）。',
-          ].filter(line => line !== '').join('\n'))
+          const headline = seen.image === undefined
+            ? [
+              `screenshot: ${seen.screenshotPath}`,
+              seen.screenshotSize === '' ? '' : `size: ${seen.screenshotSize}`,
+              ...(seen.note === '' ? [] : [`note: ${seen.note}`]),
+              '当前部署无法内联图像，请用读图工具查看该 PNG。',
+            ].filter(line => line !== '').join('\n')
+            : [
+              `screenshot: ${seen.screenshotSize === '' ? seen.screenshotPath : seen.screenshotSize}`,
+              ...(seen.note === '' ? [] : [`note: ${seen.note}`]),
+            ].join('\n')
+          const blocks: ContentBlock[] = textBlock(headline)
+          if (seen.image !== undefined) {
+            blocks.push({
+              type: 'image',
+              // 结构上就是宿主的 ImageAttachmentRef；不引入运行时依赖故此处断言。
+              attachment: {
+                attachmentId: seen.image.attachmentId,
+                mediaType: seen.image.mediaType,
+                bytes: seen.image.bytes,
+                width: seen.image.width,
+                height: seen.image.height,
+              } as never,
+            })
+          }
+          return blocks
         }
         return textBlock(`${seen.note === '' ? '' : `note: ${seen.note}\n`}${seen.content}`)
       },
@@ -114,9 +153,18 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
       const sessionId = requireSessionId(exec)
       const mode = args.mode ?? 'snapshot'
       const captured = await takeSnapshot(deps, sessionId, exec.signal)
-      const base = observationValue(captured.record, captured.snapshot)
+      const seen = observationValue(captured.record, captured.snapshot)
+      // 只回传 observeSchema 声明的字段：多一个键就会被注册表的
+      // additionalProperties:false 拒掉（曾经把 observationValue 整份展开而踩过）。
+      const common = {
+        url: seen.url,
+        title: seen.title,
+        bskSessionId: seen.bskSessionId,
+        refs: seen.refs,
+        truncated: seen.truncated,
+      }
       if (mode === 'snapshot') {
-        return { ...base, mode, content: base.snapshot, screenshotPath: '', screenshotBytes: 0, screenshotSize: '' }
+        return { ...common, mode, note: '', content: seen.snapshot, screenshotPath: '', screenshotBytes: 0, screenshotSize: '' }
       }
       if (mode === 'html') {
         const htmlArgs = ['get-html', '--json', ...(args.ref !== undefined ? ['--ref', args.ref] : []),
@@ -124,7 +172,7 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
         const html = await runFor(deps, sessionId, htmlArgs, { signal: exec.signal })
         const content = typeof html.json?.['html'] === 'string' ? html.json['html'] : html.stdout
         return {
-          ...base, mode, content,
+          ...common, mode, content,
           screenshotPath: '', screenshotBytes: 0, screenshotSize: '',
           note: args.ref !== undefined ? `已按 ${args.ref} 收窄 HTML` : '',
         }
@@ -132,11 +180,21 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
       const shot = await captureScreenshot(deps, sessionId, args.ref, exec.signal)
       deps.store.update(sessionId, { lastScreenshotPath: shot.path })
       return {
-        ...base, mode, content: '',
+        ...common, mode, content: '',
         screenshotPath: shot.path,
         screenshotBytes: shot.bytes,
         screenshotSize: shot.width === 0 ? '' : `${String(shot.width)}x${String(shot.height)}`,
         note: shot.note,
+        // 只在真有附件时带上该键：schema 用 additionalProperties:false，多余键会被拒。
+        ...(shot.image !== undefined ? {
+          image: {
+            attachmentId: shot.image.attachmentId,
+            mediaType: shot.image.mediaType,
+            bytes: shot.image.bytes,
+            width: shot.image.width,
+            height: shot.image.height,
+          },
+        } : {}),
       }
     },
     presentCall: args => ({

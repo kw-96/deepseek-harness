@@ -1,5 +1,7 @@
 # community — vendored deploy assets
 
+English | [中文](README.zh.md)
+
 This directory makes the DeepSeek Harness checkout self-contained for
 deployment: community plugins, the skills the agent uses, and the web profile
 manifest all live here, outside the harness `packages/` pnpm workspace (the

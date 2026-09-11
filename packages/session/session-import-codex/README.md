@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-import-codex` imports current Codex threads and archived rollout sessions from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each source into a standard DSH event log, stores it durably, publishes it live, and reconciles its Workspace membership against the source working directory. The current SQLite thread wins when it shares an id with an archived rollout, so one Codex session never produces a duplicate DSH session. Automatic import is off by default; enabling the settings-card toggle runs one reconciliation and then uses the configured interval. The importer reads Codex only and never writes back to it.
+`dsh-session-import-codex` imports current Codex threads and archived rollouts from your local Codex install into DeepSeek Harness sessions when you choose **Import now**. It converts each source into a standard DSH event log, stores it durably, publishes it live, and reconciles its Workspace membership against the source working directory. The current SQLite thread wins when it shares an id with an archived rollout, so one Codex session never produces a duplicate DSH session. Automatic import is off by default; the settings-card toggle runs one reconciliation and then uses the configured interval. The importer reads Codex only.
 
 ## Table of Contents
 

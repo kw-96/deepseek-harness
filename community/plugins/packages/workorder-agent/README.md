@@ -1,10 +1,10 @@
 # workorder-agent
 
-[简体中文](README.zh-CN.md)
+English | [中文](README.zh.md)
 
-This self-developed DeepSeek Harness bundle provides a directly usable 易协作 workorder control plane for NetEase design operations:
+This self-developed DeepSeek Harness bundle provides Ticket Hub, a directly usable Yixiezuo workorder control plane for NetEase design operations:
 
-- Queries project workorders in the 美术完成 state by date and persists field snapshots, submitter names, and update timestamps in SQLite.
+- Queries project workorders in the "Artwork Complete" state by date and persists field snapshots, submitter names, and update timestamps in SQLite.
 - Applies deterministic required-field rules, then uses a configured Harness model and workorder-standard knowledge base for semantic review.
 - Stores every review's rule result, model output, and POPO delivery receipt; missing-field messages address the submitter as `@submitter` in the configured group robot.
 - Provides overview, workorder query, field review, statistics, Webhook, inspection preview, POPO messages, inspection sending, and settings pages.
@@ -15,14 +15,26 @@ The package declares official `dsh.bundle` metadata and is installed from the ta
 
 The frontend-first setup needs no preset environment variables:
 
-1. Open `/workorder-agent` on first startup and enter the Webhook token, 易协作 GCP user key, POPO group robot URL and secret, data directory, project ids, review model, and workorder-standard knowledge base.
+1. Open `/workorder-agent` on first startup and enter the Webhook token, Yixiezuo GCP user key, POPO group robot URL and secret, data directory, project ids, review model, and workorder-standard knowledge base.
 2. Saving writes to the Harness `workorder-agent` settings namespace and reloads the runtime; the control plane Settings page can later update the model, maximum output tokens, knowledge base, and notification switches.
 3. Review provider and model id must be supplied together. Leaving both empty makes the background review Agent inherit Harness's default model selection.
 4. A POPO custom group robot only delivers to its configured group. The reminder text targets the submitter read from the workorder event and falls back to the assignee when the event has no submitter field.
 
-Environment variables are first-boot defaults only: `WEBHOOK_TOKEN`, `GCP_USER_KEY`, `GCP_MCP_URL`, `GCP_HOST`, `POPO_WEBHOOK_URL`, `POPO_WEBHOOK_SECRET`, `DATA_DIR`, project id variables, `REVIEW_ENABLED`, `REVIEW_MODEL_PROVIDER`, `REVIEW_MODEL`, `REVIEW_MAX_TOKENS`, `REVIEW_KNOWLEDGE_BASE`, and `REVIEW_NOTIFICATION_ENABLED`.
+Environment variables are first-boot defaults only: `WEBHOOK_TOKEN`, `WEBHOOK_INGRESS_ENABLED`, `WEBHOOK_INGRESS_HOST`, `WEBHOOK_INGRESS_PORT`, `GCP_USER_KEY`, `GCP_MCP_URL`, `GCP_HOST`, `POPO_WEBHOOK_URL`, `POPO_WEBHOOK_SECRET`, `DATA_DIR`, project id variables, `REVIEW_ENABLED`, `REVIEW_MODEL_PROVIDER`, `REVIEW_MODEL`, `REVIEW_MAX_TOKENS`, `REVIEW_KNOWLEDGE_BASE`, and `REVIEW_NOTIFICATION_ENABLED`.
 
 The control plane's `/api/admin/*` routes are unauthenticated and are served only by the local Harness web server. With `enabled: false`, the Host plugin does not mount the control plane. Missing required tokens show the bootstrap page; completing it loads the control plane without taking down the Web host.
+
+## Yixiezuo event ingress
+
+The control plane shares the Harness web server's bind address, which defaults to `127.0.0.1` (Harness rejects `--host 0.0.0.0`), so a Yixiezuo gateway on the intranet cannot call it directly. Enable the dedicated ingress when real-time events are needed:
+
+1. Turn on `webhookIngressEnabled` and set `webhookIngressHost` (`0.0.0.0` when the machine is reachable from the intranet, `127.0.0.1` for local self-testing) plus `webhookIngressPort`.
+2. The ingress serves only `POST /webhooks/gcp/<webhookToken>` and returns 404 for every other path. Register it in Yixiezuo Webhook as `http://<local-or-server-intranet-ip>:<webhookIngressPort>/webhooks/gcp/<webhookToken>`.
+3. Check the "workorder -> created" and "workorder -> edited" triggers: the plugin handles creation events plus edits that move the status to "Artwork Complete"; every other event is ignored, and both the ignore reason and a payload summary appear in the control plane's Webhook page under the ingress request log.
+4. Events are only queued, never auto-processed; enable "Webhook processing" in the control plane Settings page (and "Automatic sending" as needed) to turn events into rule checks, model review, and POPO reminders.
+5. The last URL segment is the only credential, so use a long random token. On the server deployment, replace the IP and keep the remaining settings unchanged.
+
+Without the ingress, the plugin still pulls Yixiezuo workorders by expected delivery date through scheduled inspection and manual sync, with no real-time delivery.
 
 ## Development
 

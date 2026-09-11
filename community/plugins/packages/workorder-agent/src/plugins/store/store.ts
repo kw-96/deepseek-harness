@@ -8,6 +8,7 @@ import { beginDelivery, claimWebhook, failWebhook } from './runtime/leases.js'
 import { StoreSettings } from './runtime/settings.js'
 import { LATEST_SCHEMA_VERSION } from './schema/migrations.js'
 import { initializeSchema } from './schema/index.js'
+import { VivoRepository } from '../vivo/repository.js'
 import type { AuditEvent, IssueReviewRecord, IssueReviewView, PreviewDetail, PreviewRecord, PreviewView, RunRecord, SettingRecord, StoreHealth, WebhookEventView, WebhookTask } from './types.js'
 
 export type { AuditEvent, IssueReviewRecord, IssueReviewView, PreviewDetail, PreviewRecord, PreviewView, RunRecord, SettingRecord, StoreHealth, WebhookEventView, WebhookTask } from './types.js'
@@ -18,6 +19,7 @@ export class WorkorderStore {
   readonly messages: MessageRepository
   readonly issues: IssueRepository
   readonly reviews: ReviewRepository
+  readonly vivo: VivoRepository
   private readonly settings: StoreSettings
 
   constructor(path: string) {
@@ -30,6 +32,7 @@ export class WorkorderStore {
     this.messages = new MessageRepository(this.db)
     this.issues = new IssueRepository(this.db)
     this.reviews = new ReviewRepository(this.db)
+    this.vivo = new VivoRepository(this.db)
     this.settings = new StoreSettings(this.db)
   }
 

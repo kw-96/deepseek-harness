@@ -1884,6 +1884,42 @@ Depends on: `Readable` (`node:stream`) · `Writable` (`node:stream`)
 
 Source: [`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
 
+<a id="deepseek-aidsh-session-import-codex"></a>
+
+## `@deepseek-ai/dsh-session-import-codex`
+
+Requires: `sessions` · `sessionPersistence` · `workspaceRegistry`
+
+```ts config-catalog
+/** Plugin configuration: Codex source location and import caps. */
+export interface Config {
+  /**
+   * Codex home directory containing the current thread store, optional title
+   * index, and legacy `archived_sessions` rollouts. Omitted to resolve from
+   * `CODEX_HOME`, then `~/.codex`.
+   */
+  codexHome?: string
+  /**
+   * Absolute working directory recorded on imported session headers when a
+   * thread carries no command cwd of its own. Omitted to use the process cwd.
+   */
+  cwd?: string
+  /** Maximum UTF-16 code units of imported tool-result text. */
+  maxToolResultChars?: number
+  /** Maximum UTF-16 code units of an imported session title. */
+  maxTitleChars?: number
+  /**
+   * Periodic re-scan interval in milliseconds while the card's sync toggle is
+   * on. `0` disables the timer; the default repeats every 60 seconds after
+   * the settings toggle becomes enabled, and the manual button is always
+   * available.
+   */
+  syncIntervalMs?: number
+}
+```
+
+Source: [`packages/session/session-import-codex/src/index.ts:54`](../packages/session/session-import-codex/src/index.ts)
+
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
 ## `@deepseek-ai/dsh-session-log-deepseek`
@@ -3456,6 +3492,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-attachment` ([`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-brand-official` ([`packages/client/ui-brand-official/src/index.ts`](../packages/client/ui-brand-official/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-chat` ([`packages/client/ui-chat/src/index.ts`](../packages/client/ui-chat/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-codex-import` ([`packages/client/ui-codex-import/src/index.ts`](../packages/client/ui-codex-import/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-commands` ([`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-conversation` ([`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-cordis` ([`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts))
@@ -3568,6 +3605,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-deque` ([`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts))
 - `@deepseek-ai/dsh-experimental-agent-team-profile` ([`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts))
 - `@deepseek-ai/dsh-experimental-agent-team-web-profile` ([`packages/experimental/agent-team-web-profile/src/index.ts`](../packages/experimental/agent-team-web-profile/src/index.ts))
+- `@deepseek-ai/dsh-experimental-web-desktop` ([`packages/experimental/web-desktop/src/index.ts`](../packages/experimental/web-desktop/src/index.ts))
 - `@deepseek-ai/dsh-experimental-webworker-packer` ([`packages/experimental/webworker-packer/src/index.ts`](../packages/experimental/webworker-packer/src/index.ts))
 - `@deepseek-ai/dsh-experimental-webworker-runtime` ([`packages/experimental/webworker-runtime/src/index.ts`](../packages/experimental/webworker-runtime/src/index.ts))
 - `@deepseek-ai/dsh-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))

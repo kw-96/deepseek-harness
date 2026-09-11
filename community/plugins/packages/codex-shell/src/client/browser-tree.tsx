@@ -3,10 +3,10 @@
  * 状态与动作来自 WorkspaceBrowser。
  */
 
-import { Archive, Folder, FolderOpen, Inbox, MessageSquarePlus, Pin } from 'lucide-react'
+import { Archive, Folder, FolderOpen, Inbox, MessageSquarePlus, MoreHorizontal, Pin } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import type { BrowserPrefsStore, OrganizeMode, SortMode } from './sidebar/prefs.js'
-import { orderProjects, sortSessionIds, type GroupsModel } from './sidebar/groups.js'
+import { orderProjects, projectForPath, sortSessionIds, type GroupsModel } from './sidebar/groups.js'
 import type { ProjectView, SearchResultLike, SessionId, SessionListStateLike, TFn, WorkspaceViewLike } from './faces.js'
 import { SessionRow } from './session-rows.js'
 import { WorkspaceHead } from './workspace-head.js'
@@ -33,8 +33,12 @@ export interface BrowserTreeProps {
   onWorkspaceMenu: (event: React.MouseEvent, workspaceId: string) => void
   onSessionMenu: (event: React.MouseEvent, sessionId: SessionId) => void
   onArchiveSession: (sessionId: SessionId) => void
+  /** 取消归档：把归档桶里的会话恢复到分组面。 */
+  onRestoreSession: (sessionId: SessionId) => void
   onToggleWorkspacePin: (workspaceId: string) => void
   onToggleProjectPin: (projectId: string) => void
+  /** 打开项目「更多」菜单（重命名/管理工作树/归档组内/删除）。 */
+  onProjectMenu: (event: React.MouseEvent, projectId: string) => void
   /** 在项目所属工作区中新建会话。 */
   onNewSession: (workspaceId: string) => void
   onBeginWorkspaceRename: (workspaceId: string, title: string) => void
@@ -52,34 +56,12 @@ export interface BrowserTreeProps {
   t: TFn
 }
 
-/** Normalize a directory path for longest-prefix matching, case-folding on Windows. */
-function projectKey(value: string): string {
-  return value.replace(/\//g, '\\').replace(/\\+$/u, '').toLowerCase()
-}
-
-/** Resolve the project owning one workspace path by longest root prefix. */
-function projectForPath(path: string, projects: readonly ProjectView[]): ProjectView | undefined {
-  const key = projectKey(path)
-  let best: ProjectView | undefined
-  let bestLength = 0
-  for (const project of projects) {
-    for (const root of project.roots) {
-      const rootKey = projectKey(root)
-      if (rootKey === '' || (key !== rootKey && !key.startsWith(rootKey + '\\'))) continue
-      if (rootKey.length < bestLength) continue
-      best = project
-      bestLength = rootKey.length
-    }
-  }
-  return best
-}
-
 /** 渲染树体。 */
 export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
   const {
     groups, list, collapsed, searching, searchItems, searchLoading,
     renaming, renameDraft, organize, sort, prefs, projects, onToggleGroup, onOpen, onWorkspaceMenu,
-    onSessionMenu, onArchiveSession, onToggleWorkspacePin, onToggleProjectPin, onNewSession,
+    onSessionMenu, onArchiveSession, onRestoreSession, onToggleWorkspacePin, onToggleProjectPin, onProjectMenu, onNewSession,
     onBeginWorkspaceRename, setRenameDraft, commitRename, commitWorkspaceRename, onSessionDrop,
     sessionWorkspaceId, meta, t,
   } = props
@@ -104,6 +86,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
       onOpen={() => { onOpen(sessionId) }}
       onMenu={event => { onSessionMenu(event, sessionId) }}
       onArchive={() => { onArchiveSession(sessionId) }}
+      onRestore={archived ? () => { onRestoreSession(sessionId) } : undefined}
       draggable={manual && !archived && wsId !== undefined}
       onDragStart={event => {
         event.dataTransfer.setData('text/session-id', sessionId)
@@ -223,6 +206,15 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
                 <MessageSquarePlus size={12} />
               </button>
             )}
+            <button
+              type="button"
+              className={css.iconButton}
+              title={t('moreActions')}
+              aria-label={t('moreActions')}
+              onClick={event => { onProjectMenu(event, project.projectId) }}
+            >
+              <MoreHorizontal size={12} />
+            </button>
           </span>
         </div>
         {!isCollapsed && sessionRows}
@@ -252,8 +244,17 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     // 置顶优先时置顶先于其余（置顶之间按最近更新），余下按最近更新。
     const sortList = (ids: readonly SessionId[]): SessionId[] =>
       sortSessionIds(ids, list, meta, sort)
-    // 项目组本身按同一套逻辑排列：置顶 → 最近更新 → 其余（注册表顺序兜底）。
-    const ordered = orderProjects(projects, prefs, sort)
+    // 项目组恒按 置顶 → 最近活动 排列：最近活动取项目下会话的最大 updatedAt，
+    // 无会话的项目回退到注册表 updatedAt（在 orderProjects 内兜底）。
+    const recency = (projectId: string): number => {
+      let latest = 0
+      for (const id of byProject.get(projectId) ?? []) {
+        const updatedAt = list.byId[id]?.updatedAt ?? 0
+        if (updatedAt > latest) latest = updatedAt
+      }
+      return latest
+    }
+    const ordered = orderProjects(projects, prefs, recency)
     return (
       <>
         {ordered.map(project => renderProject(

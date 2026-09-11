@@ -3,10 +3,12 @@
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type {
-  GitActionResponse, GitCommitResponse, GitIdentity, GitLogResponse, GitMessageResponse, GitStatusResponse,
+  GitActionResponse, GitBranches, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity, GitLogResponse,
+  GitMessageResponse, GitMessageText, GitStatusResponse,
 } from './types.js'
 import {
-  gitActionValue, gitCommitResultValue, gitIdentityValue, gitLogValue, gitMessageValue, gitStatusValue,
+  gitActionValue, gitBranchesValue, gitCommitDetailValue, gitCommitResultValue, gitDiffValue, gitIdentityValue,
+  gitLogValue, gitMessageTextValue, gitMessageValue, gitStatusValue,
 } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
@@ -32,6 +34,18 @@ const pathList = z.array(z.string())
 const descriptors = [
   descriptor('status', [parameter('cwd', z.string())], gitStatusValue, 'GitStatusResponse'),
   descriptor('log', [parameter('cwd', z.string()), optionalParameter('limit', z.number())], gitLogValue, 'GitLogResponse'),
+  descriptor('diff', [
+    parameter('cwd', z.string()), parameter('path', z.string()), parameter('staged', z.boolean()),
+  ], gitDiffValue, 'GitDiffResponse'),
+  descriptor('show', [parameter('cwd', z.string()), parameter('hash', z.string())], gitCommitDetailValue, 'GitCommitDetail'),
+  descriptor('showFile', [
+    parameter('cwd', z.string()), parameter('hash', z.string()), parameter('path', z.string()),
+  ], gitDiffValue, 'GitDiffResponse'),
+  descriptor('branches', [parameter('cwd', z.string())], gitBranchesValue, 'GitBranches'),
+  descriptor('checkout', [parameter('cwd', z.string()), parameter('branch', z.string())], gitActionValue, 'GitActionResponse'),
+  descriptor('createBranch', [parameter('cwd', z.string()), parameter('name', z.string())], gitActionValue, 'GitActionResponse'),
+  descriptor('lastMessage', [parameter('cwd', z.string())], gitMessageTextValue, 'GitMessageText'),
+  descriptor('discard', [parameter('cwd', z.string()), parameter('paths', pathList)], gitActionValue, 'GitActionResponse'),
   descriptor('stage', [parameter('cwd', z.string()), parameter('paths', pathList)], gitActionValue, 'GitActionResponse'),
   descriptor('unstage', [parameter('cwd', z.string()), parameter('paths', pathList)], gitActionValue, 'GitActionResponse'),
   descriptor('stageAll', [parameter('cwd', z.string())], gitActionValue, 'GitActionResponse'),
@@ -56,6 +70,14 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface TypertRemoteMap {
     'gitPanel/status': (cwd: string) => Promise<RemoteResult<GitStatusResponse>>
     'gitPanel/log': (cwd: string, limit?: number) => Promise<RemoteResult<GitLogResponse>>
+    'gitPanel/diff': (cwd: string, path: string, staged: boolean) => Promise<RemoteResult<GitDiffResponse>>
+    'gitPanel/show': (cwd: string, hash: string) => Promise<RemoteResult<GitCommitDetail>>
+    'gitPanel/showFile': (cwd: string, hash: string, path: string) => Promise<RemoteResult<GitDiffResponse>>
+    'gitPanel/branches': (cwd: string) => Promise<RemoteResult<GitBranches>>
+    'gitPanel/checkout': (cwd: string, branch: string) => Promise<RemoteResult<GitActionResponse>>
+    'gitPanel/createBranch': (cwd: string, name: string) => Promise<RemoteResult<GitActionResponse>>
+    'gitPanel/lastMessage': (cwd: string) => Promise<RemoteResult<GitMessageText>>
+    'gitPanel/discard': (cwd: string, paths: readonly string[]) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/stage': (cwd: string, paths: readonly string[]) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/unstage': (cwd: string, paths: readonly string[]) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/stageAll': (cwd: string) => Promise<RemoteResult<GitActionResponse>>

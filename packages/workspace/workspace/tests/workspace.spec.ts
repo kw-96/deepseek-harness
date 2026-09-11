@@ -946,6 +946,25 @@ describe('registry-global session archive', () => {
     expect(storedState(result.pool).archivedSessionIds).toEqual(['stray', 'live-only'])
   })
 
+  it('restores archived sessions durably and ignores ids that are not archived', async () => {
+    const dir = await makeDir('archive-restore')
+    const result = await harness({ sessions: [header('first', dir, 100), header('second', dir, 200)] })
+    await result.registry.archiveSession(SessionId('first'))
+    await result.registry.archiveSession(SessionId('second'))
+    expect(result.registry.archivedSessionIds).toEqual(['first', 'second'])
+
+    await result.registry.unarchiveSession(SessionId('first'))
+    expect(result.registry.archivedSessionIds).toEqual(['second'])
+    expect(storedState(result.pool).archivedSessionIds).toEqual(['second'])
+    // Restoring never touches workspace accounting: the slot survived archiving.
+    expect(result.registry.list()[0]!.sessionIds).toContain('first')
+
+    // A repeat, or an id that was never archived, is a silent no-op.
+    await result.registry.unarchiveSession(SessionId('first'))
+    await result.registry.unarchiveSession(SessionId('never-archived'))
+    expect(result.registry.archivedSessionIds).toEqual(['second'])
+  })
+
   it('propagates a persistence-listing failure instead of reporting an unknown session', async () => {
     const result = await harness({ sessions: [] })
     result.list.mockRejectedValueOnce(new Error('persistence backend down'))

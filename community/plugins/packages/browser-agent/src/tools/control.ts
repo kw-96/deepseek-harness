@@ -7,9 +7,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { parseBrowsers, parseSessions } from '../host/parse.js'
 import type { BrowserInstanceView } from '../types.js'
-import { ackRender } from './observation.js'
+import { ackRender, refreshCurrentUrl } from './observation.js'
 import type { BrowserToolDeps } from './shared.js'
-import { durationArg, registerTool, requireSessionId, runFor, textBlock, valueSchema } from './shared.js'
+import { durationArg, registerTool, runFor } from './actions.js'
+import { requireSessionId, textBlock, valueSchema } from './shared.js'
 
 /** 人工求助默认等待上限（毫秒）。 */
 const DEFAULT_HELP_TIMEOUT_MS = 300_000
@@ -83,14 +84,16 @@ export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void 
       const owned = deps.store.ownedSessionIds()
       const others = parseSessions(listed.rows).filter(id => !owned.includes(id)).length
       const record = deps.store.get(sessionId)
+      if (record !== undefined) await refreshCurrentUrl(deps, sessionId, exec.signal)
+      const current = deps.store.get(sessionId)
       return {
         daemon: `v${String(status.json?.['daemon_version'] ?? '未知')}`,
         connected: parseBrowsers(status.json).length > 0,
         browsers: parseBrowsers(status.json),
-        sessionOpen: record !== undefined,
-        bskSessionId: record?.bskSessionId ?? '',
-        currentUrl: record?.currentUrl ?? '',
-        idleDeadlineAtMs: record === undefined ? 0 : record.lastActionAtMs + deps.config.actionTimeoutMs,
+        sessionOpen: current !== undefined,
+        bskSessionId: current?.bskSessionId ?? '',
+        currentUrl: current?.currentUrl ?? '',
+        idleDeadlineAtMs: current === undefined ? 0 : current.lastActionAtMs + deps.config.actionTimeoutMs,
         ownedSessions: owned.length,
         otherSessions: others,
       }

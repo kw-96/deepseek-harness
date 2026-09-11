@@ -121,6 +121,11 @@ export interface WorkspaceArchiveSessionRequest {
   readonly sessionId: SessionId
 }
 
+/** Session requested back from the registry-global archive set. */
+export interface WorkspaceUnarchiveSessionRequest {
+  readonly sessionId: SessionId
+}
+
 /** Complete archived Session set after a mutation. */
 export interface WorkspaceArchiveValue {
   readonly archivedSessionIds: readonly SessionId[]

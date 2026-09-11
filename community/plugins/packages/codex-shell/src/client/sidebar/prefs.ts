@@ -19,7 +19,12 @@ interface PrefsFile {
   projectPinned?: Record<string, boolean>
   /** 收起的组键集合（项目/工作区/归档桶），数组序列化以兼容 JSON。 */
   collapsedGroups?: string[]
+  /** 自动归档阈值（天）：会话超过该天数无活动即自动归档；0 表示关闭。 */
+  autoArchiveDays?: number
 }
+
+/** 自动归档默认阈值（天）。 */
+export const DEFAULT_AUTO_ARCHIVE_DAYS = 30
 
 const PREFS_KEY = 'dsh-codex-shell.browser-prefs.v1'
 
@@ -29,6 +34,7 @@ const DEFAULTS: PrefsFile = {
   workspacePinned: {},
   projectPinned: {},
   collapsedGroups: [],
+  autoArchiveDays: DEFAULT_AUTO_ARCHIVE_DAYS,
 }
 
 /**
@@ -52,6 +58,18 @@ export class BrowserPrefsStore {
   /** 当前排序模式。 */
   get sort(): SortMode {
     return this.data.sort
+  }
+
+  /** 自动归档阈值（天）；0 表示关闭。 */
+  get autoArchiveDays(): number {
+    const value = this.data.autoArchiveDays
+    return typeof value === 'number' && value >= 0 ? value : DEFAULT_AUTO_ARCHIVE_DAYS
+  }
+
+  /** 写入自动归档阈值（0 关闭）。 */
+  setAutoArchiveDays(days: number): void {
+    this.data = { ...this.data, autoArchiveDays: Math.max(0, Math.floor(days)) }
+    this.persist()
   }
 
   /** 某工作区是否本地置顶。 */
@@ -110,19 +128,29 @@ export class BrowserPrefsStore {
   }
 }
 
+/** 偏好快照：整理模式、排序模式与自动归档阈值。 */
+export interface BrowserPrefsSnapshot {
+  organize: OrganizeMode
+  sort: SortMode
+  autoArchiveDays: number
+}
+
 /** 订阅偏好变更（组件内本地快照）。 */
 export function useBrowserPrefs(store: BrowserPrefsStore): [
-  { organize: OrganizeMode; sort: SortMode },
-  (patch: Partial<{ organize: OrganizeMode; sort: SortMode }>) => void,
+  BrowserPrefsSnapshot,
+  (patch: Partial<BrowserPrefsSnapshot>) => void,
 ] {
-  const [snap, setSnap] = useState(() => ({ organize: store.organize, sort: store.sort }))
+  const snapshot = (): BrowserPrefsSnapshot =>
+    ({ organize: store.organize, sort: store.sort, autoArchiveDays: store.autoArchiveDays })
+  const [snap, setSnap] = useState(snapshot)
   useEffect(() => {
-    setSnap({ organize: store.organize, sort: store.sort })
+    setSnap(snapshot())
   }, [store])
-  const update = useCallback((patch: Partial<{ organize: OrganizeMode; sort: SortMode }>) => {
+  const update = useCallback((patch: Partial<BrowserPrefsSnapshot>) => {
     if (patch.organize !== undefined) store.setOrganize(patch.organize)
     if (patch.sort !== undefined) store.setSort(patch.sort)
-    setSnap({ organize: store.organize, sort: store.sort })
+    if (patch.autoArchiveDays !== undefined) store.setAutoArchiveDays(patch.autoArchiveDays)
+    setSnap(snapshot())
   }, [store])
   return [snap, update]
 }

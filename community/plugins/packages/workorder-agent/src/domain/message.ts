@@ -44,6 +44,6 @@ export function buildIssueReviewMessage(
     `@${submitter}：请补全易协作工单 [#${issue.id}](${issueUrl(host, issue.id)})。`,
     `规则核验：${violations.map((item) => item.message).join('；')}`,
     `模型审核：${modelOutput}`,
-    '补全后可再次在工单控制面执行“填写核验”。',
+    '补全后可再次在 Ticket Hub 执行“填写核验”。',
   ].join('\n')
 }

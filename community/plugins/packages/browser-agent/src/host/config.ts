@@ -26,6 +26,15 @@ export interface BrowserAgentConfig {
   screenshotDir: string
   /** 是否允许 evaluate（默认关闭）。 */
   allowEvaluate: boolean
+  /**
+   * 点击方式。
+   *
+   * - `pointer`（默认）：交给 `bsk click`，用 CDP 派发真实指针事件；
+   * - `dom`：先 `bsk hover` 取元素坐标，再经 `bsk evaluate` 在页面上执行
+   *   固定的 `element.click()`（表达式由插件生成，模型无法注入脚本），
+   *   用于扩展浮层 `<browser-skill-overlay>` 吞掉指针点击时的过渡场景。
+   */
+  clickMode: 'pointer' | 'dom'
   /** 借用用户标签页前是否必须取得审批（默认开启）。 */
   requireApprovalForBorrow: boolean
   /** 敏感站点关键词（凭据面）。 */
@@ -45,6 +54,7 @@ export const CONFIG_DEFAULTS: BrowserAgentConfig = {
   snapshotMaxChars: 24_000,
   screenshotDir: '',
   allowEvaluate: false,
+  clickMode: 'pointer',
   requireApprovalForBorrow: true,
   sensitivePatterns: [...DEFAULT_SENSITIVE_PATTERNS],
   allowedPatterns: [],
@@ -61,6 +71,7 @@ export const BrowserAgentConfigSchema: z<BrowserAgentConfig> = z.object({
   snapshotMaxChars: z.number().default(24_000),
   screenshotDir: z.string().default(''),
   allowEvaluate: z.boolean().default(false),
+  clickMode: z.union(['pointer', 'dom'] as const).default('pointer'),
   requireApprovalForBorrow: z.boolean().default(true),
   sensitivePatterns: z.array(z.string()).default([...DEFAULT_SENSITIVE_PATTERNS]),
   allowedPatterns: z.array(z.string()).default([]),
@@ -73,4 +84,35 @@ export const BrowserAgentConfigSchema: z<BrowserAgentConfig> = z.object({
  */
 export function resolveConfig(partial: Partial<BrowserAgentConfig> = {}): BrowserAgentConfig {
   return { ...CONFIG_DEFAULTS, ...partial }
+}
+
+/** 一个活跃 bsk 会话的运行态。 */
+export interface BskSessionRecord {
+  bskSessionId: string
+  windowId: string | null
+  startedAtMs: number
+  lastActionAtMs: number
+  currentUrl: string | null
+  pageTitle: string | null
+  /** 上一次快照的引用是否已失效（导航或 DOM 变化后置位）。 */
+  refsStale: boolean
+  tabCount: number
+  lastScreenshotPath: string | null
+  lastError: string | null
+}
+
+/** 会话托管配置。 */
+export interface SessionStoreOptions {
+  /** 空闲多久后自动结束会话（毫秒）。 */
+  idleTimeoutMs: number
+  /** 快照输出字符上限。 */
+  snapshotMaxChars: number
+  /** 目标浏览器实例（id 或 label）；空串表示要求唯一实例。 */
+  browserInstance: string
+  /**
+   * 宿主会话是否仍然存在。返回 false 时该记录会被回收：会话 id 失效后
+   * 再没有任何调用能替它 stop，否则只能等空闲巡检，期间会留下孤儿 Agent Window。
+   */
+  isOwnerAlive?: ((sessionId: string) => boolean) | undefined
+  log: (message: string) => void
 }

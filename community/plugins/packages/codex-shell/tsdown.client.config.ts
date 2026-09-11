@@ -22,6 +22,9 @@ const externals = [
   '@deepseek-ai/dsh-typert-protocol',
   'react',
   'react/jsx-runtime',
+  // hero 折叠弹层用 createPortal：react-dom 属宿主基线模块，必须外置，
+  // 否则会把整份 react-dom 打进插件产物（双 reconciler 与体积翻倍）。
+  'react-dom',
 ]
 const cssPrefix = '\0dsh-codex-shell-css:'
 const cssPlainPrefix = '\0dsh-codex-shell-css-plain:'

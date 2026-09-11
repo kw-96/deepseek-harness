@@ -68,29 +68,56 @@ export function sortSessionIds(
 }
 
 /**
- * 项目组排序：置顶优先时置顶在前（置顶之间按最近更新），
- * 其余按项目 updatedAt 倒序；最近更新模式只看 updatedAt；
- * 手动模式保持注册表顺序。
+ * 项目组排序：**恒为 置顶 → 最近活动 → 兜底**（项目没有拖拽排序，
+ * 因此不受会话排序模式影响）。最近活动由调用方给出（项目下会话的
+ * 最大 updatedAt，无会话时回退项目注册表 updatedAt）。
  * @param projects - 宿主项目注册表顺序。
  * @param prefs - 项目置顶状态仓。
- * @param sort - 当前排序模式。
+ * @param recency - 返回某项目的最近活动时间（epoch ms，取不到为 0）。
  * @returns 排序后的新数组。
  */
 export function orderProjects(
   projects: readonly ProjectView[],
   prefs: BrowserPrefsStore,
-  sort: SortMode,
+  recency: (projectId: string) => number,
 ): ProjectView[] {
-  if (sort === 'manual') return [...projects]
-  const time = (project: ProjectView): number => Date.parse(project.updatedAt) || 0
   return [...projects].sort((left, right) => {
-    if (sort === 'pinnedFirst') {
-      const pinDiff = Number(prefs.projectPinned(right.projectId))
-        - Number(prefs.projectPinned(left.projectId))
-      if (pinDiff !== 0) return pinDiff
-    }
-    return time(right) - time(left)
+    const pinDiff = Number(prefs.projectPinned(right.projectId))
+      - Number(prefs.projectPinned(left.projectId))
+    if (pinDiff !== 0) return pinDiff
+    const timeDiff = recency(right.projectId) - recency(left.projectId)
+    if (timeDiff !== 0) return timeDiff
+    const fallback = (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0)
+    if (fallback !== 0) return fallback
+    return 0
   })
+}
+
+/** Normalize a directory path for matching: uniform separators, no trailing separator, case-folded on Windows-style paths. */
+export function pathKey(value: string): string {
+  return value.replace(/\//g, '\\').replace(/\\+$/u, '').toLowerCase()
+}
+
+/**
+ * Resolve the project owning one directory path by longest root prefix.
+ * @param path - workspace or session directory path.
+ * @param projects - project registry rows.
+ * @returns the owning project, or undefined when no root matches.
+ */
+export function projectForPath(path: string, projects: readonly ProjectView[]): ProjectView | undefined {
+  const key = pathKey(path)
+  let best: ProjectView | undefined
+  let bestLength = 0
+  for (const project of projects) {
+    for (const root of project.roots) {
+      const rootKey = pathKey(root)
+      if (rootKey === '' || (key !== rootKey && !key.startsWith(rootKey + '\\'))) continue
+      if (rootKey.length < bestLength) continue
+      best = project
+      bestLength = rootKey.length
+    }
+  }
+  return best
 }
 
 /** 按偏好构建侧栏分组模型。 */

@@ -1,5 +1,6 @@
 /**
- * 侧栏「项目」标题栏：标题 + 整理/排序菜单（…）+ 添加工作区（+）。
+ * 侧栏「项目」标题栏：标题 + 整理/排序菜单（…）+ 新建项目（+）。
+ * 「添加工作区…」保留在整理菜单里（顶层入口让给新建项目）。
  */
 
 import { MoreHorizontal, Plus } from 'lucide-react'
@@ -12,12 +13,18 @@ import css from '../styles.module.css'
 export interface SectionHeaderProps {
   organize: OrganizeMode
   sort: SortMode
+  /** 自动归档阈值（天）；0 表示关闭。 */
+  autoArchiveDays: number
   onOrganize: (mode: OrganizeMode) => void
   onSort: (mode: SortMode) => void
+  onAutoArchive: (days: number) => void
   onAddWorkspace: () => void
-  onAddProject: () => void
+  onNewProject: () => void
   t: TFn
 }
+
+/** 自动归档的可选阈值（天）；0 为关闭。 */
+const AUTO_ARCHIVE_CHOICES: readonly number[] = [0, 7, 14, 30, 90]
 
 /** 项目区段标题栏。 */
 export function SectionHeader(props: SectionHeaderProps): React.ReactNode {
@@ -42,11 +49,11 @@ export function SectionHeader(props: SectionHeaderProps): React.ReactNode {
         <button
           type="button"
           className={css.iconButton}
-          title={props.t('addWorkspace')}
-          aria-label={props.t('addWorkspace')}
+          title={props.t('addProject')}
+          aria-label={props.t('addProject')}
           onClick={event => {
             event.stopPropagation()
-            props.onAddWorkspace()
+            props.onNewProject()
           }}
         >
           <Plus size={14} />
@@ -87,9 +94,19 @@ export function SectionHeader(props: SectionHeaderProps): React.ReactNode {
             onClick={() => { props.onSort('manual'); setOpen(false) }}
           />
           <MenuSep />
+          <div className={css.menuGroupLabel}>{props.t('autoArchiveLabel')}</div>
+          {AUTO_ARCHIVE_CHOICES.map(days => (
+            <MenuItem
+              key={days}
+              label={days === 0 ? props.t('autoArchiveOff') : props.t('autoArchiveDays', { n: days })}
+              trailing={props.autoArchiveDays === days ? '✓' : undefined}
+              onClick={() => { props.onAutoArchive(days); setOpen(false) }}
+            />
+          ))}
+          <MenuSep />
           <MenuItem
-            label={props.t('addProject')}
-            onClick={() => { props.onAddProject(); setOpen(false) }}
+            label={props.t('addWorkspace')}
+            onClick={() => { props.onAddWorkspace(); setOpen(false) }}
           />
         </div>
       )}

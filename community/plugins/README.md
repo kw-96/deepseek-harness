@@ -1,6 +1,6 @@
 # DeepSeek Harness Plugin Manager and Marketplace
 
-[简体中文](README.zh-CN.md)
+English | [中文](README.zh.md)
 
 This repository contains two independent community plugins for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness):
 

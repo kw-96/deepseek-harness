@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | [中文](2026-09-11-composer-attachment-picker-restored.md)
+English | [中文](2026-09-11-composer-attachment-picker-restored.zh.md)
 
 ## Problem
 

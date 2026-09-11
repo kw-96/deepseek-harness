@@ -5,11 +5,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { ackRender, observationRender, observationSchema, observationValue } from './observation.js'
+import { domClickExpression } from './actions.js'
+import { ackRender, observationRender, observationSchema, observationValue, refreshCurrentUrl } from './observation.js'
 import type { BrowserToolDeps } from './shared.js'
-import {
-  durationArg, refreshRefs, registerTool, requireSessionId, runFor, takeSnapshot, textBlock, valueSchema,
-} from './shared.js'
+import { durationArg, refreshRefs, registerTool, runFor, takeSnapshot } from './actions.js'
+import { requireSessionId, textBlock, valueSchema } from './shared.js'
 
 /** 形如 `@e3` / `e3` 的引用写法。 */
 const REF_PATTERN = /^@?e\d+$/
@@ -36,6 +36,33 @@ export function isRef(target: string): boolean {
 }
 
 /**
+ * DOM 模式点击：先用 `hover` 取元素坐标（只发 mouseMoved，不改变页面状态），
+ * 再经 `evaluate` 在固定表达式里对最上层非浮层元素执行 `click()`。
+ * @param deps - 工具依赖
+ * @param sessionId - DSH 会话 id
+ * @param target - 引用或 CSS 选择器
+ * @param signal - 取消信号
+ */
+async function clickViaDom(
+  deps: BrowserToolDeps,
+  sessionId: string,
+  target: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const hovered = await runFor(deps, sessionId, ['hover', target, '--json'], { signal })
+  const x = hovered.json?.['x']
+  const y = hovered.json?.['y']
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    throw new Error(`DOM 模式点击拿不到 ${target} 的坐标（hover 未返回 x/y）`)
+  }
+  const clicked = await runFor(deps, sessionId, ['evaluate', domClickExpression(x, y), '--json'], { signal })
+  if (clicked.json?.['ok'] === false) {
+    const detail = (clicked.json['error'] as { text?: string } | undefined)?.text ?? '未知原因'
+    throw new Error(`DOM 模式点击 ${target} 失败：${detail}`)
+  }
+}
+
+/**
  * 注册 browser_click / browser_fill / browser_press / browser_select。
  * @param ctx - 宿主上下文（提供 tools 注册表）
  * @param deps - 工具依赖
@@ -57,15 +84,24 @@ export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void
     async execute(args, exec) {
       const sessionId = requireSessionId(exec)
       const refreshed = await refreshRefs(deps, sessionId, exec.signal)
-      const command = ['click', args.target, '--json', '--timeout', durationArg(deps.config.actionTimeoutMs)]
-      if (args.button !== undefined) command.push('--button', args.button)
-      if (args.clickCount !== undefined) command.push('--click-count', String(args.clickCount))
-      if (args.modifiers !== undefined) command.push('--modifiers', args.modifiers)
-      await runFor(deps, sessionId, command, { signal: exec.signal })
+      const domMode = deps.config.clickMode === 'dom'
+      if (domMode) {
+        await clickViaDom(deps, sessionId, args.target, exec.signal)
+      }
+      else {
+        const command = ['click', args.target, '--json', '--timeout', durationArg(deps.config.actionTimeoutMs)]
+        if (args.button !== undefined) command.push('--button', args.button)
+        if (args.clickCount !== undefined) command.push('--click-count', String(args.clickCount))
+        if (args.modifiers !== undefined) command.push('--modifiers', args.modifiers)
+        await runFor(deps, sessionId, command, { signal: exec.signal })
+      }
       deps.store.markRefsStale(sessionId)
       const captured = await takeSnapshot(deps, sessionId, exec.signal)
+      // 点击常触发跳转：URL 以活动标签页为准，避免「旧 URL + 新快照」。
+      await refreshCurrentUrl(deps, sessionId, exec.signal)
       const prefix = refreshed === null ? '' : '点击前引用已失效，已自动补拍快照；'
-      return observationValue(captured.record, captured.snapshot, `${prefix}点击后已重新快照`)
+      const suffix = domMode ? 'DOM 模式点击后已重新快照' : '点击后已重新快照'
+      return observationValue(deps.store.get(sessionId) ?? captured.record, captured.snapshot, `${prefix}${suffix}`)
     },
     presentCall: args => ({ card: 'generic', title: `点击 ${args.target}`, kind: 'other', rawInput: args.target }),
   }))
@@ -136,7 +172,16 @@ export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void
       }
       deps.store.markRefsStale(sessionId)
       const captured = await takeSnapshot(deps, sessionId, exec.signal)
-      return { message, refsValid: false, ...observationValue(captured.record, captured.snapshot, `${args.key} 可能已触发提交或导航，快照已刷新`) }
+      await refreshCurrentUrl(deps, sessionId, exec.signal)
+      return {
+        message,
+        refsValid: false,
+        ...observationValue(
+          deps.store.get(sessionId) ?? captured.record,
+          captured.snapshot,
+          `${args.key} 可能已触发提交或导航，快照已刷新`,
+        ),
+      }
     },
     presentCall: args => ({ card: 'generic', title: `按键 ${args.key}`, kind: 'other', rawInput: args.key }),
   }))

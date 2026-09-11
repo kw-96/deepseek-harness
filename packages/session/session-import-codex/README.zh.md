@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的当前 Codex 线程和归档 rollout 会话导入为 DeepSeek Harness 会话。它把每个来源转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按来源工作目录对账 DSH 工作区归属。当前 SQLite 线程与归档 rollout 共享 id 时，当前线程优先，因此一个 Codex 会话不会产生重复 DSH 会话。自动导入默认关闭；开启设置卡片的开关后会先执行一轮对账，再按配置间隔执行。导入器只读取 Codex，不会向 Codex 回写。
+`dsh-session-import-codex` 在你选择“立即导入”时，把本地安装的当前 Codex 线程和归档 rollout 导入为 DeepSeek Harness 会话。它把每个来源转换为标准 DSH 事件日志，经会话持久化后端落盘，再作为活跃会话发布，并按来源工作目录对账 DSH 工作区归属。当前 SQLite 线程与归档 rollout 共享 id 时，当前线程优先，因此一个 Codex 会话不会产生重复 DSH 会话。自动导入默认关闭；设置卡片的开关会先执行一轮对账，再按配置间隔执行。导入器只读取 Codex。
 
 ## 目录
 

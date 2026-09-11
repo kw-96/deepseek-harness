@@ -47,6 +47,32 @@ describe('session hover actions', () => {
     expect(onMenu).toHaveBeenCalledTimes(1)
   })
 
+  it('restores an archived session from its hover action', () => {
+    const onRestore = vi.fn()
+    render(
+      <SessionRow
+        sessionId="s1"
+        title="Archived"
+        current={false}
+        running={false}
+        archived
+        renaming={false}
+        renameDraft=""
+        setRenameDraft={() => {}}
+        commitRename={() => {}}
+        onOpen={() => {}}
+        onMenu={event => { event.stopPropagation() }}
+        onArchive={() => {}}
+        onRestore={onRestore}
+        draggable={false}
+        meta={new SessionMetaStore()}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText('恢复'))
+    expect(onRestore).toHaveBeenCalledTimes(1)
+  })
+
   it('opens a session row from the keyboard', () => {
     const meta = new SessionMetaStore()
     const onOpen = vi.fn()
@@ -82,7 +108,7 @@ describe('nested menus', () => {
       togglePin: vi.fn(),
       toggleUnread: vi.fn(),
       archive: vi.fn(),
-      moveToWorkspace: vi.fn(),
+      moveToProject: vi.fn(),
       moveToUngrouped: vi.fn(),
       canMoveToUngrouped: true,
       copyCwd: vi.fn(),
@@ -100,18 +126,18 @@ describe('nested menus', () => {
     render(
       <SessionMenuBody
         actions={actions}
-        workspaces={[
-          { workspaceId: 'w1', title: 'A', path: 'D:/proj-a', sessionIds: [] },
-          { workspaceId: 'w2', title: 'B', path: 'D:/proj-b', sessionIds: [] },
+        projects={[
+          { projectId: 'p1', name: 'A', roots: ['D:/proj-a'], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+          { projectId: 'p2', name: 'B', roots: ['D:/proj-b'], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
         ]}
-        currentWorkspaceId="w1"
+        currentProjectId="p1"
         t={t}
       />,
     )
     fireEvent.mouseEnter(screen.getByText('项目').closest('div')!)
     expect(screen.getByText('移到未分组')).toBeTruthy()
     fireEvent.click(screen.getByText('B'))
-    expect(actions.moveToWorkspace).toHaveBeenCalledWith('w2')
+    expect(actions.moveToProject).toHaveBeenCalledWith('p2')
     fireEvent.click(screen.getByText('移到未分组'))
     expect(actions.moveToUngrouped).toHaveBeenCalledTimes(1)
     fireEvent.mouseEnter(screen.getByText('分叉').closest('div')!)
@@ -142,24 +168,53 @@ describe('nested menus', () => {
 })
 
 describe('section header', () => {
-  it('switches organize and sort prefs', () => {
+  it('switches organize, sort, and auto-archive prefs', () => {
     const onOrganize = vi.fn()
     const onSort = vi.fn()
+    const onAutoArchive = vi.fn()
     render(
       <SectionHeader
         organize="byProject"
         sort="pinnedFirst"
+        autoArchiveDays={30}
         onOrganize={onOrganize}
         onSort={onSort}
+        onAutoArchive={onAutoArchive}
         onAddWorkspace={vi.fn()}
-        onAddProject={vi.fn()}
+        onNewProject={vi.fn()}
         t={t}
       />,
     )
     expect(screen.getByText('项目')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('整理侧边栏'))
+    // 自动归档：阈值选项带当前值勾选，点击派发天数（点击后菜单关闭）。
+    expect(screen.getByText('30 天无活动')).toBeTruthy()
+    fireEvent.click(screen.getByText('14 天无活动'))
+    expect(onAutoArchive).toHaveBeenCalledWith(14)
+    // 重新打开菜单再切换整理模式。
+    fireEvent.click(screen.getByLabelText('整理侧边栏'))
     fireEvent.click(screen.getByText('在一个列表中'))
     expect(onOrganize).toHaveBeenCalledWith('flat')
+  })
+
+  it('offers turning auto-archive off', () => {
+    const onAutoArchive = vi.fn()
+    render(
+      <SectionHeader
+        organize="byProject"
+        sort="pinnedFirst"
+        autoArchiveDays={0}
+        onOrganize={vi.fn()}
+        onSort={vi.fn()}
+        onAutoArchive={onAutoArchive}
+        onAddWorkspace={vi.fn()}
+        onNewProject={vi.fn()}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText('整理侧边栏'))
+    fireEvent.click(screen.getByText('关闭'))
+    expect(onAutoArchive).toHaveBeenCalledWith(0)
   })
 
   it('toggles a workspace from the keyboard without opening its actions', () => {

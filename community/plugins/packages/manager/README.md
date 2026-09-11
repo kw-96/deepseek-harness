@@ -1,6 +1,6 @@
 # DeepSeek Harness Plugin Manager
 
-[简体中文](README.zh-CN.md)
+English | [中文](README.zh.md)
 
 **DeepSeek Harness Plugin Manager** is a Web-based plugin manager for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) and its Cordis plugin runtime. Its defining feature is Cordis HMR-backed hot loading inside a running profile, alongside inspection, search, enable, disable, grouping, and batch management from the Harness Plugins settings page.
 

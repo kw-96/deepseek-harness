@@ -1,6 +1,6 @@
 # DSH Plugin Marketplace
 
-[简体中文](README.zh-CN.md)
+English | [中文](README.zh.md)
 
 An independent DeepSeek Harness marketplace plugin that reads one automatically generated plugin catalog and installs exact npm versions through the official `dsh plugin` command boundary.
 

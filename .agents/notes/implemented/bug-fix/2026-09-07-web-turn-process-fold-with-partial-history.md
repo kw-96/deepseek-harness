@@ -6,7 +6,7 @@ English | [中文](2026-09-07-web-turn-process-fold-with-partial-history.zh.md)
 
 ## Problem
 
-[Web Turn process folding](../feature/2026-08-14-web-turn-process-folding.md) withheld Compact disclosure whenever Session history still offered Load earlier. Long sessions almost always keep that control, so Compact never collapsed tools or reasoning even though the preference was already `compact` and the loaded Turns had final answers. Users saw the setting as broken.
+[Web Turn process folding](../../archived/feature/2026-08-14-web-turn-process-folding.md) withheld Compact disclosure whenever Session history still offered Load earlier. Long sessions almost always keep that control, so Compact never collapsed tools or reasoning even though the preference was already `compact` and the loaded Turns had final answers. Users saw the setting as broken.
 
 ## Decision
 

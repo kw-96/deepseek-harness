@@ -464,6 +464,14 @@
   from { opacity: 0; transform: translateY(-4px); }
 }
 
+/* 项目列表可能很长：弹层内部滚动，避免溢出视口。 */
+.menuScrollable {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .menuItem {
   display: flex;
   align-items: center;
@@ -814,6 +822,33 @@
   background: var(--cx-line-strong);
   color: var(--cx-text-low);
   cursor: default;
+}
+
+/* 次级按钮：弹窗里的「取消 / 返回」这类安静动作。 */
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--cx-text-mid);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  background: var(--cx-hover);
+  color: var(--cx-text-hi);
+}
+
+/* 弹窗列表里当前选中的一行。 */
+.fileRowActive {
+  background: var(--cx-current);
+  color: var(--cx-text-hi);
 }
 
 .error {

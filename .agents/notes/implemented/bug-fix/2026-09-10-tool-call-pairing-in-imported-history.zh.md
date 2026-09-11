@@ -30,9 +30,7 @@ Status: implemented
 
 ## Testing
 
-`packages/llm/llm-pi-ai/tests/convert.spec.ts` 与
-`packages/llm/llm-deepseek/tests/serialize.spec.ts` 覆盖两条路径：配对的结果仍是提供方工具消息，未配对的结果变成降级文本（含错误标记）并上报原因。
-`packages/session/session-import-codex/tests/convert.spec.ts` 断言每条 `tool/result` 都引用一条由前置 assistant 消息声明的调用。
+`packages/llm/llm-pi-ai/tests/convert.spec.ts` 与 `packages/llm/llm-deepseek/tests/serialize.spec.ts` 覆盖两条路径：配对的结果仍是提供方工具消息，未配对的结果变成降级文本（含错误标记）并上报原因。 `packages/session/session-import-codex/tests/convert.spec.ts` 断言每条 `tool/result` 都引用一条由前置 assistant 消息声明的调用。
 
 ## Consequences
 

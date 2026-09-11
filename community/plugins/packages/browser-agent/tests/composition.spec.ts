@@ -32,16 +32,24 @@ function registry(registered: Map<string, ToolDefinition>) {
   }
 }
 
-/** 准备一个带 tools/subprocess 服务的真实上下文。 */
+/** 准备一个带 tools/subprocess/agents 服务的真实上下文。 */
 function makeContext(registered: Map<string, ToolDefinition>): Context {
   const ctx = new Context()
   ctx.reflect.provide('tools', registry(registered))
   // Service 子类在构造时自行注册，不能再 provide 一次。
   void new LocalSubprocessRuntime(ctx)
+  // 孤儿巡检经 `ctx.agents` 判定宿主会话，插件据此声明了 `agents` 注入。
+  ctx.reflect.provide('agents', { get: () => undefined })
   return ctx
 }
 
 describe('真实 Cordis 组合', () => {
+  it('声明 agents 注入：孤儿巡检经 ctx.agents 判定宿主会话', () => {
+    // 巡检回调访问 `ctx.agents`；漏声明会让该访问抛
+    // `cannot get property "agents" without inject`，并终止整个 dsh web 进程。
+    expect(BrowserAgent.inject).toEqual(['agents', 'tools', 'subprocess'])
+  })
+
   it('挂载后注册 12 个工具，卸载后全部释放', async () => {
     const registered = new Map<string, ToolDefinition>()
     const ctx = makeContext(registered)

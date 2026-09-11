@@ -241,6 +241,11 @@ describe('WorkspaceController commands', () => {
       .resolves.toEqual({ archivedSessionIds: [session.id] })
     await expect(controller.archiveSession({ sessionId: SessionId('unknown') }))
       .rejects.toMatchObject({ code: 'session/not-found' })
+    await expect(controller.unarchiveSession({ sessionId: session.id }))
+      .resolves.toEqual({ archivedSessionIds: [] })
+    // Restoring an id outside the set is a silent no-op, not an error.
+    await expect(controller.unarchiveSession({ sessionId: SessionId('unknown') }))
+      .resolves.toEqual({ archivedSessionIds: [] })
   })
 })
 

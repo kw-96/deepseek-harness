@@ -12,13 +12,37 @@ import { PopoDeliveryService } from './plugins/popo/delivery.js'
 import { startScheduler } from './plugins/scheduler/scheduler.js'
 import { WorkorderStatsService } from './plugins/stats/service.js'
 import { WorkorderStore } from './plugins/store/store.js'
+import { VivoService } from './plugins/vivo/service.js'
 import { GcpWebhookHandler } from './plugins/webhook/handler.js'
+import { startWebhookIngress, type WebhookIngress } from './plugins/webhook/ingress.js'
+import { WebhookRequestLog } from './plugins/webhook/log.js'
+import { installWebhookRoute } from './plugins/webhook/route.js'
 import { IssueReviewWorkflow } from './plugins/workflow/review.js'
 import { InspectionWorkflow } from './plugins/workflow/service.js'
 
 export interface AppRuntime {
   app: Hono
   close: () => Promise<void>
+}
+
+/**
+ * 按配置启动独立事件入口；启动失败只记录并继续，不影响控制面。
+ * @param config 业务运行配置
+ * @param webhook 事件处理器
+ * @param log 入口回调记录
+ * @returns 已启动的入口，未启用或启动失败时为 undefined
+ */
+async function startIngress(config: AppConfig, webhook: GcpWebhookHandler, log: WebhookRequestLog): Promise<WebhookIngress | undefined> {
+  if (!config.webhookIngress.enabled) return undefined
+  const { host, port } = config.webhookIngress
+  try {
+    const ingress = await startWebhookIngress(webhook, { host, port, token: config.webhookToken, log })
+    console.log(`易协作事件入口已监听：http://${host}:${ingress.port}/webhooks/gcp/<令牌>`)
+    return ingress
+  } catch (error) {
+    console.error(`易协作事件入口监听失败（${host}:${port}）：`, error)
+    return undefined
+  }
 }
 
 /** 创建完整业务运行时及内部管理 API。 */
@@ -35,8 +59,12 @@ export async function createApp(
   const workflow = new InspectionWorkflow(issues, store, delivery, config.gcp.host)
   const review = new IssueReviewWorkflow(store, delivery, config.gcp.host, config.review, agentRouter)
   const stats = new WorkorderStatsService(store)
-  const webhook = new GcpWebhookHandler(store, gcp, config.projects, config.gcp.host, review)
+  const vivo = new VivoService(store, config.vivo, delivery)
+  vivo.sync()
+  const webhook = new GcpWebhookHandler(store, gcp, config.projects, config.gcp.host, review, config.completedStatusId)
+  const webhookLog = new WebhookRequestLog()
   webhook.start()
+  const ingress = await startIngress(config, webhook, webhookLog)
   const stopScheduler = startScheduler(workflow, store)
   const app = new Hono()
   app.onError((error, context) => {
@@ -52,17 +80,14 @@ export async function createApp(
     return context.json({ ready, ...components }, ready ? 200 : 503)
   })
   app.use('/api/admin/*', createRateLimit(30, 60_000))
-  installAdminRoutes(app, { config, store, issues, delivery, workflow, review, stats, agentRouter, writePluginSettings })
-  app.post(`/webhooks/gcp/${config.webhookToken}`, async (context) => {
-    const length = Number(context.req.header('content-length') ?? 0)
-    if (length > 256_000) return context.json({ error: '请求体过大' }, 413)
-    return context.json(webhook.accept(await context.req.json()))
-  })
+  installAdminRoutes(app, { config, store, issues, delivery, workflow, review, stats, vivo, webhookLog, agentRouter, writePluginSettings })
+  installWebhookRoute(app, config.webhookToken, webhook, webhookLog, 'host')
   return {
     app,
     close: async (): Promise<void> => {
       stopScheduler()
       webhook.stop()
+      await ingress?.close()
       store.close()
       await gcp.close()
     },

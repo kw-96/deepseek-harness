@@ -1,14 +1,29 @@
 /** Host 基础件测试：bsk 输出解析、快照处理、安全策略与会话托管。 */
 
 import { describe, expect, it } from 'vitest'
-import { BskError, parseJsonObject } from '../src/host/bsk.js'
-import { parseBrowsers, parseTabs } from '../src/host/parse.js'
+import { BskError } from '../src/host/bsk.js'
+import { parseJsonObject } from '../src/host/parse.js'
+import { OVERLAY_TAG, domClickExpression } from '../src/tools/actions.js'
+import { parseBrowsers, parseTabs, sniffImageMediaType } from '../src/host/parse.js'
 import { BrowserPolicy, hostOf } from '../src/host/policy.js'
-import { countRefs, extractTitle, firstRef, truncateText } from '../src/host/snapshot.js'
+import { countRefs, extractRootRef, extractTitle, firstRef, truncateText } from '../src/host/snapshot.js'
 import { BskSessionStore } from '../src/host/store.js'
 import { defaultOutcome, FakeRunner, failure } from './support/fake-runner.js'
 
 const SNAPSHOT = '@e1 RootWebArea "示例页"\n  @e2 button "提交"\n'
+
+/** bsk 0.2.x 的 VOM 观测文本（引用只标在交互元素上）。 */
+const VOM = [
+  '@vom 1',
+  '@view 980x556',
+  '@layers 1 focus=L1',
+  'L1 page',
+  '  RootWebArea "Example Domain"',
+  '    heading "Example Domain"',
+  '    paragraph',
+  '      @e1 link "Learn more" [→ iana.org]',
+  '',
+].join('\n')
 
 /** 构造一个记录日志的会话托管器。 */
 function makeStore(
@@ -71,6 +86,47 @@ describe('快照处理', () => {
     expect(firstRef(SNAPSHOT)).toBe('@e1')
     expect(firstRef('no refs')).toBeNull()
     expect(countRefs(SNAPSHOT)).toBe(2)
+  })
+
+  it('认 0.2.x 的 VOM 文本（RootWebArea 行不带引用）', () => {
+    expect(extractTitle(VOM)).toBe('Example Domain')
+    // VOM 只给交互元素标引用，根节点没有引用 → 不能拿它做「视口等价」截图回退
+    expect(extractRootRef(VOM)).toBeNull()
+    expect(firstRef(VOM)).toBe('@e1')
+    expect(countRefs(VOM)).toBe(1)
+  })
+
+  it('旧版 aria 快照能取到根节点引用', () => {
+    expect(extractRootRef(SNAPSHOT)).toBe('@e1')
+    expect(extractRootRef('没有 RootWebArea')).toBeNull()
+  })
+})
+
+describe('截图媒体类型嗅探', () => {
+  it('按魔术字节识别四种图片类型，不认识就返回 undefined', () => {
+    expect(sniffImageMediaType(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBe('image/png')
+    expect(sniffImageMediaType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe('image/jpeg')
+    expect(sniffImageMediaType(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))).toBe('image/gif')
+    expect(sniffImageMediaType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toBe('image/webp')
+    expect(sniffImageMediaType(new Uint8Array([1, 2, 3]))).toBeUndefined()
+  })
+})
+
+describe('DOM 点击表达式', () => {
+  it('只嵌入坐标，且不含引号（便于经 CLI 原样传递）', () => {
+    const expr = domClickExpression(240.5, 192)
+    expect(expr).toContain('xs=240.5')
+    expect(expr).toContain('ys=192')
+    expect(expr).toContain('elementsFromPoint')
+    expect(expr).not.toMatch(/['"]/)
+  })
+
+  it('用字符码拼出浮层标签名来跳过浮层（同样避免引号）', () => {
+    const expr = domClickExpression(1, 2)
+    expect(expr).toContain('String.fromCharCode')
+    expect(expr).toContain('closest')
+    const codes = ([...expr.matchAll(/fromCharCode\(([\d,]+)\)/g)][0]?.[1] ?? '').split(',').map(Number)
+    expect(String.fromCharCode(...codes)).toBe(OVERLAY_TAG)
   })
 })
 
@@ -155,6 +211,30 @@ describe('会话托管', () => {
     expect(await store.stop('s5', '测试')).toBe(false)
     await store.stopAll('测试')
     expect(store.get('s6')).toBeUndefined()
+  })
+
+  it('宿主会话消失后回收其记录，活着的保持不动', async () => {
+    const runner = new FakeRunner()
+    const store = new BskSessionStore(runner, {
+      idleTimeoutMs: 60_000,
+      snapshotMaxChars: 1000,
+      browserInstance: '',
+      isOwnerAlive: sessionId => sessionId !== 'gone',
+      log: () => {},
+    })
+    await store.ensure('gone')
+    await store.ensure('alive')
+    expect(await store.reapOrphaned()).toEqual(['gone'])
+    expect(store.get('gone')).toBeUndefined()
+    expect(store.get('alive')).toBeDefined()
+    expect(await store.reapOrphaned()).toEqual([])
+  })
+
+  it('未提供存活判定时不回收任何记录', async () => {
+    const store = makeStore(new FakeRunner())
+    await store.ensure('s7')
+    expect(await store.reapOrphaned()).toEqual([])
+    expect(store.get('s7')).toBeDefined()
   })
 })
 

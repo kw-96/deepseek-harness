@@ -2,7 +2,7 @@
  * Copy the release desktop shell next to the repository root `dsh.cmd`
  * so day-to-day use is a double-click, not a buried `target/release` path.
  */
-import { copyFileSync, existsSync, unlinkSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,7 +47,12 @@ if (process.platform === 'win32' && existsSync(dest)) {
   try {
     unlinkSync(dest)
   } catch {
-    // File may be locked; overwrite in place below.
+    // 正在运行的 shell 锁住自己的镜像：Windows 允许重命名但不允许删除，所以把
+    // 旧文件移进忽略目录 .data/，让新产物落到原路径。运行中的窗口继续使用被
+    // 改名的镜像，无需先关闭它。
+    const backupDir = join(repoRoot, '.data')
+    mkdirSync(backupDir, { recursive: true })
+    renameSync(dest, join(backupDir, `${destName}.${Date.now()}.old`))
   }
 }
 copyFileSync(releaseExe, dest)

@@ -3,7 +3,7 @@
  * 置顶/未读角标常驻；运行中会话点亮点。
  */
 
-import { Archive, MoreHorizontal, Pin } from 'lucide-react'
+import { Archive, MoreHorizontal, Pin, RotateCcw } from 'lucide-react'
 import type { SessionMetaStore } from './session-meta.js'
 import { useSessionMeta } from './session-meta.js'
 import type { SessionId, TFn } from './faces.js'
@@ -23,6 +23,8 @@ export interface SessionRowProps {
   onOpen: () => void
   onMenu: (event: React.MouseEvent) => void
   onArchive: () => void
+  /** 归档行的恢复动作；未提供时不渲染。 */
+  onRestore?: (() => void) | undefined
   draggable: boolean
   onDragStart?: (event: React.DragEvent) => void
   onDragOver?: (event: React.DragEvent) => void
@@ -75,6 +77,22 @@ export function SessionRow(props: SessionRowProps): React.ReactNode {
           </span>
         )}
         {rowMeta.unread && <span className={css.badge} aria-hidden="true" />}
+        {props.archived && props.onRestore !== undefined && (
+          <span className={css.rowHoverActions}>
+            <button
+              type="button"
+              className={css.iconButton}
+              title={props.t('restoreSession')}
+              aria-label={props.t('restoreSession')}
+              onClick={event => {
+                event.stopPropagation()
+                props.onRestore?.()
+              }}
+            >
+              <RotateCcw size={13} />
+            </button>
+          </span>
+        )}
         {!props.archived && (
           <span className={css.rowHoverActions}>
             <button

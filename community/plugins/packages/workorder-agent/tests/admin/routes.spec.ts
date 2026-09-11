@@ -7,6 +7,7 @@ import type { AppConfig } from '../../src/config.js'
 import type { IssueSnapshot } from '../../src/domain/types.js'
 import { installAdminRoutes } from '../../src/plugins/admin/routes.js'
 import { WorkorderStore } from '../../src/plugins/store/store.js'
+import { WebhookRequestLog } from '../../src/plugins/webhook/log.js'
 import { IssueReviewWorkflow } from '../../src/plugins/workflow/review.js'
 
 const directories: string[] = []
@@ -38,7 +39,7 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-describe('工单控制面管理路由', () => {
+describe('Ticket Hub 管理路由', () => {
   it('同步工单、执行填写核验并返回持久化记录', async () => {
     const store = database()
     const app = new Hono()
@@ -48,7 +49,7 @@ describe('工单控制面管理路由', () => {
     installAdminRoutes(app, {
       config, store, issues: issues as never, delivery: { resume: vi.fn() } as never,
       workflow: { sendTestNotification: vi.fn(), inspect: vi.fn(), sendPreview: vi.fn(), resendPreview: vi.fn() } as never,
-      review, stats: { compute: vi.fn() } as never,
+      review, stats: { compute: vi.fn() } as never, webhookLog: new WebhookRequestLog(),
     })
     const synced = await app.request('/api/admin/issues/sync', { method: 'POST', body: JSON.stringify({ startDate: '2026-09-01', endDate: '2026-09-09' }), headers: { 'content-type': 'application/json' } })
     expect(synced.status).toBe(200)
@@ -67,7 +68,7 @@ describe('工单控制面管理路由', () => {
     const writePluginSettings = vi.fn(async (): Promise<void> => undefined)
     installAdminRoutes(app, {
       config, store, issues: {} as never, delivery: {} as never, workflow: {} as never,
-      review: {} as never, stats: {} as never, writePluginSettings,
+      review: {} as never, stats: {} as never, webhookLog: new WebhookRequestLog(), writePluginSettings,
     })
     const response = await app.request('/api/admin/review-settings', {
       method: 'POST', headers: { 'content-type': 'application/json' },

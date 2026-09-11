@@ -7,11 +7,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { GitBranch } from 'lucide-react'
 import remoteContribution from 'dsh-git-timeline/remote'
-import { GitBody, type GitBodyInjected } from './GitBody.js'
-import { en, zh } from './locales.js'
+import { GitBody, type GitBodyInjected } from './panel/GitBody.js'
+import { en, zh } from './lib/locales.js'
 import type {
   GitPanelApi, GitPanelRemoteFace, LocaleFace, RemoteFace, RemoteResult, SlotsFace, TabRegistryFace, TFn,
-} from './faces.js'
+  WorkspaceChangeFace,
+} from './lib/faces.js'
 
 /** 文案命名空间。 */
 const NS = 'gitPanel'
@@ -38,6 +39,14 @@ function panelApi(git: GitPanelRemoteFace): GitPanelApi {
   return {
     status: async cwd => unwrap(await git.status(cwd)),
     log: async (cwd, limit) => unwrap(await git.log(cwd, limit)),
+    diff: async (cwd, path, staged) => unwrap(await git.diff(cwd, path, staged)),
+    show: async (cwd, hash) => unwrap(await git.show(cwd, hash)),
+    showFile: async (cwd, hash, path) => unwrap(await git.showFile(cwd, hash, path)),
+    branches: async cwd => unwrap(await git.branches(cwd)),
+    checkout: async (cwd, branch) => unwrap(await git.checkout(cwd, branch)),
+    createBranch: async (cwd, name) => unwrap(await git.createBranch(cwd, name)),
+    lastMessage: async cwd => unwrap(await git.lastMessage(cwd)),
+    discard: async (cwd, paths) => unwrap(await git.discard(cwd, paths)),
     stage: async (cwd, paths) => unwrap(await git.stage(cwd, paths)),
     unstage: async (cwd, paths) => unwrap(await git.unstage(cwd, paths)),
     stageAll: async cwd => unwrap(await git.stageAll(cwd)),
@@ -65,6 +74,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeLocale = locale.register(NS, { zh, en } as Record<string, Record<string, string>>)
   const t: TFn = locale.bind(NS)
   const api = panelApi(ctx.get('remote.gitPanel') as GitPanelRemoteFace)
+  const filesFace = ctx.get('remote.workspaceFiles') as WorkspaceChangeFace | undefined
 
   const disposeType = tabs.register({
     id: ID,
@@ -82,7 +92,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     name: 'sidebar.right.pane.tab',
     key: ID,
     locale: NS,
-    inject: (): GitBodyInjected => ({ api }),
+    // 会话文件变更流是可选面：宿主没挂载 workspaceFiles 时，面板只是不自动刷新。
+    inject: (): GitBodyInjected => (filesFace === undefined ? { api } : { api, files: filesFace }),
   }, GitBody))
 
   return async () => {

@@ -1,38 +1,37 @@
 # dsh-codex-shell
 
-Codex 工作流风格的一体化 DeepSeek Harness Web 插件：把工作区/会话侧栏、开发侧栏项目管理与底部多 tab 交互终端合并进**一个 bundle**。右侧面板由宿主原生 `details` 列提供，本插件不再占用该列。
+English | [中文](README.zh.md)
 
 A Codex-workflow-styled integrated workspace shell for DeepSeek Harness (DSH): the workspace/session sidebar, per-workspace project directories, and a multi-tab bottom terminal in **one bundle plugin**. The right-hand panel belongs to the host's native `details` column; this plugin no longer occupies it.
 
-## 功能 / Features
+## Features
 
-- **侧栏浏览器**（遮蔽 `sidebar.workspaces`，参考 Codex 左侧栏排布，并隐藏顶部品牌行——DeepSeek 图标与文字）：搜索请求防抖、取消且只展示最新结果；结果与会话/项目树行支持键盘打开和开合；会话行不显示更新时间，标题常态占满可用宽度、仅在超出容器宽度时省略，置顶/归档/更多操作仅在悬浮或选中行时显示；菜单支持外点或 Esc 关闭并避免越出视口；侧栏折叠/展开控制在 Web 下位于顶部（宽态：新会话按钮上方的折叠按钮；轨道态：常显的打开图标），桌面独立窗口不显示（标题栏负责）；「项目」标题栏提供整理（按项目/扁平）与排序（置顶优先/最近更新/手动拖拽），项目组自身同样按置顶 → 最近更新 → 其余排列（项目行悬停可置顶/取消置顶，置顶按钮右侧为「在项目中新建会话」按钮，点击即在项目首个归属工作区开会话；无归属工作区时不显示该按钮），项目详情改为显式信息按钮；会话提供置顶/归档/更多操作（子代理信息由会话 header 目录呈现，侧栏不再嵌套子代理行）。
-- **添加工作区**（标题栏 `+`）：居中目录选择弹窗（路径输入 + 目录浏览 + 创建，基于 `codexShell.fsList`），不复用原生 directoryFlow 槽；侧栏页脚不再显示添加工作区按钮。
-- **底部交互终端**：宿主 `bottom` 行的独立多 tab 终端（`pwsh`/`bash` 新建、Agent `terminal_*` 会话可跟随；`@xterm/xterm` 渲染），与模型侧行模式工具并行；列宽/拖拽/动画由宿主布局接管。
-- **会话头工具按钮**（`conversation.session.header.utilities`）：Web 下渲染底部终端按钮；桌面独立窗口不渲染（该按钮由顶部栏在窗口控制按钮左侧提供）。右侧面板归宿主官方右栏（`ui-sidebar-right`）：Web 用右栏自带的会话头角落按钮开合，桌面独立窗口用顶部栏的「切换右侧面板」按钮开合。
-- **视觉**：完全映射宿主 `--dsw-*` 主题令牌，亮/暗主题自动跟随；侧栏为 Codex 式极简排布（安静分组、单行会话、悬停显露操作）。
+- **Sidebar browser** (shadows `sidebar.workspaces`, follows the Codex left-rail arrangement, and hides the top brand row with the DeepSeek icon and wordmark): search requests are debounced and cancelled so that only the newest result is shown; result rows and session/project tree rows support keyboard open and collapse; session rows do not show the update time, titles normally fill the available width and are elided only when they overflow the container, and pin/archive/more actions appear only on hover or on the selected row; menus close on outside click or Esc and stay inside the viewport; the sidebar collapse/expand control sits at the top on Web (wide state: a collapse button above the new-session button; rail state: an always-visible open icon) and is not shown in the standalone desktop window (the title bar owns it); the far right of the "Projects" title bar is **New project** (the dialog picks a name plus the base workspace; a directory can also be selected directly, and that directory first creates or reuses a workspace and then becomes its first worktree), while "Add workspace..." stays in the organize menu; the project list always sorts as **pinned > most recent activity > fallback** (most recent activity is the newest update time among the project's sessions); hovering a project row pins or unpins it, to the right of the pin button is "New session in project" (starts a session in the project's first owning workspace, hidden when there is no owning workspace), and the "..." menu to its right offers rename project / manage worktrees (add or remove project roots) / archive group sessions / delete project; the "More > Project" entry of a session lists exactly those projects, and on attach a session directory that hits one of the project's workspaces lands in that workspace and otherwise lands in the project's base workspace, while a project with no workspace yet gets one created from its session directory and taken into the project; sessions offer pin/archive/more actions (subagent information is presented by the session header directory, and the sidebar no longer nests subagent rows).
+- **Add workspace** (organize menu; the desktop title bar's File > Open Workspace uses the same path): a centered directory picker dialog (path input + directory browsing + create, backed by `codexShell.fsList`) that does not reuse the native directoryFlow slot; the sidebar footer no longer shows an add-workspace button.
+- **Archiving and auto-archive**: a single archive from the session menu; the "Organize" menu sets the auto-archive threshold (off / 7 / 14 / 30 / 90 days without activity, 30 days by default, written to the sidebar preference store), and while the sidebar is open it scans once every 30 minutes, skipping running, currently selected, blank placeholder, and subagent sessions; archived sessions are collected into the sidebar's "Archived" bucket, and hovering a row offers "Restore" (the host's `unarchiveSession`, which keeps the original workspace position unchanged).
+- **Project picker on the new-session page** (shadows `conversation.hero.workspace`): the workspace chip of the empty-session hero now selects a **project**; it lists projects (pinned > recent) + ungrouped workspaces + "New project..."; a project with several workspaces expands its worktrees first so that the user picks one, a single-workspace project starts the session directly, and a project with no owning workspace is disabled with the reason shown.
+- **Bottom interactive terminal**: a self-contained multi-tab terminal in the host's `bottom` row (new tabs create `pwsh`/`bash`, agent `terminal_*` sessions can be followed, rendered with `@xterm/xterm`) that runs in parallel with the model-side line-mode tools; column widths, dragging, and animation are owned by the host layout.
+- **Session header utility button** (`conversation.session.header.utilities`): renders the bottom terminal button on Web, and is not rendered in the standalone desktop window (the top bar provides that button to the left of the window controls). The right-hand panel belongs to the host's official right sidebar (`ui-sidebar-right`): on Web it is toggled by the session-header corner button that the right sidebar itself provides, and in the standalone desktop window by the top bar's "Toggle right panel" button.
+- **Visuals**: maps the host's `--dsw-*` theme tokens completely and follows light and dark themes automatically; the sidebar uses a minimal Codex-style arrangement (quiet grouping, single-line sessions, actions revealed on hover).
 
-## 安装 / Install
+## Install
 
 ```sh
 dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-shell-0.6.5.tgz
 dsh plugin --profile web remove dsh-codex-shell
 ```
 
-## 开发 / Develop (source link + hot reload)
+## Develop (source link + hot reload)
 
-保持 `dsh web`（或桌面壳）运行，然后执行：
+Keep `dsh web` (or the desktop shell) running, then run:
 
 ```sh
 node community/plugins/dev.mjs codex-shell
 ```
 
-脚本会把插件以源码 link 挂载进 web profile、在 `cordis.patch.yml` 启用
-Cordis HMR 并指向源码目录，再启动 host/client 双面 watch 构建。之后修改
-源码，host 侧由 Cordis HMR 热替换、client 侧由 `client-hmr` 推送浏览器
-热重载，无需重启服务或手动刷新页面。
+The script mounts the plugin into the web profile as a source link, enables Cordis HMR in `cordis.patch.yml` and points it at the source directory, then starts the dual host/client watch build. Afterwards, edit the source: the host side is hot-swapped by Cordis HMR and the client side pushes browser hot reloads through `client-hmr`, with no server restart and no manual page refresh.
 
-或手动在 profile 的 `cordis.patch.yml` 里 insert：
+Or insert it manually in the profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
@@ -40,21 +39,21 @@ Cordis HMR 并指向源码目录，再启动 host/client 双面 watch 构建。�
       name: dsh-codex-shell
 ```
 
-安装后重启 profile（`dsh web`）。插件、MCP 与 Skills 的查看和配置请使用宿主「设置 → 插件」页面（需 `dsh-plugin-manager` 等宿主侧能力），本插件不再提供对应面板。
+Restart the profile after installing (`dsh web`). Use the host's "Settings > Plugins" page to view and configure plugins, MCP servers, and skills (it requires host-side capabilities such as `dsh-plugin-manager`); this plugin no longer provides its own panel.
 
-## 宿主 Remote / Host Remote
+## Host Remote
 
-`ctx.remote.codexShell`（Typert）：
+`ctx.remote.codexShell` (Typert):
 
-- `terminalOpen/terminalList/terminalFollow/terminalWrite/terminalResize/terminalClose`（底栏多 tab；`terminalSend`/`terminalRead` 仍保留）
-- `fsList`（添加工作区弹窗的目录浏览）
-- `projectList/projectCreate/projectRename/projectSetRoots/projectDelete`（侧栏项目层，走宿主 workspaceRegistry）
+- `terminalOpen/terminalList/terminalFollow/terminalWrite/terminalResize/terminalClose` (bottom-bar multi-tab; `terminalSend`/`terminalRead` are still available)
+- `fsList` (directory browsing for the add-workspace dialog)
+- `projectList/projectCreate/projectRename/projectSetRoots/projectDelete` (sidebar project layer, going through the host workspaceRegistry)
 
-目录列举经 `ctx.fs`。git 能力（提交历史、变更清单）已移出本插件：见独立的 [`dsh-git-timeline`](../git-timeline/README.md) 右栏标签插件。
+Directory listing goes through `ctx.fs`. Git capabilities (commit history, change list) have moved out of this plugin: see the separate [`dsh-git-timeline`](../git-timeline/README.md) right-sidebar tab plugin.
 
 ## Known Limitations and Deferred Work
 
-- 跨目录「迁项目」需改会话 cwd（本期不做）；同目录归入匹配工作区（`attachSession`）与「移到未分组」（`detachSession`）已闭环。永久工作树 / Cursor 打开器仍待 Host。
-- 右侧面板归宿主官方右栏（`ui-sidebar-right`：文件 / 指南 / 文档预览等标签页取决于已安装的右栏标签包）；本插件不再提供文件树 / Git / 命令历史 / 摘要 / 内嵌浏览器面板。Git 时间线在 `dsh-git-timeline` 插件里。
-- 附加目录仅登记路径，不接管沙箱权限（不替换 `fs-sandbox`）。
-- 添加工作区选择器为插件自带（目录浏览 + 路径输入），不复用原生 directoryFlow 流。
+- Moving a project across directories requires changing the session cwd (deferred for this release); attaching a session to a matching workspace in the same directory (`attachSession`) and "move to ungrouped" (`detachSession`) are complete. Permanent worktrees / a Cursor opener still await the host.
+- The right-hand panel belongs to the host's official right sidebar (`ui-sidebar-right`: the file / guide / document-preview tabs depend on the installed right-sidebar tab packages); this plugin no longer provides the file tree / Git / command history / summary / embedded browser panels. The Git timeline lives in the `dsh-git-timeline` plugin.
+- Extra directories register paths only and do not take over sandbox permissions (they do not replace `fs-sandbox`).
+- The add-workspace picker ships with the plugin (directory browsing + path input) and does not reuse the native directoryFlow flow.

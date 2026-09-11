@@ -505,6 +505,16 @@
       "source": "packages/todo/tool-todo/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/session-import.md",
+      "symbol": "CodexImportRun",
+      "source": "packages/session/session-import-codex/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-import.md",
+      "symbol": "CodexImportHistoryValue",
+      "source": "packages/session/session-import-codex/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/session.md",
       "symbol": "SessionEvent",
       "source": "packages/core/session/src/types.ts"

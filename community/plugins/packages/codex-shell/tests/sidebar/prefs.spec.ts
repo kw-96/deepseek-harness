@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BrowserPrefsStore } from '../../src/client/sidebar/prefs.js'
+import { BrowserPrefsStore, DEFAULT_AUTO_ARCHIVE_DAYS } from '../../src/client/sidebar/prefs.js'
 
 describe('BrowserPrefsStore 收起状态持久化', () => {
   beforeEach(() => {
@@ -36,5 +36,19 @@ describe('BrowserPrefsStore 收起状态持久化', () => {
     restored.setProjectPinned('p1', false)
     expect(new BrowserPrefsStore().projectPinned('p1')).toBe(false)
     expect(new BrowserPrefsStore().projectPinned('p2')).toBe(true)
+  })
+
+  it('自动归档阈值默认 30 天，写入后跨实例保持，且 0 表示关闭', () => {
+    expect(new BrowserPrefsStore().autoArchiveDays).toBe(DEFAULT_AUTO_ARCHIVE_DAYS)
+    const store = new BrowserPrefsStore()
+    store.setAutoArchiveDays(14)
+    expect(new BrowserPrefsStore().autoArchiveDays).toBe(14)
+    store.setAutoArchiveDays(0)
+    expect(new BrowserPrefsStore().autoArchiveDays).toBe(0)
+    // 负数与非整数归一化：不低于 0 且取整。
+    store.setAutoArchiveDays(-5)
+    expect(new BrowserPrefsStore().autoArchiveDays).toBe(0)
+    store.setAutoArchiveDays(7.8)
+    expect(new BrowserPrefsStore().autoArchiveDays).toBe(7)
   })
 })

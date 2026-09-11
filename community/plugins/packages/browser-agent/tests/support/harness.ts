@@ -5,10 +5,14 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import { expect } from 'vitest'
 import { BrowserPolicy } from '../../src/host/policy.js'
 import { BskSessionStore } from '../../src/host/store.js'
-import type { ApprovalFace } from '../../src/tools/shared.js'
-import { registerBrowserTools } from '../../src/tools/register.js'
+import { registerControlTools } from '../../src/tools/control.js'
+import { registerInteractTools } from '../../src/tools/interact.js'
+import { registerNavigateTools } from '../../src/tools/navigate.js'
+import { registerObserveTools } from '../../src/tools/observe.js'
+import type { ApprovalFace, BrowserToolDeps } from '../../src/tools/shared.js'
 import { FakeRunner } from './fake-runner.js'
 
 /** 夹具配置。 */
@@ -19,6 +23,15 @@ export interface HarnessOptions {
   requireApprovalForBorrow?: boolean
   idleTimeoutMs?: number
   browserInstance?: string
+  clickMode?: 'pointer' | 'dom'
+  /** 截图附件桥的替身；未提供时工具退回「只给路径」形态。 */
+  saveImage?: (input: { sessionId: string; data: Uint8Array; mediaType: string; name: string }) => Promise<{
+    attachmentId: string
+    mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+    bytes: number
+    width: number
+    height: number
+  } | undefined>
 }
 
 /** 一次测试用的插件装配结果。 */
@@ -67,7 +80,7 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
   const approval: ApprovalFace | undefined = options.approval === undefined ? undefined : {
     request: async () => options.approval ?? 'unavailable',
   }
-  registerBrowserTools(ctx, {
+  const deps: BrowserToolDeps = {
     runner,
     store,
     policy: new BrowserPolicy({
@@ -80,9 +93,15 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
       navigationTimeoutMs: 2000,
       screenshotDir: '',
       requireApprovalForBorrow: options.requireApprovalForBorrow ?? true,
+      clickMode: options.clickMode ?? 'pointer',
     },
     ...(approval !== undefined ? { approval } : {}),
-  })
+    ...(options.saveImage !== undefined ? { saveImage: options.saveImage } : {}),
+  }
+  registerObserveTools(ctx, deps)
+  registerInteractTools(ctx, deps)
+  registerNavigateTools(ctx, deps)
+  registerControlTools(ctx, deps)
   const exec: Harness['exec'] = { signal: new AbortController().signal }
   if (options.agent !== false) exec.agent = { session: { id: 'sess-1' } }
   return {
@@ -109,4 +128,35 @@ export async function call(harness: Harness, name: string, args: unknown): Promi
   const tool = harness.tools.get(name)
   if (tool === undefined) throw new Error(`未注册工具：${name}`)
   return await tool.execute(args, harness.exec as never) as Record<string, unknown>
+}
+
+/**
+ * 断言工具返回值与它声明的输出 schema 完全一致。
+ *
+ * 直接调 `execute` 会绕过注册表的输出校验（`additionalProperties: false`），
+ * 多带一个字段在真实管线里会被判为 invalid output，而单测却全绿——因此每个
+ * 工具用例都应过一遍这个检查。
+ * @param harness - 夹具
+ * @param name - 工具名
+ * @param value - 工具的返回值
+ */
+/**
+ * 断言工具返回值符合它声明的输出 schema。
+ *
+ * 直接调 `execute` 会绕过注册表的输出校验（`additionalProperties: false`），
+ * 多带一个字段在真实管线里会被判为 invalid output，而单测却全绿——因此每个
+ * 工具用例都应过一遍这个检查：不得多键，`required` 键必须齐（可选项可缺席）。
+ * @param harness - 夹具
+ * @param name - 工具名
+ * @param value - 工具的返回值
+ */
+export function expectDeclaredKeys(harness: Harness, name: string, value: Record<string, unknown>): void {
+  const schema = harness.tools.get(name)?.output.schema as
+    { properties?: Record<string, { required?: true }> } | undefined
+  const properties = schema?.properties ?? {}
+  expect(Object.keys(value).filter(key => !(key in properties))).toEqual([])
+  const missing = Object.entries(properties)
+    .filter(([key, spec]) => spec.required === true && !(key in value))
+    .map(([key]) => key)
+  expect(missing).toEqual([])
 }

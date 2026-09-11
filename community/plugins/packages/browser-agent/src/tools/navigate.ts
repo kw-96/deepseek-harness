@@ -9,9 +9,10 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { parseTabs } from '../host/parse.js'
 import type { BrowserTabView } from '../types.js'
 import { requireApproval } from './approval.js'
-import { observationRender, observationSchema, observationValue } from './observation.js'
+import { observationRender, observationSchema, observationValue, refreshCurrentUrl } from './observation.js'
 import type { BrowserToolDeps } from './shared.js'
-import { durationArg, registerTool, requireSessionId, runFor, takeSnapshot, textBlock, valueSchema } from './shared.js'
+import { durationArg, registerTool, runFor, takeSnapshot } from './actions.js'
+import { requireSessionId, textBlock, valueSchema } from './shared.js'
 
 const HISTORY_ACTIONS = ['back', 'forward', 'reload'] as const
 const TAB_ACTIONS = ['list', 'create', 'close', 'select', 'borrow', 'return'] as const
@@ -62,7 +63,13 @@ export function registerNavigateTools(ctx: Context, deps: BrowserToolDeps): void
       await runFor(deps, sessionId, command, { timeoutMs: deps.config.navigationTimeoutMs, signal: exec.signal })
       deps.store.markRefsStale(sessionId)
       const captured = await takeSnapshot(deps, sessionId, exec.signal)
-      return observationValue(captured.record, captured.snapshot, `${args.action} 后已重新快照`)
+      // 后退/前进/刷新可能落在应用内路由上，URL 一律以活动标签页为准。
+      await refreshCurrentUrl(deps, sessionId, exec.signal)
+      return observationValue(
+        deps.store.get(sessionId) ?? captured.record,
+        captured.snapshot,
+        `${args.action} 后已重新快照`,
+      )
     },
     presentCall: args => ({ card: 'generic', title: `导航 ${args.action}`, kind: 'other', rawInput: args.action }),
   }))
