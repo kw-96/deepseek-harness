@@ -5,6 +5,8 @@ node_modules/
 # (corepack/npm); the desktop shell invokes those shims on every launch.
 !.runtime/**/node_modules/
 lib/
+# Source trees may contain a directory named `lib` (e.g. `src/client/lib`); re-include those.
+!**/src/**/lib/
 *.tsbuildinfo
 pnpm-debug.log
 .pnpm-store/
