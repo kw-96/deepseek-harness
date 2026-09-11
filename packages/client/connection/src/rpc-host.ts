@@ -161,6 +161,17 @@ export class HostConnectionService extends Service implements HostConnectionHand
     handler: ConnectionRpcHandler,
   ): () => Promise<void> {
     assertChannel(channel)
+    // 本地定制(dev fork)：0.1.5 将 webServer 改由动态注入提供之后，插件 ctx
+    // 不再持有该注入，而 cordis 拒绝未注入服务的属性访问
+    // (cannot get property "webServer" without inject)，导致任何插件的
+    // rpc.handle() 都失败、其 RPC 通道从未挂载（浏览器侧表现为 HTTP 405）。
+    // 此处改用 ctx.get 读取全局服务注册表，保持 0.1.5 的注入契约不变。
+    const webServer = owner.get('webServer')
+    if (webServer === undefined) {
+      throw new Error(
+        `connection: cannot register RPC channel ${JSON.stringify(channel)}; the webServer service is unavailable`,
+      )
+    }
     const fetchHandler = rpcFetchHandler(channel, handler)
     const route: WebRoute = {
       kind: 'prefix',
@@ -176,7 +187,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
       },
     }
     return owner.effect(
-      () => owner.webServer.register(route),
+      () => webServer.register(route),
       `client-connection: ${channel} rpc channel`,
     )
   }
