@@ -3,28 +3,28 @@
 import type { GitEntry } from '../../types.js'
 import type { TFn } from './faces.js'
 
-/** porcelain-v2 里未合并（冲突）的 XY 组合。 */
-const CONFLICT_CODES = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
-
-/** 该条目是否处于未解决的合并冲突。 */
+/** 未合并（冲突）条目：XY 含 U，或双方同为 A/D。 */
 export function isConflict(xy: string): boolean {
-  return CONFLICT_CODES.has(xy)
+  if (xy === '??') return false
+  if (xy.includes('U')) return true
+  const [index, work] = [xy.slice(0, 1), xy.slice(1, 2)]
+  return (index === 'A' && work === 'A') || (index === 'D' && work === 'D')
 }
 
-/** porcelain 的 XY 状态码转单字母展示（冲突统一显示 `!`）。 */
+/** porcelain 的 XY 状态码转单字母展示；冲突统一显示 `!`。 */
 export function statusLetter(xy: string): string {
-  if (xy === '??') return 'U'
   if (isConflict(xy)) return '!'
+  if (xy === '??') return 'U'
   const stripped = xy.replaceAll(' ', '').replaceAll('.', '')
   if (stripped === '') return 'M'
   const letter = stripped.slice(0, 1)
   return letter === '?' ? 'U' : letter
 }
 
-/** 状态字母的类型：改动 / 新增 / 删除 / 冲突，用于配色。 */
+/** 状态字母的类型：冲突 / 改动 / 新增 / 删除，用于配色。 */
 export function statusKind(xy: string): 'modified' | 'added' | 'deleted' | 'conflict' {
+  if (isConflict(xy)) return 'conflict'
   const letter = statusLetter(xy)
-  if (letter === '!') return 'conflict'
   if (letter === 'A' || letter === 'U') return 'added'
   if (letter === 'D') return 'deleted'
   return 'modified'
