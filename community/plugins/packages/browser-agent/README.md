@@ -11,9 +11,10 @@ reclaimed by the plugin instead of by the model's memory.
 
 ## What it does
 
-- Registers 12 model tools: `browser_open`, `browser_observe`, `browser_click`, `browser_fill`, `browser_press`,
-  `browser_select`, `browser_history`, `browser_tabs`, `browser_ask_human`, `browser_evaluate`, `browser_status`,
-  `browser_stop`.
+- Registers 18 model tools: `browser_open`, `browser_observe`, `browser_click`, `browser_hover`, `browser_fill`,
+  `browser_press`, `browser_select`, `browser_history`, `browser_tabs`, `browser_session`, `browser_transfer`,
+  `browser_wait`,
+  `browser_inspect`, `browser_emulate`, `browser_ask_human`, `browser_evaluate`, `browser_status`, `browser_stop`.
 - Owns the `bsk` session for every DSH session: lazy start on first use, and reclamation through five paths —
   explicit `browser_stop`, DSH session disposal (`agent/disposed`), plugin unload, orphan reaping for a host session
   that no longer exists (a restarted plugin cannot `browser_stop` a record whose session id changed), and an idle sweep.
@@ -25,9 +26,12 @@ reclaimed by the plugin instead of by the model's memory.
   the model to reopen the page, and the next call lazily starts a fresh session.
 - Keeps refs honest: any navigation or click marks refs stale, and a ref-consuming tool re-snapshots before it
   writes, then snapshots again after the DOM may have changed.
+- Runs several browser sessions in parallel: `browser_session` lists, creates, switches and closes them by alias;
+  every other tool takes an optional `session` alias and defaults to the active one, and both session disposal and
+  the idle sweep reclaim every alias at once.
 - Defaults to observation-first: `browser_observe` returns the accessibility snapshot unless the caller asks for
   `html` or `screenshot`.
-- Serves a right-sidebar tab "浏览器" with session state, tabs, the latest screenshot, and a Stop button.
+- Serves a right-sidebar tab "浏览器" with session state, tabs, the latest screenshot, and a live view: it refreshes the running action plus elapsed time every second, can interrupt the in-flight tool call, and offers a Stop button.
 
 ## Requirements
 
@@ -82,12 +86,14 @@ Declared by the plugin's `Config` schema and overridable from `cordis.yml`:
 | `binary` | `bsk` | Executable name or absolute path. |
 | `browserInstance` | `''` | Target browser instance id or label; empty requires exactly one connected browser. |
 | `workspaceRoot` | `process.cwd()` | Working directory for the `bsk` child process. |
+| `bskHome` | '' | bsk home directory (daemon socket, lock, logs). Empty uses bsk's own default; tests must point it at a temp directory, because disposable subprocess jobs would otherwise kill the real daemon. |
 | `idleTimeoutMs` | `600000` | Idle time before the sweep ends a session. |
 | `actionTimeoutMs` | `30000` | Timeout for ordinary commands. |
 | `navigationTimeoutMs` | `60000` | Timeout for navigation-class commands. |
 | `snapshotMaxChars` | `24000` | Character cap for one snapshot handed to the model. |
 | `screenshotDir` | `''` | Screenshot output directory; empty uses the `bsk` temp default. |
 | `allowEvaluate` | `false` | Whether `browser_evaluate` may run at all. |
+| `clickMode` | `pointer` | How clicks are delivered: `pointer` uses CDP pointer events; `dom` resolves the target with `hover` and then runs a fixed `element.click()` expression, for the transition case where the extension overlay swallows pointer clicks. The expression is plugin-authored, so the model cannot inject script through it. |
 | `requireApprovalForBorrow` | `true` | Ask the harness approval service before borrowing a user tab. |
 | `sensitivePatterns` | credentials keywords | Host substrings where scripting is refused. |
 | `allowedPatterns` | `[]` | Non-empty restricts navigation to matching hosts. |

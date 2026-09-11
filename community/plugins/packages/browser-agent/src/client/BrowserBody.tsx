@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { BrowserPanelSnapshot, BrowserPreviewResult } from '../types.js'
 import type { BrowserPanelApi } from './faces.js'
 import type { TFn } from './faces.js'
+import { LiveSection } from './LiveSection.js'
 import styles from './styles.module.css'
 
 /** 面板注入的依赖与运行时 props。 */
@@ -104,6 +105,8 @@ export function BrowserBody({ sessionId, api, t }: BrowserBodyProps): React.Reac
                 {browser.versionSkew && <span className={styles.warn}>版本不一致</span>}
               </div>
             ))}
+
+          <LiveSection sessionId={sessionId} api={api} t={t} active={session?.state === 'open'} />
 
           <div className={styles.section}>{t('currentPage')}</div>
           {page === null || page === ''

@@ -80,7 +80,8 @@ function api(over: Partial<GitPanelApi> = {}): GitPanelApi {
     push: vi.fn(async () => ({ detail: '' })),
     pull: vi.fn(async () => ({ detail: '' })),
     fetch: vi.fn(async () => ({ detail: '' })),
-    identity: vi.fn(async () => ({ name: 'dev', email: 'dev@example.test' })),
+    identity: vi.fn(async () => ({ name: 'dev', email: 'dev@example.test', origin: 'C:/Users/x/.gitconfig' })),
+    setIdentity: vi.fn(async () => ({ detail: 'dev <dev@example.test>' })),
     message: vi.fn(async () => ({ message: '整理 Git 面板', provider: 'deepseek', model: 'chat' })),
     ...over,
   } as GitPanelApi
@@ -275,12 +276,38 @@ describe('git panel body', () => {
     expect(screen.getByText('+const b = 3')).toBeTruthy()
   })
 
+  it('offers to configure the git account when no identity is set', async () => {
+    const setIdentity = vi.fn(async () => ({ detail: 'dev <dev@example.test>' }))
+    const identity = vi.fn(async () => ({ name: null, email: null, origin: null }))
+    render(<GitBody {...props({ api: api({ identity, setIdentity }) })} />)
+    const chip = await screen.findByRole('button', { name: 'Git 账号' })
+    expect(chip.textContent).toContain('设置 Git 账号')
+    fireEvent.click(chip)
+    expect(screen.getByText('尚未配置提交署名，git 提交会被拒绝。填写后点保存即可。')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: 'dev' } })
+    fireEvent.change(screen.getByLabelText('邮箱'), { target: { value: 'dev@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: '仅本仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(setIdentity).toHaveBeenCalledWith('E:/repo', 'dev', 'dev@example.test', 'local'))
+  })
+
+  it('prefills the configured identity and its source file', async () => {
+    render(<GitBody {...props()} />)
+    const chip = await screen.findByRole('button', { name: 'Git 账号' })
+    expect(chip.textContent).toContain('dev · dev@example.test')
+    expect(chip.getAttribute('title')).toBe('C:/Users/x/.gitconfig')
+    fireEvent.click(chip)
+    expect(screen.getByText('来源：C:/Users/x/.gitconfig')).toBeTruthy()
+    expect((screen.getByLabelText('姓名') as HTMLInputElement).value).toBe('dev')
+    expect((screen.getByLabelText('邮箱') as HTMLInputElement).value).toBe('dev@example.test')
+  })
+
   it('shows branch, workspace and account in the bottom bar', async () => {
     render(<GitBody {...props()} />)
     const branch = await screen.findByRole('button', { name: '切换分支' })
     expect(branch.textContent).toContain('dev')
     expect(branch.textContent).toContain('↑1')
     expect(screen.getByTitle('repo')).toBeTruthy()
-    expect(screen.getByTitle('dev · dev@example.test')).toBeTruthy()
+    expect(screen.getByTitle('C:/Users/x/.gitconfig')).toBeTruthy()
   })
 })

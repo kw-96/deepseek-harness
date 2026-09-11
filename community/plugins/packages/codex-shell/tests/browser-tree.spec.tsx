@@ -5,7 +5,7 @@ import { BrowserTree } from '../src/client/browser-tree.js'
 import { SessionMetaStore } from '../src/client/session-meta.js'
 import { BrowserPrefsStore } from '../src/client/sidebar/prefs.js'
 import { zh } from '../src/client/locales.js'
-import type { ProjectView, SessionListStateLike, WorkspaceViewLike } from '../src/client/faces.js'
+import type { ProjectView, SessionListStateLike, SessionSummaryLike, WorkspaceViewLike } from '../src/client/faces.js'
 
 const t = (key: string, params?: Record<string, unknown>): string => {
   const raw = (zh as Record<string, string>)[key] ?? key
@@ -24,20 +24,38 @@ const project = (roots: readonly string[]): ProjectView => ({
 
 const list: SessionListStateLike = { ids: [], byId: {}, current: undefined, phase: 'ready' }
 
-/** 渲染项目视图（byProject）并返回注入回调。 */
-function renderTree(path: string, roots: readonly string[], pinned: boolean) {
+/** 渲染项目视图（byProject）并返回注入回调；可附带一个组内会话用于状态标记断言。 */
+function renderTree(
+  path: string,
+  roots: readonly string[],
+  pinned: boolean,
+  session?: { id: string; running: boolean },
+) {
   const prefs = new BrowserPrefsStore()
   if (pinned) prefs.setProjectPinned('p1', true)
   const onNewSession = vi.fn()
   const onToggleGroup = vi.fn()
   const onToggleProjectPin = vi.fn()
+  const summary: SessionSummaryLike | undefined = session === undefined
+    ? undefined
+    : {
+      id: session.id,
+      displayTitle: '会话一',
+      running: session.running,
+      blank: false,
+      updatedAt: 1,
+    }
   render(
     <BrowserTree
       groups={{
-        grouped: [{ workspace: workspace(path), sessions: [] }],
+        grouped: [{ workspace: workspace(path), sessions: session === undefined ? [] : [session.id] }],
         ungrouped: [], archived: [], flat: [],
       }}
-      list={list}
+      list={{
+        ...list,
+        ids: session === undefined ? [] : [session.id],
+        byId: summary === undefined ? {} : { [session.id]: summary },
+      }}
       collapsed={new Set()}
       searching={false}
       searchItems={[]}
@@ -96,5 +114,23 @@ describe('项目行动作按钮', () => {
     renderTree('D:\\other', ['D:\\proj'], true)
     expect(screen.queryByLabelText('在项目中新建会话')).toBeNull()
     expect(screen.getByLabelText('取消置顶')).toBeTruthy()
+  })
+})
+
+describe('项目名称行的进行中标记', () => {
+  it('组内任一会话运行中时点亮标记', () => {
+    renderTree('D:\\proj', ['D:\\proj'], false, { id: 's1', running: true })
+    expect(screen.getByTitle('进行中')).toBeTruthy()
+  })
+
+  it('组内没有运行中的会话时不显示标记', () => {
+    renderTree('D:\\proj', ['D:\\proj'], false, { id: 's1', running: false })
+    expect(screen.queryByTitle('进行中')).toBeNull()
+  })
+
+  it('标记与项目名同处名称行（紧邻项目名右侧，不是分区标题行）', () => {
+    renderTree('D:\\proj', ['D:\\proj'], false, { id: 's1', running: true })
+    const dot = screen.getByTitle('进行中')
+    expect(dot.previousElementSibling).toBe(screen.getByText('项目一'))
   })
 })

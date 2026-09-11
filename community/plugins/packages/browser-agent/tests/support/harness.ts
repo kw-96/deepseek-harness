@@ -6,12 +6,15 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { expect } from 'vitest'
+import type { ActionTracker } from '../../src/host/live/tracker.js'
 import { BrowserPolicy } from '../../src/host/policy.js'
 import { BskSessionStore } from '../../src/host/store.js'
+import { registerAdvancedTools } from '../../src/tools/advanced.js'
 import { registerControlTools } from '../../src/tools/control.js'
 import { registerInteractTools } from '../../src/tools/interact.js'
 import { registerNavigateTools } from '../../src/tools/navigate.js'
 import { registerObserveTools } from '../../src/tools/observe.js'
+import { registerSessionTools } from '../../src/tools/sessions/session.js'
 import type { ApprovalFace, BrowserToolDeps } from '../../src/tools/shared.js'
 import { FakeRunner } from './fake-runner.js'
 
@@ -24,6 +27,8 @@ export interface HarnessOptions {
   idleTimeoutMs?: number
   browserInstance?: string
   clickMode?: 'pointer' | 'dom'
+  /** 实时动作跟踪器；提供后工具包装器会记录动作并支持中断。 */
+  tracker?: ActionTracker
   /** 截图附件桥的替身；未提供时工具退回「只给路径」形态。 */
   saveImage?: (input: { sessionId: string; data: Uint8Array; mediaType: string; name: string }) => Promise<{
     attachmentId: string
@@ -97,11 +102,14 @@ export function makeHarness(options: HarnessOptions = {}): Harness {
     },
     ...(approval !== undefined ? { approval } : {}),
     ...(options.saveImage !== undefined ? { saveImage: options.saveImage } : {}),
+    ...(options.tracker !== undefined ? { tracker: options.tracker } : {}),
   }
   registerObserveTools(ctx, deps)
   registerInteractTools(ctx, deps)
   registerNavigateTools(ctx, deps)
   registerControlTools(ctx, deps)
+  registerAdvancedTools(ctx, deps)
+  registerSessionTools(ctx, deps)
   const exec: Harness['exec'] = { signal: new AbortController().signal }
   if (options.agent !== false) exec.agent = { session: { id: 'sess-1' } }
   return {

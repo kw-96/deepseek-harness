@@ -5,7 +5,8 @@
 
 import type { ComponentType } from 'react'
 import type {
-  BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult, BrowserTabView,
+  BrowserInterruptResult, BrowserLiveView, BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult,
+  BrowserTabView,
 } from '../types.js'
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string
@@ -35,6 +36,8 @@ export interface BrowserAgentRemoteFace {
   panel(sessionId: string): Promise<RemoteResult<BrowserPanelSnapshot>>
   stop(sessionId: string): Promise<RemoteResult<BrowserStopResult>>
   preview(sessionId: string): Promise<RemoteResult<BrowserPreviewResult>>
+  live(sessionId: string): Promise<RemoteResult<BrowserLiveView>>
+  interrupt(sessionId: string): Promise<RemoteResult<BrowserInterruptResult>>
 }
 
 /** 解包后的面板 API：组件直接消费的形态。 */
@@ -42,6 +45,8 @@ export interface BrowserPanelApi {
   panel(sessionId: string): Promise<BrowserPanelSnapshot>
   stop(sessionId: string): Promise<BrowserStopResult>
   preview(sessionId: string): Promise<BrowserPreviewResult>
+  live(sessionId: string): Promise<BrowserLiveView>
+  interrupt(sessionId: string): Promise<BrowserInterruptResult>
 }
 
 /** 引导页入口胶囊。 */

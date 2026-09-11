@@ -11,9 +11,10 @@ describe('工具注册', () => {
   it('注册全部浏览器工具', () => {
     const harness = makeHarness()
     expect([...harness.tools.keys()].sort()).toEqual([
-      'browser_ask_human', 'browser_click', 'browser_evaluate', 'browser_fill', 'browser_history',
-      'browser_observe', 'browser_open', 'browser_press', 'browser_select', 'browser_status',
-      'browser_stop', 'browser_tabs',
+      'browser_ask_human', 'browser_click', 'browser_emulate', 'browser_evaluate', 'browser_fill',
+      'browser_history', 'browser_hover', 'browser_inspect', 'browser_observe', 'browser_open',
+      'browser_press', 'browser_select', 'browser_session', 'browser_status', 'browser_stop', 'browser_tabs',
+      'browser_transfer', 'browser_wait',
     ])
     for (const tool of harness.tools.values()) expect(tool.output.render).toBeTypeOf('function')
   })
@@ -25,7 +26,7 @@ describe('工具注册', () => {
 
   it('卸载时注销全部工具', () => {
     const harness = makeHarness()
-    expect(harness.tools.size).toBe(12)
+    expect(harness.tools.size).toBe(18)
     harness.dispose()
     expect(harness.tools.size).toBe(0)
   })
@@ -219,6 +220,16 @@ describe('输出契约', () => {
     expectDeclaredKeys(harness, 'browser_status', status)
     const stopped = await call(harness, 'browser_stop', {})
     expectDeclaredKeys(harness, 'browser_stop', stopped)
+    const hovered = await call(harness, 'browser_hover', { target: '@e2' })
+    expectDeclaredKeys(harness, 'browser_hover', hovered)
+    const waited = await call(harness, 'browser_wait', { ms: 10 })
+    expectDeclaredKeys(harness, 'browser_wait', waited)
+    const inspected = await call(harness, 'browser_inspect', { kind: 'network' })
+    expectDeclaredKeys(harness, 'browser_inspect', inspected)
+    const emulated = await call(harness, 'browser_emulate', { width: 390, height: 844 })
+    expectDeclaredKeys(harness, 'browser_emulate', emulated)
+    const uploaded = await call(harness, 'browser_transfer', { action: 'upload', target: '@e1', files: ['a.txt'] })
+    expectDeclaredKeys(harness, 'browser_transfer', uploaded)
   })
 })
 describe('截图附件内联', () => {
@@ -229,7 +240,9 @@ describe('截图附件内联', () => {
     const harness = makeHarness({
       saveImage: async input => ({
         attachmentId: 'att-1',
-        mediaType: input.mediaType as 'image/png',
+        // 归一化把这张不透明大图重编码成了 JPEG：引用必须采用附件库返回的类型，
+        // 而不是提交时按字节嗅探出来的 PNG。
+        mediaType: 'image/jpeg',
         bytes: input.data.byteLength,
         width: 10,
         height: 5,
@@ -241,7 +254,7 @@ describe('截图附件内联', () => {
     try {
       const value = await call(harness, 'browser_observe', { mode: 'screenshot' })
       expectDeclaredKeys(harness, 'browser_observe', value)
-      expect(value['image']).toEqual({ attachmentId: 'att-1', mediaType: 'image/png', bytes: png.length, width: 10, height: 5 })
+      expect(value['image']).toEqual({ attachmentId: 'att-1', mediaType: 'image/jpeg', bytes: png.length, width: 10, height: 5 })
       const tool = harness.tools.get('browser_observe')
       const blocks = tool?.output.render({ mode: 'screenshot' } as never, value as never) as { type: string }[]
       expect(blocks.some(block => block.type === 'image')).toBe(true)

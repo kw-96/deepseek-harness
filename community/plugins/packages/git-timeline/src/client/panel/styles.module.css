@@ -869,3 +869,104 @@
 .detailFileButton:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
 }
+
+/* ── Git 账号（底部栏可配置） ───────────────────────── */
+
+.accountButton {
+  display: inline-flex;
+  max-width: 220px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.accountButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.accountUnset {
+  color: var(--dsw-alias-state-warn-primary, #f59e0b);
+}
+
+.accountMenu {
+  position: absolute;
+  right: 6px;
+  bottom: 30px;
+  z-index: 30;
+  width: 260px;
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--dsw-alias-bg-overlay, #ffffff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.accountOrigin {
+  padding: 0 4px 6px;
+  color: var(--dsw-alias-label-tertiary, #818589);
+  font-size: 10.5px;
+  overflow-wrap: anywhere;
+}
+
+.accountField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  color: var(--dsw-alias-label-secondary, #61656b);
+  font-size: 11px;
+}
+
+.accountField > span {
+  width: 34px;
+  flex: none;
+}
+
+.accountScope {
+  display: flex;
+  gap: 4px;
+  padding: 5px 4px 2px;
+}
+
+.scopeOption {
+  flex: 1;
+  border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  padding: 3px 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #61656b);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.scopeOptionOn {
+  border-color: var(--dsw-alias-state-business-primary, #4d90fe);
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  color: var(--dsw-alias-state-business-primary, #4d90fe);
+}
+
+.accountSave {
+  width: 100%;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: var(--dsw-alias-brand-primary, #0f1115);
+  color: var(--dsw-alias-label-primary-inverted, #ffffff);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.accountSave:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

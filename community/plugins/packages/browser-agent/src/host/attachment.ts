@@ -8,6 +8,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { IMAGE_MEDIA_TYPES } from './parse.js'
 
 /**
  * 附件服务的结构化面。
@@ -24,6 +25,11 @@ interface AttachmentLike {
   }
   saveImage(input: { data: Uint8Array; mediaType: string; name?: string }): Promise<{
     attachmentId: unknown
+    /**
+     * 附件库落盘对象的真实媒体类型。归一化会重编码（不透明大图落到 JPEG），
+     * 因此它与提交时声明的类型可能不同，引用必须采用这个值。
+     */
+    mediaType: string
     bytes: number
     width: number
     height: number
@@ -107,9 +113,17 @@ export function createImageSaver(ctx: Context): ImageSaver | undefined {
         mediaType: input.mediaType,
         name: input.name,
       })
+      // 类型以附件库返回的为准，不能用提交时的声明：归一化把不透明大图重编码成
+      // JPEG，若仍按截图原始的 PNG 写引用，之后每一轮重放都会因为落盘对象与引用
+      // 元数据不符而被判 ATTACHMENT_CORRUPT，整个会话从此发不出请求。
+      const mediaType = ref.mediaType
+      if (!IMAGE_MEDIA_TYPES.includes(mediaType as ImageMediaType)) {
+        ctx.logger.warn(`browser-agent: 附件库返回了不支持的图片类型 ${mediaType}，已退回路径形态`)
+        return undefined
+      }
       return {
         attachmentId: String(ref.attachmentId),
-        mediaType: input.mediaType,
+        mediaType: mediaType as ImageMediaType,
         bytes: ref.bytes,
         width: ref.width,
         height: ref.height,

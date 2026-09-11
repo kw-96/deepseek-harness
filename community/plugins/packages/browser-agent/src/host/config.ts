@@ -14,6 +14,12 @@ export interface BrowserAgentConfig {
   browserInstance: string
   /** bsk 子进程工作目录。 */
   workspaceRoot: string
+  /**
+   * bsk 的 home 目录（daemon 的 socket、锁与日志都在它下面）。
+   * 空串表示沿用 bsk 自己的默认（`~/.bsk`）。测试必须指向临时目录，
+   * 否则测试结束时子进程运行时回收 Job 会连带杀掉真实 daemon。
+   */
+  bskHome: string
   /** 空闲多久后自动结束会话（毫秒）。 */
   idleTimeoutMs: number
   /** 普通动作超时（毫秒）。 */
@@ -48,6 +54,7 @@ export const CONFIG_DEFAULTS: BrowserAgentConfig = {
   binary: 'bsk',
   browserInstance: '',
   workspaceRoot: process.cwd(),
+  bskHome: '',
   idleTimeoutMs: 600_000,
   actionTimeoutMs: 30_000,
   navigationTimeoutMs: 60_000,
@@ -65,6 +72,7 @@ export const BrowserAgentConfigSchema: z<BrowserAgentConfig> = z.object({
   binary: z.string().default('bsk'),
   browserInstance: z.string().default(''),
   workspaceRoot: z.string().default(process.cwd()),
+  bskHome: z.string().default(''),
   idleTimeoutMs: z.number().default(600_000),
   actionTimeoutMs: z.number().default(30_000),
   navigationTimeoutMs: z.number().default(60_000),

@@ -45,11 +45,16 @@ export class FakeRunner implements BskCommandRunner {
  * @param args - 命令参数
  * @returns 与真实 bsk 一致的输出形状
  */
+/** 已启动的会话计数（多会话测试需要唯一的 bsk 会话 id）。 */
+let startedSessions = 0
+
 export function defaultOutcome(args: readonly string[]): BskOutcome {
   const head = args[0]
   const sessionId = args.includes('--session') ? args[args.indexOf('--session') + 1] ?? 'aaaa' : 'aaaa'
   if (head === 'session' && args[1] === 'start') {
-    return ok({ agent_window_id: 1, browser_instance_id: 'test', session_id: sessionId })
+    // 每次启动给出唯一 id：多会话下两个会话必须是两条不同记录。
+    startedSessions += 1
+    return ok({ agent_window_id: startedSessions, browser_instance_id: 'test', session_id: `bsk-${String(startedSessions)}` })
   }
   if (head === 'session' && args[1] === 'stop') {
     return ok({ failed: [], return_failures: [], returned_tab_ids: [], stopped: [sessionId] })

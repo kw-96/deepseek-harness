@@ -13,7 +13,7 @@ describe('gitPanel descriptors', () => {
     expect(descriptors.map(descriptor => descriptor.method)).toEqual([
       'status', 'log', 'diff', 'show', 'showFile', 'branches', 'checkout', 'createBranch',
       'lastMessage', 'discard', 'stage', 'unstage', 'stageAll', 'unstageAll',
-      'commit', 'push', 'pull', 'fetch', 'identity', 'message',
+      'commit', 'setIdentity', 'push', 'pull', 'fetch', 'identity', 'message',
     ])
   })
 

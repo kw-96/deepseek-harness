@@ -1,15 +1,11 @@
-/**
- * 交互类工具：点击、填写、按键与下拉选择。写操作前会自动补齐失效的
- * 引用；选择器写法与引用写法都支持，引用优先。
- */
+/** 交互类工具：点击、填写、按键与下拉选择（写前自动补齐失效引用）。 */
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { domClickExpression } from './actions.js'
+import { domClickExpression, durationArg, refreshRefs, runFor, takeSnapshot } from './actions.js'
 import { ackRender, observationRender, observationSchema, observationValue, refreshCurrentUrl } from './observation.js'
-import type { BrowserToolDeps } from './shared.js'
-import { durationArg, refreshRefs, registerTool, runFor, takeSnapshot } from './actions.js'
-import { requireSessionId, textBlock, valueSchema } from './shared.js'
+import { registerTool } from './register/register.js'
+import { SESSION_PARAM, requireSessionId, textBlock, valueSchema, type BrowserToolDeps } from './shared.js'
 
 /** 形如 `@e3` / `e3` 的引用写法。 */
 const REF_PATTERN = /^@?e\d+$/
@@ -35,14 +31,7 @@ export function isRef(target: string): boolean {
   return REF_PATTERN.test(target.trim())
 }
 
-/**
- * DOM 模式点击：先用 `hover` 取元素坐标（只发 mouseMoved，不改变页面状态），
- * 再经 `evaluate` 在固定表达式里对最上层非浮层元素执行 `click()`。
- * @param deps - 工具依赖
- * @param sessionId - DSH 会话 id
- * @param target - 引用或 CSS 选择器
- * @param signal - 取消信号
- */
+/** DOM 模式点击：`hover` 取坐标（只发 mouseMoved），再经 `evaluate` 在固定表达式里点击。 */
 async function clickViaDom(
   deps: BrowserToolDeps,
   sessionId: string,
@@ -68,13 +57,14 @@ async function clickViaDom(
  * @param deps - 工具依赖
  */
 export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void {
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_click',
     description:
       'Click an element. Prefer an @eN ref from the most recent snapshot; a CSS selector also works. '
       + 'If the refs are stale the plugin re-snapshots first, and it always returns a fresh snapshot '
       + 'afterwards because the DOM or URL may have changed.',
     parameters: {
+      ...SESSION_PARAM,
       target: { type: 'string', required: true, description: 'Snapshot ref (@eN) or CSS selector.' },
       button: { type: 'string', enum: ['left', 'middle', 'right'], description: 'Mouse button (default left).' },
       clickCount: { type: 'integer', description: 'Consecutive presses; 2 double-clicks.' },
@@ -106,12 +96,13 @@ export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void
     presentCall: args => ({ card: 'generic', title: `点击 ${args.target}`, kind: 'other', rawInput: args.target }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_fill',
     description:
       'Clear and type text into an input, textarea, or contenteditable element. Prefer an @eN ref from the '
       + 'most recent snapshot. Element refs stay valid after filling, so no snapshot is returned.',
     parameters: {
+      ...SESSION_PARAM,
       target: { type: 'string', required: true, description: 'Snapshot ref (@eN) or CSS selector.' },
       value: { type: 'string', required: true, description: 'Text to type.' },
       clear: { type: 'boolean', description: 'Wipe the field first (default true).' },
@@ -128,12 +119,13 @@ export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void
     presentCall: args => ({ card: 'generic', title: `填写 ${args.target}`, kind: 'other', rawInput: args.value }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_press',
     description:
       'Dispatch a keyboard key or combo (Enter, Tab, Escape, Ctrl+A, ArrowDown). Optionally focus an element '
       + 'first with a ref or selector. When the key can submit or navigate, a fresh snapshot is returned.',
     parameters: {
+      ...SESSION_PARAM,
       key: { type: 'string', required: true, description: 'Key spec, e.g. Enter, Ctrl+A, ArrowLeft.' },
       target: { type: 'string', description: 'Optional ref or selector to focus first.' },
     },
@@ -186,10 +178,11 @@ export function registerInteractTools(ctx: Context, deps: BrowserToolDeps): void
     presentCall: args => ({ card: 'generic', title: `按键 ${args.key}`, kind: 'other', rawInput: args.key }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_select',
     description: 'Set the value(s) of a <select> element. Repeat `values` for a multi-select.',
     parameters: {
+      ...SESSION_PARAM,
       target: { type: 'string', required: true, description: 'Snapshot ref (@eN) or CSS selector.' },
       values: { type: 'array', required: true, items: { type: 'string', description: 'Option value to select.' }, description: 'Option values to select.' },
     },

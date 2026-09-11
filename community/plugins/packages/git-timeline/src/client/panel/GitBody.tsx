@@ -88,6 +88,7 @@ export function GitBody({ sessionId, useSessions, t, api, files }: GitBodyProps)
         onToggleBranchMenu={panel.toggleBranchMenu}
         onCheckout={panel.checkoutBranch}
         onCreateBranch={panel.createBranch}
+        onSaveIdentity={panel.saveIdentity}
         onRefresh={() => { panel.runAction('refresh') }}
       />
     </div>

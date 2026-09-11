@@ -74,3 +74,21 @@ export function firstRef(snapshotText: string): string | null {
 export function countRefs(snapshotText: string): number {
   return new Set(snapshotText.match(/@e\d+/g) ?? []).size
 }
+
+/**
+ * 把一次原始快照投影成模型可见的形状：按上限截断、必要时回数引用。
+ * @param raw - bsk 返回的快照字段
+ * @param maxChars - 字符上限
+ * @returns 规范化后的快照
+ */
+export function projectSnapshot(
+  raw: { text: string, refCount: number, truncated: boolean },
+  maxChars: number,
+): SnapshotPayload {
+  const cut = truncateText(raw.text, maxChars)
+  return {
+    text: cut.text,
+    refCount: raw.refCount > 0 ? raw.refCount : countRefs(raw.text),
+    truncated: raw.truncated || cut.truncated,
+  }
+}

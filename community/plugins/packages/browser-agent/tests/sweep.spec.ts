@@ -7,6 +7,8 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { describe, expect, it, vi } from 'vitest'
 import BrowserAgent from '../lib/types/index.js'
 import { resolveConfig } from '../lib/types/host/config.js'
@@ -61,7 +63,7 @@ function makeFixture(isOwnerAlive: { get: (id: string) => unknown }): Fixture {
   })
   const warnings: string[] = []
   ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as never
-  const plugin = new BrowserAgent(ctx, resolveConfig({ binary: 'bsk', browserInstance: 'edge' }))
+  const plugin = new BrowserAgent(ctx, resolveConfig({ binary: 'bsk', browserInstance: 'edge', bskHome: TEST_BSK_HOME }))
   const store = (plugin as unknown as { store: BskSessionStore }).store
   return {
     ctx,
@@ -72,12 +74,23 @@ function makeFixture(isOwnerAlive: { get: (id: string) => unknown }): Fixture {
   }
 }
 
+/**
+ * 测试专用的 bsk home：让测试自己起一个 daemon。
+ *
+ * 必须隔离——本地子进程运行时用 Job 对象托管子进程，测试结束时回收 Job 会连带
+ * 杀掉默认 home 下的真实 daemon，从而破坏正在使用插件的会话。
+ */
+const TEST_BSK_HOME = join(tmpdir(), `bsk-test-home-${String(process.pid)}`)
 describe('runSweep 失败隔离', () => {
   it('巡检抛错时只记录，不向调用方抛出', async () => {
     const logged: string[] = []
     const target = {
-      reapOrphaned: async () => { throw new Error('agents 不可用') },
-      sweepIdle: async () => [],
+      keys: () => { throw new Error('agents 不可用') },
+      peek: () => undefined,
+      stop: async () => false,
+      forgetActive: () => {},
+      ownerAlive: () => true,
+      idleTimeoutMs: () => 60_000,
     }
     await expect(runSweep(target, 0, message => { logged.push(message) })).resolves.toBeUndefined()
     expect(logged.join()).toContain('会话巡检失败')

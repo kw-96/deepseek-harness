@@ -280,6 +280,17 @@
   display: inline-flex;
 }
 
+/* 项目名称行的进行中标记：与会话行同一个运行中点；悬停/聚焦显露动作按钮时收起，
+   避免与三个图标并排。 */
+.projectRunning {
+  composes: dotRunning;
+}
+
+.workspaceHead:hover .projectRunning,
+.workspaceHead:focus-within .projectRunning {
+  display: none;
+}
+
 /* ── 单行会话行（Codex 式：固定行高 + 悬停/选中显露操作） ── */
 
 .row,

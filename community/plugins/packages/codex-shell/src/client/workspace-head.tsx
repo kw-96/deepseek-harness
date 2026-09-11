@@ -12,6 +12,8 @@ export interface WorkspaceHeadProps {
   label: string
   path: string
   sessionCount: number
+  /** 组内是否有会话正在运行：名称行右侧点亮运行中点。 */
+  running: boolean
   pinned: boolean
   collapsed: boolean
   renaming: boolean
@@ -78,6 +80,9 @@ export function WorkspaceHead(props: WorkspaceHeadProps): React.ReactNode {
           onClick={event => event.stopPropagation()}
         />
         : <span className={css.workspaceLabel}>{props.label}</span>}
+      {!props.renaming && props.running && (
+        <span aria-hidden="true" className={css.projectRunning} title={props.t('running')} />
+      )}
       {!props.renaming && (
         <span className={css.workspaceActions}>
           <button

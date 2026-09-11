@@ -164,7 +164,7 @@ describe('会话托管', () => {
     const store = makeStore(runner)
     const first = await store.ensure('s1')
     const again = await store.ensure('s1')
-    expect(first.bskSessionId).toBe('aaaa')
+    expect(first.bskSessionId).toMatch(/^bsk-\d+$/)
     expect(again).toBe(first)
     expect(runner.daemonCalls).toBe(1)
     expect(runner.commands.filter(command => command.args[1] === 'start').length).toBe(1)

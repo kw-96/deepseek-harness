@@ -38,6 +38,7 @@ DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 
   - 每行：提交标题 + 短哈希/作者/相对时间 + 分支与标签徽标（当前分支高亮）
   - 工具栏：跳转到当前历史记录项（滚动到最新并高亮）、从所有远程存储库中抓取、拉取、推送、刷新
   - **提交详情**：点击提交行就地展开该提交的哈希、作者与时间、合并提交父数、以及改动文件清单（A/M/D/R）；再点文件行可就地展开**该提交内该文件的差异**
+- **Git 账号**：点击底部栏账号区展开就地配置（姓名/邮箱 + 全局或仅本仓库 + 保存）；未配置时显示「设置 Git 账号」并给出提示，悬停可看当前署名的来源配置文件
 - **底部栏**（固定）：**分支切换器**（点击展开本地分支列表，勾选当前分支，点击即 `git checkout`；底部输入框可新建分支并切换，名称先过 `git check-ref-format`）、当前分支（含 ahead/behind）、刷新、当前工作区名称、Git 账号（`user.name · user.email`）
 - **自动刷新**：订阅官方 `remote.workspaceFiles.changes` 会话文件变更流，写入后去抖 400 毫秒重读工作区状态（提交历史不重拉），展开中的差异同步刷新
 - 顶部**没有**路径栏与搜索框（按要求精简）
@@ -88,7 +89,8 @@ pnpm test          # vitest（36 项）
 | `stageAll(cwd)` / `unstageAll(cwd)` | 全部暂存 / 取消暂存 |
 | `commit(cwd, message, amend)` | 提交（`amend` 为真时 `--amend`），返回新短哈希 |
 | `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | 推送 / 拉取（`--no-edit`）/ 抓取全部远程并清理 |
-| `identity(cwd)` | `user.name` / `user.email` |
+| `identity(cwd)` | 提交署名 + 来源配置文件（`--show-origin`，回退 `git var GIT_COMMITTER_IDENT`） |
+| `setIdentity(cwd, name, email, scope)` | 写入署名（`global` 写用户级配置，`local` 只写当前仓库） |
 | `message(sessionId, cwd)` | 用该会话的模型路由生成提交信息 |
 
 所有命令经 `ctx.shell` 执行 git（普通 30 秒、网络类 120 秒超时）；可省参数在描述符里显式声明 `acceptsUndefined`。

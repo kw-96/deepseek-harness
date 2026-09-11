@@ -88,6 +88,8 @@ export class BskRunner implements BskCommandRunner {
     private readonly binary: string,
     private readonly cwd: string,
     private readonly log: (message: string) => void = () => {},
+    /** 子进程环境覆盖（例如 `BSK_HOME`）；未给时沿用父进程环境。 */
+    private readonly env: Readonly<Record<string, string>> | undefined = undefined,
   ) {}
 
   /**
@@ -109,6 +111,7 @@ export class BskRunner implements BskCommandRunner {
       const handle = this.subprocess.spawn({
         argv,
         cwd: this.cwd,
+        ...(this.env !== undefined ? { env: this.env } : {}),
         stdio: {
           stdin: 'ignore',
           stdout: { maxBytes: STDOUT_MAX_BYTES },

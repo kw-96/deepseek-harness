@@ -45,6 +45,14 @@ describe.skipIf(!enabled)('真实 bsk 冒烟', () => {
         { timeoutMs: 30_000 },
       )
       expect(String(evaluated.json?.['value'])).toContain('Example Domain')
+
+      // 面板中断按钮靠取消信号实现：取消必须真的终止 CLI 子进程，而不是等它跑完。
+      const controller = new AbortController()
+      const started = Date.now()
+      const aborted = runner.run(['wait-ms', '15s'], { timeoutMs: 20_000, signal: controller.signal })
+      setTimeout(() => controller.abort(new Error('用户从面板中断了该动作')), 700)
+      await expect(aborted).rejects.toThrow()
+      expect(Date.now() - started).toBeLessThan(6000)
     } finally {
       await store.stop('e2e', '冒烟结束')
     }

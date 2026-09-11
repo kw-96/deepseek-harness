@@ -38,6 +38,7 @@ The official full Git panel tab in the DeepSeek Harness (DSH) right sidebar (`ui
   - Each row: commit title, short hash, author, relative time, and branch and tag badges (the current branch is highlighted)
   - Toolbar: jump to the current history entry (scroll to the newest commit and highlight it), fetch from all remotes, pull, push, and refresh
   - **Commit details**: clicking a commit row expands that commit's hash, author and time, parent count for merges, and changed-file list (A/M/D/R) in place; clicking a file row then expands **that file's diff within the commit**, also in place
+- **Git account**: clicking the account chip opens an inline editor (name, email, global or this-repository scope, Save); an unset identity reads “Set Git account” with a hint, and the chip tooltip names the config file the value comes from
 - **Bottom bar** (fixed): the **branch switcher** (click to expand the local branch list, with the current branch checked; clicking a branch runs `git checkout`; the input at the bottom creates and switches to a new branch after its name passes `git check-ref-format`), the current branch (with ahead/behind), refresh, the current workspace name, and the Git account (`user.name` / `user.email`)
 - **Automatic refresh**: subscribes to the official `remote.workspaceFiles.changes` session file-change stream and, 400 milliseconds after a write (debounced), re-reads the workspace status without re-fetching the commit history; diffs that are expanded refresh in step
 - The top has **no** path bar or search box (trimmed as required)
@@ -88,7 +89,8 @@ Note: **after changing `src/remote.ts` (the Remote method surface) you must rest
 | `stageAll(cwd)` / `unstageAll(cwd)` | Stage / unstage everything |
 | `commit(cwd, message, amend)` | Commit (`--amend` when `amend` is true); returns the new short hash |
 | `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | Push / pull (`--no-edit`) / fetch all remotes and prune |
-| `identity(cwd)` | `user.name` / `user.email` |
+| `identity(cwd)` | The signing identity plus the config file it comes from (`--show-origin`, falling back to `git var GIT_COMMITTER_IDENT`) |
+| `setIdentity(cwd, name, email, scope)` | Write the signing identity (`global` writes the user config, `local` writes this repository only) |
 | `message(sessionId, cwd)` | Generate a commit message with that session's model route |
 
 Every command runs git through `ctx.shell` (a 30-second timeout normally, 120 seconds for network operations); optional parameters are declared explicitly with `acceptsUndefined` in the descriptor.

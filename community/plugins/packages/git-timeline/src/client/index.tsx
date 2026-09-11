@@ -56,6 +56,7 @@ function panelApi(git: GitPanelRemoteFace): GitPanelApi {
     pull: async cwd => unwrap(await git.pull(cwd)),
     fetch: async cwd => unwrap(await git.fetch(cwd)),
     identity: async cwd => unwrap(await git.identity(cwd)),
+    setIdentity: async (cwd, name, email, scope) => unwrap(await git.setIdentity(cwd, name, email, scope)),
     message: async (sessionId, cwd) => unwrap(await git.message(sessionId, cwd)),
   }
 }

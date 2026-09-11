@@ -8,9 +8,9 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { parseBrowsers, parseSessions } from '../host/parse.js'
 import type { BrowserInstanceView } from '../types.js'
 import { ackRender, refreshCurrentUrl } from './observation.js'
-import type { BrowserToolDeps } from './shared.js'
-import { durationArg, registerTool, runFor } from './actions.js'
-import { requireSessionId, textBlock, valueSchema } from './shared.js'
+import { durationArg, runFor } from './actions.js'
+import { registerTool } from './register/register.js'
+import { SESSION_PARAM, requireSessionId, textBlock, valueSchema, type BrowserToolDeps } from './shared.js'
 
 /** 人工求助默认等待上限（毫秒）。 */
 const DEFAULT_HELP_TIMEOUT_MS = 300_000
@@ -53,12 +53,12 @@ const statusSchema = valueSchema({
  * @param deps - 工具依赖
  */
 export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void {
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_status',
     description:
       'Report browser automation health: the bsk daemon, connected browsers, and whether this session '
       + 'currently owns an Agent Window. Use it when a command fails unexpectedly.',
-    parameters: {},
+    parameters: { ...SESSION_PARAM },
     output: {
       schema: statusSchema,
       render: (_args, value) => {
@@ -101,13 +101,13 @@ export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void 
     presentCall: () => ({ card: 'generic', title: '浏览器状态', kind: 'read', rawInput: '' }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_stop',
     description:
       'End this session\'s browser automation session: closes the Agent Window and returns every borrowed tab. '
       + 'Call it when the browser work is finished; the plugin also stops automatically on idle, on session end, '
       + 'and on unload.',
-    parameters: {},
+    parameters: { ...SESSION_PARAM },
     output: {
       schema: {
         type: 'object' as const,
@@ -127,7 +127,7 @@ export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void 
     presentCall: () => ({ card: 'generic', title: '结束浏览器会话', kind: 'other', rawInput: '' }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_ask_human',
     description:
       'Pause and ask the human to do something in the page (solve a captcha, finish a login, confirm a '
@@ -135,6 +135,7 @@ export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void 
       + 'the user continues, cancels, or the wait times out. Treat `continued` as confirmation and `cancelled` '
       + 'as refusal.',
     parameters: {
+      ...SESSION_PARAM,
       prompt: { type: 'string', required: true, description: 'What the user must do, in the user\'s language.' },
       title: { type: 'string', description: 'Optional overlay title.' },
       targets: { type: 'array', items: { type: 'string', description: 'Snapshot ref (@eN) or CSS selector.' }, description: 'Elements to scroll to and highlight.' },
@@ -167,13 +168,14 @@ export function registerControlTools(ctx: Context, deps: BrowserToolDeps): void 
     presentCall: args => ({ card: 'generic', title: '请求人工协助', kind: 'other', rawInput: args.prompt }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_evaluate',
     description:
       'Evaluate a JavaScript expression in the current page. Disabled unless the deployment enables '
       + '`allowEvaluate`, and always refused on credential surfaces (login, banking, password managers). '
       + 'Prefer snapshot plus click/fill/select; use this only when those cannot express the step.',
     parameters: {
+      ...SESSION_PARAM,
       expression: { type: 'string', required: true, description: 'JavaScript expression; use an IIFE for statements.' },
     },
     output: {

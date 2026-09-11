@@ -47,6 +47,24 @@ export const browserStopValue = z.object({
   message: z.string(),
 })
 
+export const browserLiveValue = z.object({
+  sessionOpen: z.boolean(),
+  running: z.boolean(),
+  toolName: z.string(),
+  summary: z.string(),
+  startedAtMs: z.number(),
+  elapsedMs: z.number().int(),
+  currentUrl: z.string(),
+  pageTitle: z.string(),
+  lastActionAtMs: z.number(),
+  idleDeadlineAtMs: z.number().nullable(),
+})
+
+export const browserInterruptValue = z.object({
+  interrupted: z.boolean(),
+  message: z.string(),
+})
+
 export const browserPreviewValue = z.object({
   dataUrl: z.string().nullable(),
   path: z.string().nullable(),
@@ -66,3 +84,7 @@ export type BrowserPanelSnapshot = z.infer<typeof browserPanelValue>
 export type BrowserStopResult = z.infer<typeof browserStopValue>
 /** 面板截图预览（data URL 有大小上限）。 */
 export type BrowserPreviewResult = z.infer<typeof browserPreviewValue>
+/** 面板实时视图：当前动作、耗时与会话状态。 */
+export type BrowserLiveView = z.infer<typeof browserLiveValue>
+/** 面板中断结果。 */
+export type BrowserInterruptResult = z.infer<typeof browserInterruptValue>

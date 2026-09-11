@@ -53,6 +53,16 @@
   官方主要是显式 stop 与插件卸载。
 - **本 fork 适配**：中文文案、右栏框架、与 codex-shell/git-timeline 一致的开发链路（dev.mjs + HMR）。
 
+## 移植进度（2026-09-11 更新）
+
+| 项 | 状态 | 落地方式 |
+| --- | --- | --- |
+| A 点击方式可选 | ✅ | 新增配置 `clickMode: 'pointer' \| 'dom'`；`dom` 用 `hover` 取坐标 + 固定表达式 `element.click()` 跳过扩展浮层 |
+| B P0 截图进模型 | ✅ | 截图经 `ctx.get('attachments').saveImage()` 存为附件，工具结果追加 `image` 内容块；宿主无附件库或路由不支持图像时自动退回路径形态。实测模型可直接看到页面 |
+| C P2 交互/诊断面 | ✅ | 新增 5 个工具：`browser_hover`、`browser_wait`、`browser_inspect`（console/network）、`browser_emulate`、`browser_transfer`（upload/download）；均已真实浏览器验证 |
+| D P1 实时观测视图 | ✅ | 面板实时区：每秒轮询当前动作与耗时、2.5 秒刷新截图、可中断正在执行的工具调用（中断经合并信号终止 CLI 子进程，daemon 协同取消） |
+| E P3 多会话 | ⏳ 待做 | `browser_session` 式多会话与 `session` 参数 |
+
 ## 移植建议（按价值排序）
 
 - **P0 截图进模型**：接 `@deepseek-ai/dsh-attachment`，把 `browser_screenshot` 的 PNG 变成附件/图像块，

@@ -1,8 +1,8 @@
-/** 工具层测试（控制与安全）：状态、人工求助、脚本闸门、借用审批。 */
+/** 工具层测试（控制/安全 + P2 进阶）：状态、求助、脚本闸门、借用审批、悬停/等待/诊断/模拟/传输。 */
 
 import { describe, expect, it } from 'vitest'
 import { defaultOutcome, failure } from './support/fake-runner.js'
-import { call, makeHarness } from './support/harness.js'
+import { call, expectDeclaredKeys, makeHarness } from './support/harness.js'
 
 describe('控制工具', () => {
   it('状态汇总 daemon、浏览器与本会话窗口', async () => {
@@ -71,17 +71,35 @@ describe('会话恢复', () => {
     expect(harness.store.get('sess-1')).toBeUndefined()
   })
 
-  it('下一次调用自动新建会话', async () => {
+  it('会话失效时自动重建并回到原页面', async () => {
+    const harness = makeHarness()
+    await call(harness, 'browser_open', { url: 'https://example.com' })
+    // 只有快照那一步失败：模拟 daemon 重启后会话注册表丢失。
+    harness.runner.responder = (args) => {
+      if (args[0] === 'snapshot') return failure('not_found', 'session not registered or already stopped', 1)
+      return defaultOutcome(args)
+    }
+    await expect(call(harness, 'browser_observe', {})).rejects.toThrow(/已自动重建会话并回到/)
+    const starts = harness.runner.commands.filter(command => command.args[0] === 'session' && command.args[1] === 'start')
+    expect(starts).toHaveLength(2)   // 1 次来自 browser_open，1 次来自失效调用里的自动重建
+    const navigate = harness.runner.commands.filter(command => command.args[0] === 'navigate')
+    expect(navigate.at(-1)?.args.some(arg => arg.includes('example.com'))).toBe(true)
+    expect(harness.store.get('sess-1')?.currentUrl).toContain('example.com')
+  })
+
+  it('重建也失败时退回旧路径，下一次调用仍能新建会话', async () => {
     const harness = makeHarness()
     await call(harness, 'browser_open', { url: 'https://example.com' })
     harness.runner.responder = args => (args[0] === 'browsers'
       ? defaultOutcome(args)
       : failure('not_found', 'session not registered or already stopped', 1))
-    await expect(call(harness, 'browser_observe', {})).rejects.toThrow()
+    await expect(call(harness, 'browser_observe', {})).rejects.toThrow(/已重置；请重新用 browser_open/)
     harness.runner.responder = defaultOutcome
     await call(harness, 'browser_observe', {})
     const starts = harness.runner.commands.filter(command => command.args[0] === 'session' && command.args[1] === 'start')
-    expect(starts.length).toBe(2)
+    // 1 次来自 browser_open；失效调用里尝试重建 1 次（navigate 也失败 → 记录被丢弃）；
+    // 之后那次调用再建 1 次后成功。
+    expect(starts.length).toBe(3)
   })
 
   it('引用失效不会被误判成会话失效', async () => {
@@ -144,5 +162,96 @@ describe('借用标签页的审批闸门', () => {
     const harness = makeHarness({ requireApprovalForBorrow: false })
     const value = await call(harness, 'browser_tabs', { action: 'borrow', tabId: '42' })
     expect(String(value['message'])).toContain('borrow')
+  })
+})
+
+describe('进阶工具', () => {
+  it('悬停后重新快照，引用保持可用', async () => {
+    const harness = makeHarness()
+    await call(harness, 'browser_open', { url: 'https://example.com' })
+    harness.runner.commands.length = 0
+    const value = await call(harness, 'browser_hover', { target: '@e2', settleMs: 300 })
+    expect(harness.commandHeads()).toEqual(['hover', 'snapshot'])
+    expect(String(value['note'])).toContain('悬停后已重新快照')
+    const hover = harness.runner.commands.find(command => command.args[0] === 'hover')
+    expect(hover?.args).toContain('300ms')
+    expectDeclaredKeys(harness, 'browser_hover', value)
+  })
+
+  it('等待：ms 走 daemon 侧睡眠（不带 --session），state 走页面生命周期', async () => {
+    const harness = makeHarness()
+    await call(harness, 'browser_open', { url: 'https://example.com' })
+    harness.runner.commands.length = 0
+    await call(harness, 'browser_wait', { ms: 1500 })
+    const sleep = harness.runner.commands.find(command => command.args[0] === 'wait-ms')
+    expect(sleep?.args).toEqual(['wait-ms', '1500ms'])
+    harness.runner.commands.length = 0
+    await call(harness, 'browser_wait', { state: 'networkidle' })
+    const navigation = harness.runner.commands.find(command => command.args[0] === 'wait-for-navigation')
+    expect(navigation?.args).toContain('networkidle')
+  })
+
+  it('等待参数必须二选一', async () => {
+    const harness = makeHarness()
+    await expect(call(harness, 'browser_wait', {})).rejects.toThrow(/需要 ms 或 state/)
+    await expect(call(harness, 'browser_wait', { ms: 10, state: 'load' })).rejects.toThrow(/只能给一个/)
+  })
+
+  it('诊断把 console 条目压成可读文本', async () => {
+    const harness = makeHarness()
+    harness.runner.responder = args => (args[0] === 'console'
+      ? {
+        stdout: '', stderr: '', exitCode: 0,
+        json: {
+          tab_id: 7,
+          entries: [
+            { sequence: 1, kind: 'log', level: 'error', text: 'boom', truncated: false },
+            { sequence: 2, kind: 'console', level: 'log', text: 'hi', line: 3, column: 9, truncated: false },
+          ],
+          next_since: 2,
+          truncated: false,
+        },
+      }
+      : defaultOutcome(args))
+    const value = await call(harness, 'browser_inspect', { kind: 'console' })
+    expect(String(value['note'])).toContain('#1 [error] boom')
+    expect(String(value['note'])).toContain('#2 [log] hi (3:9)')
+    expect(String(value['note'])).toContain('since=2')
+  })
+
+  it('模拟移动端会带上设备参数并重快照', async () => {
+    const harness = makeHarness()
+    const value = await call(harness, 'browser_emulate', { device: 'iPhone 15', touch: true })
+    const emulate = harness.runner.commands.find(command => command.args[0] === 'emulate')
+    expect(emulate?.args).toContain('iPhone 15')
+    expect(emulate?.args).toContain('--touch')
+    expect(String(value['note'])).toContain('模拟环境已应用')
+  })
+
+  it('上传把本地文件交给页面，下载捕获到指定路径', async () => {
+    const harness = makeHarness()
+    harness.runner.responder = args => (args[0] === 'download'
+      ? { stdout: '', stderr: '', exitCode: 0, json: { path: 'C:/tmp/a.zip', byte_size: 2048 } }
+      : defaultOutcome(args))
+    const upload = await call(harness, 'browser_transfer', {
+      action: 'upload', target: '@e5', files: ['C:/tmp/a.txt', 'C:/tmp/b.txt'],
+    })
+    expect(String(upload['message'])).toContain('已上传 2 个文件')
+    const uploadCommand = harness.runner.commands.find(command => command.args[0] === 'upload')
+    expect(uploadCommand?.args.filter(arg => arg === '--file')).toHaveLength(2)
+    const download = await call(harness, 'browser_transfer', {
+      action: 'download', target: '@e6', out: 'C:/tmp/a.zip',
+    })
+    expect(download['path']).toBe('C:/tmp/a.zip')
+    expect(download['bytes']).toBe(2048)
+    expect(String(download['message'])).toContain('已下载到')
+  })
+
+  it('传输参数缺失时明确报错', async () => {
+    const harness = makeHarness()
+    await expect(call(harness, 'browser_transfer', { action: 'upload', target: '@e1', files: [] }))
+      .rejects.toThrow(/至少一个 files/)
+    await expect(call(harness, 'browser_transfer', { action: 'download', target: '@e1' }))
+      .rejects.toThrow(/需要 out/)
   })
 })

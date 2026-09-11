@@ -6,7 +6,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { BrowserPanelApi } from '../src/client/faces.js'
 import { BrowserBody } from '../src/client/BrowserBody.js'
 import { zh } from '../src/client/locales.js'
-import type { BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult } from '../src/types.js'
+import type {
+  BrowserInterruptResult, BrowserLiveView, BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult,
+} from '../src/types.js'
+
+/** 空闲的实时视图。 */
+const IDLE_LIVE: BrowserLiveView = {
+  sessionOpen: true,
+  running: false,
+  toolName: '',
+  summary: '',
+  startedAtMs: 0,
+  elapsedMs: 0,
+  currentUrl: 'https://example.com/',
+  pageTitle: '示例页',
+  lastActionAtMs: 0,
+  idleDeadlineAtMs: 0,
+}
 
 afterEach(() => { cleanup() })
 
@@ -40,6 +56,7 @@ function snapshot(overrides: Partial<BrowserPanelSnapshot> = {}): BrowserPanelSn
 function api(
   panel: BrowserPanelSnapshot,
   preview: BrowserPreviewResult = { dataUrl: null, path: null, bytes: 0, message: '本次会话尚未截图' },
+  live: BrowserLiveView = IDLE_LIVE,
 ): { api: BrowserPanelApi, calls: string[] } {
   const calls: string[] = []
   return {
@@ -48,6 +65,14 @@ function api(
       panel: async () => { calls.push('panel'); return panel },
       stop: async (): Promise<BrowserStopResult> => { calls.push('stop'); return { stopped: true, message: '已结束浏览器会话' } },
       preview: async () => { calls.push('preview'); return preview },
+      live: async (): Promise<BrowserLiveView> => {
+        calls.push('live')
+        return live
+      },
+      interrupt: async (): Promise<BrowserInterruptResult> => {
+        calls.push('interrupt')
+        return { interrupted: true, message: '已中断当前动作' }
+      },
     },
   }
 }
@@ -106,5 +131,31 @@ describe('浏览器面板', () => {
     render(<BrowserBody sessionId="sess-1" api={panelApi} t={t} />)
     fireEvent.click(await screen.findByText(zh.showPreview))
     expect(await screen.findByText(zh.previewFailed)).toBeDefined()
+  })
+})
+describe('实时观测区', () => {
+  it('执行中显示动作与耗时，中断按钮可用', async () => {
+    const running: BrowserLiveView = {
+      ...IDLE_LIVE,
+      running: true,
+      toolName: 'browser_click',
+      summary: 'browser_click @e2',
+      startedAtMs: Date.now() - 2500,
+      elapsedMs: 2500,
+    }
+    const { api: panelApi, calls } = api(snapshot(), { dataUrl: null, path: null, bytes: 0, message: null }, running)
+    render(<BrowserBody sessionId="sess-1" api={panelApi} t={t} />)
+    expect(await screen.findByText(/browser_click @e2/)).toBeDefined()
+    expect(screen.getByText(/已用时/)).toBeDefined()
+    const button = screen.getByText(zh.interrupt) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    await waitFor(() => { expect(calls).toContain('interrupt') })
+  })
+
+  it('空闲时中断按钮禁用并显示空闲', async () => {
+    render(<BrowserBody sessionId="sess-1" api={api(snapshot()).api} t={t} />)
+    expect(await screen.findByText(zh.noAction)).toBeDefined()
+    expect((screen.getByText(zh.interrupt) as HTMLButtonElement).disabled).toBe(true)
   })
 })

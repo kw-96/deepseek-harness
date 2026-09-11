@@ -38,6 +38,8 @@ function panelApi(remote: BrowserAgentRemoteFace): BrowserPanelApi {
     panel: async sessionId => unwrap(await remote.panel(sessionId)),
     stop: async sessionId => unwrap(await remote.stop(sessionId)),
     preview: async sessionId => unwrap(await remote.preview(sessionId)),
+    live: async sessionId => unwrap(await remote.live(sessionId)),
+    interrupt: async sessionId => unwrap(await remote.interrupt(sessionId)),
   }
 }
 

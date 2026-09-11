@@ -93,6 +93,8 @@ export interface GitPanelController {
   closeBranchMenu: () => void
   checkoutBranch: (branch: string) => void
   createBranch: (name: string) => void
+  /** 写入 git 身份并刷新底部栏。 */
+  saveIdentity: (name: string, email: string, scope: 'global' | 'local') => void
   runAction: (task: 'fetch' | 'pull' | 'push' | 'refresh') => void
   commitNow: () => void
   toggleStage: (entry: GitEntry, verb: 'stage' | 'unstage') => void

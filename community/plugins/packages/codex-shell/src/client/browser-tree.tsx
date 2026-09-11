@@ -118,6 +118,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
           label={workspace.title}
           path={workspace.path}
           sessionCount={sessions.length}
+          running={sessions.some(id => list.byId[id]?.running === true)}
           pinned={prefs.workspacePinned(workspace.workspaceId)}
           collapsed={isCollapsed}
           renaming={renaming === `ws:${workspace.workspaceId}`}
@@ -151,12 +152,15 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
 
   const renderProject = (
     project: ProjectView,
+    sessionIds: readonly SessionId[],
     sessionRows: React.ReactNode[],
     workspaceId: string | undefined,
   ): React.ReactNode => {
     const key = `project:${project.projectId}`
     const isCollapsed = collapsed.has(key)
     const pinned = prefs.projectPinned(project.projectId)
+    // 项目名称行的进行中标记：组内任一会话在跑就点亮，收起时同样可见。
+    const running = sessionIds.some(id => list.byId[id]?.running === true)
     return (
       <div key={key} className={css.workspaceGroup}>
         <div
@@ -177,6 +181,7 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
             ? <Folder size={13} className={css.workspaceIcon} />
             : <FolderOpen size={13} className={css.workspaceIcon} />}
           <span className={css.workspaceLabel}>{project.name}</span>
+          {running && <span aria-hidden="true" className={css.projectRunning} title={t('running')} />}
           {/* 置顶与新建会话共用同一动作容器：悬停或键盘聚焦时显示，
               已置顶项目的动作常驻。 */}
           <span className={pinned ? `${css.workspaceActions} ${css.actionsPinned}` : css.workspaceActions}>
@@ -257,11 +262,15 @@ export function BrowserTree(props: BrowserTreeProps): React.ReactNode {
     const ordered = orderProjects(projects, prefs, recency)
     return (
       <>
-        {ordered.map(project => renderProject(
-          project,
-          sortList(byProject.get(project.projectId) ?? []).map(id => sessionRow(id)),
-          workspaceByProject.get(project.projectId),
-        ))}
+        {ordered.map(project => {
+          const ids = sortList(byProject.get(project.projectId) ?? [])
+          return renderProject(
+            project,
+            ids,
+            ids.map(id => sessionRow(id)),
+            workspaceByProject.get(project.projectId),
+          )
+        })}
         {sortList(ungrouped).map(id => sessionRow(id))}
       </>
     )

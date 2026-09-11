@@ -54,6 +54,16 @@ export async function runCheckout(ctx: ActionContext, branch: string): Promise<s
   return (await ctx.api.checkout(ctx.cwd, branch)).detail
 }
 
+/** 写入 git 身份（全局或本仓库）。 */
+export async function runSetIdentity(
+  ctx: ActionContext,
+  name: string,
+  email: string,
+  scope: 'global' | 'local',
+): Promise<string> {
+  return (await ctx.api.setIdentity(ctx.cwd, name, email, scope)).detail
+}
+
 /** 新建并切换到分支。 */
 export async function runCreateBranch(ctx: ActionContext, name: string): Promise<string> {
   return (await ctx.api.createBranch(ctx.cwd, name)).detail

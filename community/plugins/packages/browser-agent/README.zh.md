@@ -8,13 +8,14 @@
 
 ## 它做什么
 
-- 注册 12 个模型工具：`browser_open`、`browser_observe`、`browser_click`、`browser_fill`、`browser_press`、`browser_select`、`browser_history`、`browser_tabs`、`browser_ask_human`、`browser_evaluate`、`browser_status`、`browser_stop`。
+- 注册 18 个模型工具：`browser_open`、`browser_observe`、`browser_click`、`browser_hover`、`browser_fill`、`browser_press`、`browser_select`、`browser_history`、`browser_tabs`、`browser_session`、`browser_transfer`、`browser_wait`、`browser_inspect`、`browser_emulate`、`browser_ask_human`、`browser_evaluate`、`browser_status`、`browser_stop`。
 - 为每个 DSH 会话托管 `bsk` 会话：首次使用时懒启动，并经由五条路径回收：显式调用 `browser_stop`、DSH 会话销毁（`agent/disposed`）、插件卸载、对已不存在的宿主会话回收遗留记录（插件重启后会话 id 已变，旧记录再无人能替它 `browser_stop`），以及空闲巡检。周期巡检中的失败只记日志、不抛出：一次 `bsk` 命令失败不能终止承载全部会话的 `dsh web` 后端。
 - 选择目标浏览器：只连一个实例时直接启动；有多个实例时拒绝启动并列出候选，便于部署方通过 `browserInstance` 固定其中一个；一个都没有时明确说明该修什么。
 - 从被外部结束的会话中恢复：遇到 `session not registered` 失败时丢弃陈旧记录并提示模型重新打开页面，下一次调用再懒启动一个新会话。
 - 让引用保持可信：任何导航或点击都把引用标记为陈旧，消费引用的工具在写入前重新快照，在 DOM 可能变化后再快照一次。
-- 默认观测优先：除非调用方要求 `html` 或 `screenshot`，`browser_observe` 返回无障碍快照。
-- 提供右栏标签页「浏览器」，显示会话状态、标签页、最新截图和一个「停止」按钮。
+- 支持同一会话下并行多个浏览器会话：`browser_session` 负责列出/新建/切换/关闭（别名区分），其余工具用可选的 `session` 参数指向其中之一，不传即当前活跃会话；宿主会话结束或空闲回收会一起收掉全部别名。
+- 默认观测优先：除非调用方要求 `html` 或 `screenshot`，`browser_observe` 返回无障碍快照。截图会提交到宿主附件库并作为图像内容块内联给模型（宿主未挂附件库、或当前模型路由不接受图像输入时，退回只给文件路径）。
+- 提供右栏标签页「浏览器」：会话状态、标签页、最近截图，以及**实时观测区**——每秒刷新当前动作与耗时、按需中断正在执行的工具调用，并有「结束会话」按钮。
 
 ## 环境要求
 
@@ -63,12 +64,14 @@ node community/plugins/dev.mjs
 | `binary` | `bsk` | 可执行文件名或绝对路径。 |
 | `browserInstance` | `''` | 目标浏览器实例的 id 或 label；为空时要求只有一个已连接浏览器。 |
 | `workspaceRoot` | `process.cwd()` | `bsk` 子进程的工作目录。 |
+| `bskHome` | '' | bsk 的 home（daemon socket/锁/日志所在）。空串用 bsk 默认 `~/.bsk`；**测试必须指向临时目录**，否则测试结束回收子进程 Job 会连带杀掉真实 daemon。 |
 | `idleTimeoutMs` | `600000` | 巡检结束会话前的空闲时长。 |
 | `actionTimeoutMs` | `30000` | 普通命令的超时时间。 |
 | `navigationTimeoutMs` | `60000` | 导航类命令的超时时间。 |
 | `snapshotMaxChars` | `24000` | 单次交给模型的快照字符上限。 |
 | `screenshotDir` | `''` | 截图输出目录；为空时使用 `bsk` 的临时默认目录。 |
 | `allowEvaluate` | `false` | `browser_evaluate` 是否允许执行。 |
+| `clickMode` | `pointer` | 点击方式：`pointer` 走 CDP 指针事件；`dom` 先 `hover` 取坐标、再经固定表达式执行 `element.click()`，用于扩展浮层吞掉指针点击的过渡场景。表达式由插件生成，模型无法注入脚本。 |
 | `requireApprovalForBorrow` | `true` | 借用用户标签页前是否先询问 harness 审批服务。 |
 | `sensitivePatterns` | 凭据关键词 | 命中即拒绝脚本的主机名子串。 |
 | `allowedPatterns` | `[]` | 非空时把导航限制在匹配的主机。 |

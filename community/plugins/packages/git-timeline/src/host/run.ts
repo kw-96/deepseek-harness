@@ -10,6 +10,28 @@ const STDOUT_MAX_BYTES = 8 * 1024 * 1024
 
 export interface GitOutcome { stdout: string; stderr: string }
 
+/** git 定位用户级/系统级配置所需的环境变量。 */
+const CONFIG_ENV_KEYS = [
+  'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'XDG_CONFIG_HOME',
+  'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'APPDATA', 'PROGRAMDATA',
+] as const
+
+/**
+ * 从宿主进程补回 git 需要的定位变量。
+ *
+ * 执行器的子进程环境可能不含 HOME/USERPROFILE，那样 git 读不到用户级
+ * `~/.gitconfig`，面板里的提交署名、身份来源就都会是空的；这里只补充
+ * 定位配置所必需的那几个键，不接管其余环境。
+ */
+function gitConfigEnv(): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const key of CONFIG_ENV_KEYS) {
+    const value = process.env[key]
+    if (value !== undefined && value !== '') env[key] = value
+  }
+  return env
+}
+
 /**
  * 执行一条 git 命令。
  * @param shell shell 执行器
@@ -25,7 +47,13 @@ export async function git(
   timeoutMs = GIT_TIMEOUT_MS,
 ): Promise<GitOutcome> {
   const quoted = args.map(arg => `'${String(arg).replaceAll("'", "'\\''")}'`).join(' ')
-  const spec = shell.resolve({ command: `git ${quoted}`, workdir: cwd, timeoutMs, stdoutMaxBytes: STDOUT_MAX_BYTES })
+  const spec = shell.resolve({
+    command: `git ${quoted}`,
+    workdir: cwd,
+    timeoutMs,
+    stdoutMaxBytes: STDOUT_MAX_BYTES,
+    env: gitConfigEnv(),
+  })
   const result = await shell.run(spec)
   if (result.exitCode !== 0) {
     const detail = result.stderr.text.trim() || result.stdout.text.trim() || `git exited ${String(result.exitCode)}`

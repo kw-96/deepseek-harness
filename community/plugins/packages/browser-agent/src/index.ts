@@ -13,6 +13,9 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createImageSaver } from './host/attachment.js'
+import { liveView, panelSnapshot, previewShot } from './host/live/panel.js'
+import type { PanelDeps } from './host/live/panel.js'
+import { ActionTracker } from './host/live/tracker.js'
 import { BskRunner } from './host/bsk.js'
 import { errorText } from './host/parse.js'
 import type { BrowserAgentConfig } from './host/config.js'
@@ -22,11 +25,15 @@ import { BrowserPolicy } from './host/policy.js'
 import { BskSessionStore } from './host/store.js'
 import { runSweep } from './host/sweep.js'
 import type { ApprovalFace } from './tools/shared.js'
+import { registerAdvancedTools } from './tools/advanced.js'
 import { registerControlTools } from './tools/control.js'
 import { registerInteractTools } from './tools/interact.js'
 import { registerNavigateTools } from './tools/navigate.js'
 import { registerObserveTools } from './tools/observe.js'
-import type { BrowserPanelSnapshot, BrowserPreviewResult, BrowserSessionView, BrowserStopResult } from './types.js'
+import { registerSessionTools } from './tools/sessions/session.js'
+import type {
+  BrowserInterruptResult, BrowserLiveView, BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult,
+} from './types.js'
 
 export type * from './types.js'
 
@@ -44,6 +51,7 @@ export class BrowserAgent extends TypertRemoteService {
 
   private readonly config: BrowserAgentConfig
   private readonly runner: BskRunner
+  private readonly tracker = new ActionTracker()
   private readonly store: BskSessionStore
   private readonly policy: BrowserPolicy
 
@@ -57,7 +65,17 @@ export class BrowserAgent extends TypertRemoteService {
     // 时可能只给部分字段甚至 {}，这里统一兜底，避免出现 undefined 配置。
     const resolved = resolveConfig(config)
     this.config = resolved
-    this.runner = new BskRunner(ctx.subprocess, resolved.binary, resolved.workspaceRoot, message => { ctx.logger.info(message) })
+    this.runner = new BskRunner(
+      ctx.subprocess,
+      resolved.binary,
+      resolved.workspaceRoot,
+      message => { ctx.logger.info(message) },
+      // 显式指定 bsk home 时注入子进程环境：测试据此隔离 daemon，
+      // 避免测试结束回收 Job 时连带杀掉真实 daemon。
+      resolved.bskHome === ''
+        ? undefined
+        : { ...process.env as Record<string, string>, BSK_HOME: resolved.bskHome },
+    )
     this.policy = new BrowserPolicy({
       allowEvaluate: resolved.allowEvaluate,
       sensitivePatterns: resolved.sensitivePatterns,
@@ -84,15 +102,16 @@ export class BrowserAgent extends TypertRemoteService {
       },
       approval: ctx.get('approval') as ApprovalFace | undefined,
       saveImage: createImageSaver(ctx),
+      tracker: this.tracker,
     })
     ctx.on('agent/disposed', ({ agent }) => {
-      void this.store.stop(String(agent.session.id), 'DSH 会话结束')
+      void this.store.stopAllOf(String(agent.session.id), 'DSH 会话结束')
     })
     const timer = ctx.get('timer')
     if (timer !== undefined) {
       ctx.effect(() => {
         const dispose = timer.interval(() => {
-          void runSweep(this.store, Date.now(), message => { ctx.logger.warn(message) })
+          void runSweep(this.store.reclaim(), Date.now(), message => { ctx.logger.warn(message) })
         }, SWEEP_INTERVAL_MS)
         return () => { dispose() }
       }, 'browser-agent session sweep')
@@ -107,26 +126,7 @@ export class BrowserAgent extends TypertRemoteService {
    */
   @Remote('panel')
   async panel(sessionId: string): Promise<BrowserPanelSnapshot> {
-    const record = this.store.get(sessionId)
-    const status = await this.runner.run(['status', '--json'], { allowFailure: true })
-    let tabs: BrowserPanelSnapshot['tabs'] = []
-    let screenshotPath = record?.lastScreenshotPath ?? null
-    if (record !== undefined) {
-      const listed = await this.runner.run(
-        ['tab', 'list', '--json', '--scope', 'agent', '--session', record.bskSessionId],
-        { allowFailure: true },
-      )
-      tabs = parseTabs(listed.json)
-      const url = activeTabUrl(listed.json)
-      this.store.update(sessionId, { tabCount: tabs.length, ...(url !== undefined ? { currentUrl: url } : {}) })
-      screenshotPath = this.store.get(sessionId)?.lastScreenshotPath ?? screenshotPath
-    }
-    return {
-      session: this.sessionView(sessionId),
-      browsers: parseBrowsers(status.json),
-      tabs,
-      lastScreenshotPath: screenshotPath,
-    }
+    return await panelSnapshot(this.panelDeps(), sessionId)
   }
 
   /**
@@ -147,49 +147,43 @@ export class BrowserAgent extends TypertRemoteService {
    */
   @Remote('preview')
   async preview(sessionId: string): Promise<BrowserPreviewResult> {
-    const path = this.store.get(sessionId)?.lastScreenshotPath ?? null
-    if (path === null) return { dataUrl: null, path: null, bytes: 0, message: '本次会话尚未截图' }
-    try {
-      const bytes = await readFile(path)
-      if (bytes.byteLength > PREVIEW_MAX_BYTES) {
-        return { dataUrl: null, path, bytes: bytes.byteLength, message: '截图过大，未内联预览' }
-      }
-      return {
-        dataUrl: `data:image/png;base64,${bytes.toString('base64')}`,
-        path,
-        bytes: bytes.byteLength,
-        message: null,
-      }
-    } catch (error) {
-      return { dataUrl: null, path, bytes: 0, message: `读取截图失败：${errorText(error)}` }
+    return await previewShot(this.store, sessionId)
+  }
+
+  /**
+   * 面板实时视图：正在执行的动作与耗时，供轮询使用（不含截图）。
+   * @param sessionId - DSH 会话 id
+   * @returns 实时视图
+   */
+  @Remote('live')
+  live(sessionId: string): BrowserLiveView {
+    return liveView(this.panelDeps(), this.store.activeKey(sessionId), Date.now())
+  }
+
+  /**
+   * 中断该会话正在执行的动作（面板按钮）。
+   * @param sessionId - DSH 会话 id
+   * @returns 中断结果
+   */
+  @Remote('interrupt')
+  interrupt(sessionId: string): BrowserInterruptResult {
+    const interrupted = this.tracker.interrupt(this.store.activeKey(sessionId))
+    return {
+      interrupted,
+      message: interrupted ? '已中断当前动作' : '当前没有正在执行的动作',
     }
   }
 
-  private sessionView(sessionId: string): BrowserSessionView {
-    const record = this.store.get(sessionId)
-    if (record === undefined) {
-      return {
-        sessionId,
-        bskSessionId: null,
-        state: 'idle',
-        currentUrl: null,
-        pageTitle: null,
-        tabCount: 0,
-        lastActionAtMs: 0,
-        idleDeadlineAtMs: null,
-        lastError: null,
-      }
-    }
+  /**
+   * 组装面板依赖（runner/store/tracker/空闲上限）。
+   * @returns 面板依赖
+   */
+  private panelDeps(): PanelDeps {
     return {
-      sessionId,
-      bskSessionId: record.bskSessionId,
-      state: 'open',
-      currentUrl: record.currentUrl,
-      pageTitle: record.pageTitle,
-      tabCount: record.tabCount,
-      lastActionAtMs: record.lastActionAtMs,
-      idleDeadlineAtMs: record.lastActionAtMs + this.config.idleTimeoutMs,
-      lastError: record.lastError,
+      runner: this.runner,
+      store: this.store,
+      tracker: this.tracker,
+      idleTimeoutMs: this.config.idleTimeoutMs,
     }
   }
 }
@@ -204,6 +198,8 @@ function registerBrowserTools(ctx: Context, deps: Parameters<typeof registerObse
   registerInteractTools(ctx, deps)
   registerNavigateTools(ctx, deps)
   registerControlTools(ctx, deps)
+  registerAdvancedTools(ctx, deps)
+  registerSessionTools(ctx, deps)
 }
 
 export default BrowserAgent

@@ -7,7 +7,7 @@ import { loadCommitFileState, loadCommitState, loadDiffState } from './details.j
 import { useBranchMenu } from './useBranchMenu.js'
 import { usePanelSync } from './usePanelSync.js'
 import {
-  runCheckout, runCommit, runCreateBranch, runDiscard, runRemote, runToggleAll, runToggleStage,
+  runCheckout, runCommit, runCreateBranch, runDiscard, runRemote, runSetIdentity, runToggleAll, runToggleStage,
 } from './actions.js'
 import { splitPath } from '../lib/format.js'
 import type {
@@ -175,6 +175,9 @@ export function useGitPanel(options: UseGitPanelOptions): GitPanelController {
     closeCommitDetail: () => { setOpenCommit(null); setDetail(null); setOpenCommitFile(null); setCommitDiff(null) },
     openCommitFile, commitDiff, toggleCommitFile,
     ...branchMenu,
+    saveIdentity: (name, email, scope) => {
+      void run(async () => await runSetIdentity(context(), name, email, scope))
+    },
     runAction: (task) => {
       void run(async () => (task === 'refresh' ? '' : await runRemote(context(), task)))
     },

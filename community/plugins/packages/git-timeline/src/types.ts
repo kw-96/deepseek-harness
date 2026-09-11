@@ -65,7 +65,12 @@ export const gitBranchesValue = z.object({
   names: z.array(z.string()).readonly(),
   error: z.string().nullable(),
 }).readonly()
-export const gitIdentityValue = z.object({ name: z.string().nullable(), email: z.string().nullable() }).readonly()
+export const gitIdentityValue = z.object({
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  /** 生效值来自哪个配置文件；读不到时为 null。 */
+  origin: z.string().nullable(),
+}).readonly()
 export const gitActionValue = z.object({ detail: z.string() }).readonly()
 export const gitCommitResultValue = z.object({ shortHash: z.string().nullable(), detail: z.string() }).readonly()
 export const gitMessageValue = z.object({
@@ -139,7 +144,12 @@ export interface GitBranches {
   error: string | null
 }
 
-export interface GitIdentity { name: string | null; email: string | null }
+export interface GitIdentity {
+  name: string | null
+  email: string | null
+  /** 生效值来自哪个配置文件；读不到时为 null。 */
+  origin: string | null
+}
 
 /** 写操作回执：`detail` 是给界面用的简短说明（多为 git 输出的尾行）。 */
 export interface GitActionResponse { detail: string }

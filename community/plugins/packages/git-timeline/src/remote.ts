@@ -53,6 +53,10 @@ const descriptors = [
   descriptor('commit', [
     parameter('cwd', z.string()), parameter('message', z.string()), parameter('amend', z.boolean()),
   ], gitCommitResultValue, 'GitCommitResponse'),
+  descriptor('setIdentity', [
+    parameter('cwd', z.string()), parameter('name', z.string()), parameter('email', z.string()),
+    parameter('scope', z.union([z.literal('global'), z.literal('local')])),
+  ], gitActionValue, 'GitActionResponse'),
   descriptor('push', [parameter('cwd', z.string())], gitActionValue, 'GitActionResponse'),
   descriptor('pull', [parameter('cwd', z.string())], gitActionValue, 'GitActionResponse'),
   descriptor('fetch', [parameter('cwd', z.string())], gitActionValue, 'GitActionResponse'),
@@ -83,6 +87,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'gitPanel/stageAll': (cwd: string) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/unstageAll': (cwd: string) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/commit': (cwd: string, message: string, amend: boolean) => Promise<RemoteResult<GitCommitResponse>>
+    'gitPanel/setIdentity': (
+      cwd: string,
+      name: string,
+      email: string,
+      scope: 'global' | 'local',
+    ) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/push': (cwd: string) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/pull': (cwd: string) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/fetch': (cwd: string) => Promise<RemoteResult<GitActionResponse>>

@@ -2,8 +2,8 @@
 
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
-import type { BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult } from './types.js'
-import { browserPanelValue, browserPreviewValue, browserStopValue } from './types.js'
+import type { BrowserInterruptResult, BrowserLiveView, BrowserPanelSnapshot, BrowserPreviewResult, BrowserStopResult } from './types.js'
+import { browserInterruptValue, browserLiveValue, browserPanelValue, browserPreviewValue, browserStopValue } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
 const parameter = (name: string, schema: z.ZodType) => ({
@@ -30,6 +30,8 @@ const descriptors = [
   descriptor('panel', [sessionId()], browserPanelValue, 'BrowserPanelSnapshot'),
   descriptor('stop', [sessionId()], browserStopValue, 'BrowserStopResult'),
   descriptor('preview', [sessionId()], browserPreviewValue, 'BrowserPreviewResult'),
+  descriptor('live', [sessionId()], browserLiveValue, 'BrowserLiveView'),
+  descriptor('interrupt', [sessionId()], browserInterruptValue, 'BrowserInterruptResult'),
 ] as const
 
 /** 供客户端 `remote.$mount` 使用的贡献。 */
@@ -46,6 +48,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'browserAgent/panel': (sessionId: string) => Promise<RemoteResult<BrowserPanelSnapshot>>
     'browserAgent/stop': (sessionId: string) => Promise<RemoteResult<BrowserStopResult>>
     'browserAgent/preview': (sessionId: string) => Promise<RemoteResult<BrowserPreviewResult>>
+    'browserAgent/live': (sessionId: string) => Promise<RemoteResult<BrowserLiveView>>
+    'browserAgent/interrupt': (sessionId: string) => Promise<RemoteResult<BrowserInterruptResult>>
   }
 }
 

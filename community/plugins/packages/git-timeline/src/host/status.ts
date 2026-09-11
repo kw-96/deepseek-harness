@@ -1,7 +1,7 @@
 /** 工作区状态、差异与身份：porcelain-v2 解析与只读读取。 */
 
 import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
-import type { GitDiffResponse, GitEntry, GitIdentity, GitStatusResponse } from '../types.js'
+import type { GitDiffResponse, GitEntry, GitStatusResponse } from '../types.js'
 import { git, repoRoot } from './run.js'
 
 /** porcelain-v2 的解析结果。 */
@@ -172,22 +172,4 @@ export async function readCommitDiff(
   if (root === null) return { text: '', truncated: false }
   const out = await git(shell, root, ['show', '--no-color', '--format=', '--patch', hash, '--', path])
   return capText(out.stdout, maxBytes)
-}
-
-/**
- * 读取 git 身份（提交署名），用于面板底部账号显示。
- * @param shell shell 执行器
- * @param cwd 会话工作目录
- */
-export async function readIdentity(shell: ShellExecutor, cwd: string): Promise<GitIdentity> {
-  const read = async (key: string): Promise<string | null> => {
-    try {
-      const out = await git(shell, cwd, ['config', '--get', key])
-      const value = out.stdout.trim()
-      return value === '' ? null : value
-    } catch {
-      return null
-    }
-  }
-  return { name: await read('user.name'), email: await read('user.email') }
 }

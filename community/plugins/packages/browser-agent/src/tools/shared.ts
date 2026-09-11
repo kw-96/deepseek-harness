@@ -3,7 +3,11 @@
  * 动作封装（命令执行、快照补拍、引用刷新）在 actions.ts。
  */
 
+import type { Context } from '@deepseek-ai/cordis'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import type { ActionTracker } from '../host/live/tracker.js'
+import { sessionKey } from '../host/session/keys.js'
 import type { ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { ImageRefLike, SaveImageInput } from '../host/attachment.js'
 import type { BskCommandRunner } from '../host/bsk.js'
@@ -57,6 +61,8 @@ export interface BrowserToolDeps {
    * 输入时返回 undefined —— 此时工具结果退回「只给文件路径」。
    */
   saveImage?: ((input: SaveImageInput) => Promise<ImageRefLike | undefined>) | undefined
+  /** 实时动作跟踪：面板据此显示「正在做什么」并支持中断。 */
+  tracker?: ActionTracker | undefined
 }
 
 /** 结构化的 Agent 面（避免依赖宿主编排类型线）。 */
@@ -71,14 +77,31 @@ export interface ExecLike {
 }
 
 /**
- * 取当前工具调用所属的 DSH 会话 id。
+ * 本次调用解析出的会话键（多会话下是复合键）。
+ *
+ * 包装器在调用前写入，工具层只读——这样 17 个工具都不必自己拼键，
+ * 也不必知道别名是怎么解析成复合键的。
+ */
+const sessionKeyByExec = new WeakMap<object, string>()
+
+/**
+ * 记录本次调用的会话键。
+ * @param exec - 本次调用传给工具的上下文
+ * @param key - 复合键
+ */
+export function setSessionKey(exec: object, key: string): void {
+  sessionKeyByExec.set(exec, key)
+}
+
+/**
+ * 取当前工具调用应作用在哪个 bsk 会话上。
  * @param exec - 工具执行上下文
- * @returns DSH 会话 id
+ * @returns 会话键（默认会话即 DSH 会话 id，多会话为 `<dshId>##<alias>`）
  */
 export function requireSessionId(exec: ExecLike): string {
   const agent = exec.agent
   if (agent === undefined) throw new Error('浏览器工具需要在 Agent 会话中调用（当前调用没有归属会话）')
-  return String(agent.session.id)
+  return sessionKeyByExec.get(exec as object) ?? String(agent.session.id)
 }
 
 /** 文本内容块。 */
@@ -94,4 +117,48 @@ export function textBlock(text: string): ContentBlock[] {
  */
 export function valueSchema<const T extends ValueSchemaSpec>(schema: T): T {
   return schema
+}
+
+/** 等待条件取值。 */
+const WAIT_UNTIL = ['load', 'domcontentloaded', 'networkidle', 'commit'] as const
+
+export const observeSchema = valueSchema({
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    mode: { type: 'string', required: true, enum: ['snapshot', 'screenshot', 'html'] },
+    url: { type: 'string', required: true },
+    title: { type: 'string', required: true },
+    bskSessionId: { type: 'string', required: true },
+    refs: { type: 'integer', required: true },
+    truncated: { type: 'boolean', required: true },
+    note: { type: 'string', required: true },
+    content: { type: 'string', required: true },
+    screenshotPath: { type: 'string', required: true },
+    screenshotBytes: { type: 'integer', required: true },
+    screenshotSize: { type: 'string', required: true },
+    // 仅当宿主挂了附件库且当前路由接受图像输入时出现；出现时 render 追加 image 内容块。
+    image: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        attachmentId: { type: 'string', required: true },
+        mediaType: { type: 'string', required: true, enum: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] },
+        bytes: { type: 'integer', required: true },
+        width: { type: 'integer', required: true },
+        height: { type: 'integer', required: true },
+      },
+    },
+  },
+})
+
+/**
+ * 所有浏览器工具共享的 `session` 参数：不传即当前活跃会话。
+ * 展开进各工具的 `parameters`，这样多会话支持不需要每个工具各写一遍。
+ */
+export const SESSION_PARAM = {
+  session: {
+    type: 'string' as const,
+    description: 'Browser session alias (default: the active one). Use browser_session to list, create or switch.',
+  },
 }

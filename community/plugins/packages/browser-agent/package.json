@@ -58,7 +58,8 @@
     "scripts/**/*.ps1",
     "docs/**/*.md",
     "README.md",
-    "README.zh-CN.md",
+    "README.zh.md",
+    "README.i18n.yaml",
     "LICENSE"
   ],
   "dsh": {

@@ -1,7 +1,4 @@
-/**
- * 观测类工具：打开页面与按需升级的观测方式。快照始终是默认路径，
- * HTML 与截图只在快照无法回答问题时使用。
- */
+/** 观测类工具：打开页面与按需升级的观测方式（快照优先，HTML/截图按需）。 */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -10,45 +7,15 @@ import type { ImageRefLike } from '../host/attachment.js'
 import { captureScreenshot, observationRender, observationSchema, observationValue } from './observation.js'
 import type { BrowserToolDeps } from './shared.js'
 import {
-  durationArg, navigationTimeout, recordNavigation, registerTool, runFor, takeSnapshot,
+  durationArg, navigationTimeout, recordNavigation, runFor, takeSnapshot,
 } from './actions.js'
-import { requireSessionId, textBlock, valueSchema } from './shared.js'
+import { SESSION_PARAM, observeSchema, requireSessionId, textBlock } from './shared.js'
+import { registerTool } from './register/register.js'
 
 /** 观测模式。 */
 const OBSERVE_MODES = ['snapshot', 'html', 'screenshot'] as const
 /** 等待条件取值。 */
 const WAIT_UNTIL = ['load', 'domcontentloaded', 'networkidle', 'commit'] as const
-
-const observeSchema = valueSchema({
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    mode: { type: 'string', required: true, enum: [...OBSERVE_MODES] },
-    url: { type: 'string', required: true },
-    title: { type: 'string', required: true },
-    bskSessionId: { type: 'string', required: true },
-    refs: { type: 'integer', required: true },
-    truncated: { type: 'boolean', required: true },
-    note: { type: 'string', required: true },
-    content: { type: 'string', required: true },
-    screenshotPath: { type: 'string', required: true },
-    screenshotBytes: { type: 'integer', required: true },
-    screenshotSize: { type: 'string', required: true },
-    // 只有在宿主挂了附件库且当前模型路由接受图像输入时才出现；
-    // 出现时 render 会额外追加一个 image 内容块，模型可直接看图。
-    image: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        attachmentId: { type: 'string', required: true },
-        mediaType: { type: 'string', required: true, enum: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] },
-        bytes: { type: 'integer', required: true },
-        width: { type: 'integer', required: true },
-        height: { type: 'integer', required: true },
-      },
-    },
-  },
-})
 
 /**
  * 注册 browser_open 与 browser_observe。
@@ -56,13 +23,14 @@ const observeSchema = valueSchema({
  * @param deps - 工具依赖
  */
 export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void {
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_open',
     description:
       'Open a URL in the browser automation window (an isolated Agent Window; the user\'s own '
       + 'windows are untouched) and return the page\'s accessibility snapshot with @eN element refs. '
       + 'Every earlier ref becomes invalid after this call — use only refs from the returned snapshot.',
     parameters: {
+      ...SESSION_PARAM,
       url: { type: 'string', required: true, description: 'Absolute URL to open.' },
       newTab: { type: 'boolean', description: 'Open in a new tab of the Agent Window instead of reusing the active tab.' },
       waitUntil: { type: 'string', enum: [...WAIT_UNTIL], description: 'Lifecycle phase to wait for (default `load`).' },
@@ -99,7 +67,7 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
     presentCall: args => ({ card: 'generic', title: `打开 ${args.url}`, kind: 'other', rawInput: args.url }),
   }))
 
-  registerTool(ctx, defineTool({
+  registerTool(ctx, deps, defineTool({
     name: 'browser_observe',
     description:
       'Observe the current page. `mode: snapshot` (default) returns the accessibility tree with @eN refs '
@@ -107,6 +75,7 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
       + 'only when hidden DOM, metadata, or markup is required, and `mode: screenshot` only when visual '
       + 'layout or canvas content cannot be inferred from the snapshot.',
     parameters: {
+      ...SESSION_PARAM,
       mode: { type: 'string', enum: [...OBSERVE_MODES], description: 'snapshot (default) | html | screenshot.' },
       ref: { type: 'string', description: 'Snapshot ref (@eN) to scope the dump or crop the screenshot.' },
       maxBytes: { type: 'integer', description: 'Byte cap for `mode: html`.' },
@@ -134,7 +103,7 @@ export function registerObserveTools(ctx: Context, deps: BrowserToolDeps): void 
           if (seen.image !== undefined) {
             blocks.push({
               type: 'image',
-              // 结构上就是宿主的 ImageAttachmentRef；不引入运行时依赖故此处断言。
+              // 结构上即宿主的 ImageAttachmentRef；不引入运行时依赖，故此处断言。
               attachment: {
                 attachmentId: seen.image.attachmentId,
                 mediaType: seen.image.mediaType,

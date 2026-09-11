@@ -7,6 +7,8 @@
  * 内挂载后模型调用走同一段代码，差别只在没有 Loader / ToolRuntime 外壳。
  */
 
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -17,9 +19,10 @@ import { resolveConfig } from '../lib/types/host/config.js'
 const enabled = process.env['BSK_E2E'] === '1'
 
 const TOOL_NAMES = [
-  'browser_ask_human', 'browser_click', 'browser_evaluate', 'browser_fill', 'browser_history',
-  'browser_observe', 'browser_open', 'browser_press', 'browser_select', 'browser_status',
-  'browser_stop', 'browser_tabs',
+  'browser_ask_human', 'browser_click', 'browser_emulate', 'browser_evaluate', 'browser_fill',
+  'browser_history', 'browser_hover', 'browser_inspect', 'browser_observe', 'browser_open',
+  'browser_press', 'browser_select', 'browser_session', 'browser_status', 'browser_stop', 'browser_tabs',
+  'browser_transfer', 'browser_wait',
 ]
 
 /** 只保留注册/注销语义的工具注册表替身。 */
@@ -43,6 +46,8 @@ function makeContext(registered: Map<string, ToolDefinition>): Context {
   return ctx
 }
 
+/** 测试专用 bsk home：绝不让测试碰到默认 home 下的真实 daemon。 */
+const TEST_BSK_HOME = join(tmpdir(), `bsk-test-home-${String(process.pid)}`)
 describe('真实 Cordis 组合', () => {
   it('声明 agents 注入：孤儿巡检经 ctx.agents 判定宿主会话', () => {
     // 巡检回调访问 `ctx.agents`；漏声明会让该访问抛
@@ -50,10 +55,10 @@ describe('真实 Cordis 组合', () => {
     expect(BrowserAgent.inject).toEqual(['agents', 'tools', 'subprocess'])
   })
 
-  it('挂载后注册 12 个工具，卸载后全部释放', async () => {
+  it('挂载后注册 18 个工具，卸载后全部释放', async () => {
     const registered = new Map<string, ToolDefinition>()
     const ctx = makeContext(registered)
-    await ctx.plugin(BrowserAgent, resolveConfig({ binary: 'bsk' }))
+    await ctx.plugin(BrowserAgent, resolveConfig({ binary: 'bsk', bskHome: TEST_BSK_HOME }))
     expect([...registered.keys()].sort()).toEqual(TOOL_NAMES)
     await ctx.fiber.dispose()
     expect(registered.size).toBe(0)
@@ -72,7 +77,7 @@ describe.skipIf(!enabled)('工具级真实浏览器端到端（组合内）', ()
   it('browser_open → observe → status → stop 全流程', async () => {
     const registered = new Map<string, ToolDefinition>()
     const ctx = makeContext(registered)
-    await ctx.plugin(BrowserAgent, resolveConfig({ binary: 'bsk' }))
+    await ctx.plugin(BrowserAgent, resolveConfig({ binary: 'bsk', bskHome: TEST_BSK_HOME }))
     const exec = { agent: { session: { id: 'composition' } }, signal: AbortSignal.timeout(120_000) }
     const call = async (name: string, args: unknown): Promise<Record<string, unknown>> => {
       const tool = registered.get(name)

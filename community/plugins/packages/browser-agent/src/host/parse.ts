@@ -182,3 +182,19 @@ export function isStaleSessionError(error: unknown): error is BskError {
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
+
+/** 把 console / network 的条目压成模型可读的多行文本（每行一条）。 */
+export function formatDiagnosticEntries(entries: readonly Record<string, unknown>[], kind: string): string {
+  if (entries.length === 0) return '（没有记录）'
+  return entries.map((entry) => {
+    const seq = String(entry['sequence'] ?? '?')
+    if (kind === 'console') {
+      const level = String(entry['level'] ?? entry['kind'] ?? 'log')
+      const where = entry['line'] !== undefined ? ` (${String(entry['line'])}:${String(entry['column'] ?? 0)})` : ''
+      return `#${seq} [${level}] ${String(entry['text'] ?? '')}${where}`
+    }
+    const status = entry['status'] !== undefined ? ` ${String(entry['status'])}` : ''
+    const failure = entry['error_text'] !== undefined ? ` ${String(entry['error_text'])}` : ''
+    return `#${seq} ${String(entry['method'] ?? '')}${status}${failure} ${String(entry['url'] ?? '')}`
+  }).join('\n')
+}

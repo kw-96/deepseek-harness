@@ -93,3 +93,4 @@ node community/plugins/dev.mjs
 | 观测文本是 `@vom/@view/@layers` 且引用只标交互元素 | 0.2.x 改用了 VOM 语义观测（0.1.x 是逐节点带引用的 aria 树） | 插件已兼容两代格式（标题解析、根节点引用回退都按格式分支） |
 | 点击偶发「无反应」（页面收不到 click、URL 不变） | 0.2.x 扩展会在页面注入固定定位、`pointer-events: auto` 的 `<browser-skill-overlay>`；它处于 blocking（人工接管）或扩展刚重载时会短暂吞掉自动化点击 | 重试一次即可；确认 Agent Window 未被人工接管。点击链路本身正常：实测坐标与元素几何一致（`getBoundingClientRect` 中心），同坐标在本地探针页上按钮/链接均可点，`bsk click` 成功时页面会正常跳转 |
 | 与 watch 同时跑 `pnpm run build` 出现 `UNRESOLVED_ENTRY` | build 会先 clean 掉 `lib/`，与增量构建竞态 | 先停 dev.mjs，构建完再启动 |
+| 浏览器会话中途失效（`session not registered`） | bsk daemon 重启会清空会话注册表；本机子进程运行时用 Windows Job 托管子进程，**任何创建过 `LocalSubprocessRuntime` 的测试在 dispose 时会连带杀掉 daemon** | 插件已自动重建会话并回到原页面；测试一律用独立 `bskHome`（见 composition/sweep 规格），别让测试碰默认 home |

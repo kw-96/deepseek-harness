@@ -9,7 +9,8 @@ import {
 import { readCommit, readLastMessage, readLog } from './host/history.js'
 import { checkout, createBranch, readBranches } from './host/branches.js'
 import { generateCommitMessage } from './host/message.js'
-import { readCommitDiff, readDiff, readIdentity, readStatus } from './host/status.js'
+import { readIdentity, writeIdentity } from './host/identity.js'
+import { readCommitDiff, readDiff, readStatus } from './host/status.js'
 import type {
   GitActionResponse, GitBranches, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity,
   GitLogResponse, GitMessageResponse, GitMessageText, GitStatusResponse,
@@ -133,10 +134,22 @@ export class GitPanel extends TypertRemoteService {
     return await fetchAll(this.ctx.shell, cwd)
   }
 
-  /** The signing identity behind commits (the panel's account display). */
+  /** The signing identity behind commits, plus the config file it comes from. */
   @Remote('identity')
   async identity(cwd: string): Promise<GitIdentity> {
     return await readIdentity(this.ctx.shell, cwd)
+  }
+
+  /**
+   * Write the signing identity, globally or for this repository only.
+   * @param cwd - session working directory.
+   * @param name - committer name (non-empty).
+   * @param email - committer email (non-empty).
+   * @param scope - `global` writes the user config, `local` writes this repository's config.
+   */
+  @Remote('setIdentity')
+  async setIdentity(cwd: string, name: string, email: string, scope: 'global' | 'local'): Promise<GitActionResponse> {
+    return await writeIdentity(this.ctx.shell, cwd, name, email, scope)
   }
 
   /** Draft a commit message with the session's own model route. */
