@@ -2,12 +2,7 @@
 
 English | [中文](README.zh.md)
 
-This directory makes the DeepSeek Harness checkout self-contained for
-deployment: community plugins, the skills the agent uses, and the web profile
-manifest all live here, outside the harness `packages/` pnpm workspace (the
-root `pnpm-workspace.yaml` globs `packages/*/*`, `vendor/*`, `apps/*`, and
-`website`; `community/` is none of those, so `pnpm install` at the repo root
-never tries to build or gate these external packages).
+This directory makes the DeepSeek Harness checkout self-contained for deployment: community plugins, the skills the agent uses, and the web profile manifest all live here, outside the harness `packages/` pnpm workspace (the root `pnpm-workspace.yaml` globs `packages/*/*`, `vendor/*`, `apps/*`, and `website`; `community/` is none of those, so `pnpm install` at the repo root never tries to build or gate these external packages).
 
 ## Layout
 
@@ -21,6 +16,9 @@ community/
   home/               global home files, copied to $DSH_HOME/ (e.g. AGENTS.md)
   profiles/web/       template for $DSH_HOME/profiles/web (manifest only)
   seed.mjs            idempotent bootstrap, hooked into the repo's `dsh` script
+  doctor.mjs          read-only host report; names the command that fixes each problem
+  preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
+  profile.mjs         profile manifest build and repair
   README.md           this file
 ```
 
@@ -35,14 +33,21 @@ pnpm run build
 pnpm dsh web
 ```
 
-The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it
-writes `$DSH_HOME/profiles/web` from `community/profiles/web/` (resolving the
-three `file:` deps to this checkout's `community/plugins/tarballs/`), copies
-the skills into `$DSH_HOME/skills/`, copies the global home files (the
-user-global `AGENTS.md`) into `$DSH_HOME/`, then `pnpm install`s the profile.
-After that it is a fast no-op. Override the home with `DSH_HOME=/path`, force a
-re-seed with `node community/seed.mjs --force`, or skip the profile install
-with `DSH_SEED_SKIP_INSTALL=1`.
+The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it writes `$DSH_HOME/profiles/web` from `community/profiles/web/` (resolving the three `file:` deps to this checkout's `community/plugins/tarballs/`), copies the skills into `$DSH_HOME/skills/`, copies the global home files (the user-global `AGENTS.md`) into `$DSH_HOME/`, then `pnpm install`s the profile. Later boots repair only what drifted: tarball paths left by a different checkout, and bundles this host cannot install. Bundles added beyond the template are never removed. Override the home with `DSH_HOME=/path`, rewrite the whole manifest with `node community/seed.mjs --force`, or skip the profile install with `DSH_SEED_SKIP_INSTALL=1`.
+
+## Check the host before deploying
+
+`node community/doctor.mjs` inspects the machine without changing anything, prints one line per check, and names the command that fixes each failure. It covers the Node and pnpm versions, Git, the Windows PowerShell execution policy, the CPU architecture, GitHub and registry reachability, the repository install, and whether the profile still matches this checkout. It exits non-zero when any check fails, so it also works as a preflight step in a script.
+
+## Bundles this host cannot install
+
+`seed.mjs` never writes a profile whose `pnpm install` is guaranteed to fail. It drops each bundle whose dependency cannot be satisfied here and prints the reason:
+
+- **Registry** — a pinned version the chosen registry no longer serves, such as an unpublished package.
+- **Network** — a bundle whose dependency is a `github:` reference while github.com is unreachable.
+- **Architecture** — a bundle whose native dependency publishes no binary for this platform and CPU.
+
+The per-platform table lives in `preflight.mjs`; add a row there when a new bundle gains a native dependency.
 
 ## Rebuilding the plugins
 
@@ -58,13 +63,10 @@ pnpm pack:check       # regenerates tarballs under each package's dist/
 
 ## NetEase-internal packages (auto-detected)
 
-`ntes-dsh-market` and `@dap-dsh-plugins/netease-auth` exist only on
-`https://npm.nie.netease.com/` (a company-internal registry that also proxies
-public npm). `seed.mjs` probes that registry up front:
+`ntes-dsh-market` and `@dap-dsh-plugins/netease-auth` exist only on `https://npm.nie.netease.com/` (a company-internal registry that also proxies public npm). `seed.mjs` probes that registry up front:
 
 - **Reachable** → full profile, internal `.npmrc`.
-- **Unreachable** → skips those two bundles and dependencies, writes the
-  public `registry.npmjs.org` `.npmrc`.
+- **Unreachable** → skips those two bundles and dependencies, writes the public `registry.npmjs.org` `.npmrc`.
 
 Force a choice instead of auto-detecting:
 
