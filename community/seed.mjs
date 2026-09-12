@@ -31,9 +31,10 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir, arch, platform } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { GITHUB_BUNDLES, probe } from './preflight.mjs'
+import { probe } from './preflight.mjs'
 import {
-  droppedBundles, materializeProfile, renderProfile, repairProfile, unavailablePinned,
+  bundleAnchors, droppedBundles, materializeProfile, renderProfile, repairProfile,
+  unavailablePinned, unresolvableBundles,
 } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -70,6 +71,19 @@ function installProfile() {
  */
 function reportDropped(dropped) {
   for (const [name, reason] of dropped) console.log(`[community] 跳过插件 ${name}：${reason}`)
+}
+
+/**
+ * Extend a drop set with the bundles nothing on this host can supply — rows
+ * `dsh-plugin-manager` wrote from its catalog without a dependency to install.
+ * @param dropped - the drop set to extend in place.
+ * @param pkg - the manifest about to be written or repaired.
+ */
+function dropUnresolvable(dropped, pkg) {
+  const anchors = bundleAnchors({ repoRoot, profileDir: profileDst, dshHome })
+  for (const [name, reason] of unresolvableBundles(pkg, anchors)) {
+    if (!dropped.has(name)) dropped.set(name, reason)
+  }
 }
 
 /**
@@ -121,6 +135,7 @@ if (existing === undefined || force) {
   // A pinned package the registry no longer serves would fail the install, so
   // it is dropped here with the reason instead.
   for (const [name, reason] of await unavailablePinned(template, registry, dropped)) dropped.set(name, reason)
+  dropUnresolvable(dropped, template)
   reportDropped(dropped)
 
   await mkdir(profileDst, { recursive: true })
@@ -139,19 +154,17 @@ if (existing === undefined || force) {
   const npmrc = existsSync(join(profileDst, '.npmrc'))
     ? await readFile(join(profileDst, '.npmrc'), 'utf8')
     : ''
-  const bundles = existing.dsh.profile.bundles ?? []
-  const githubReachable = GITHUB_BUNDLES.some(name => bundles.includes(name))
-    ? await probe('https://github.com')
-    : true
-  const changes = repairProfile(existing, {
-    tarballsUrl,
-    dropped: droppedBundles({
-      internal: npmrc.includes('nie.netease.com'),
-      githubReachable,
-      platform: platform(),
-      arch: arch(),
-    }),
+  // Repair never probes the network. A bundle that is already installed keeps
+  // working offline, and a probe that wrongly reports "unreachable" would
+  // delete it; only a fresh seed weighs the network, before anything exists.
+  const dropped = droppedBundles({
+    internal: npmrc.includes('nie.netease.com'),
+    githubReachable: true,
+    platform: platform(),
+    arch: arch(),
   })
+  dropUnresolvable(dropped, existing)
+  const changes = repairProfile(existing, { tarballsUrl, dropped })
   if (changes.length > 0) {
     for (const change of changes) console.log(`[community] ${change}`)
     await writeFile(profileManifest, renderProfile(existing), 'utf8')

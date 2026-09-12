@@ -19,7 +19,7 @@ import {
   GITHUB_BUNDLES, NATIVE_BUNDLE_LIMITS, REQUIRED_NODE_RANGE, REQUIRED_PNPM_VERSION,
   nodeVersionSupported, probe,
 } from './preflight.mjs'
-import { droppedBundles, repairProfile } from './profile.mjs'
+import { bundleAnchors, droppedBundles, repairProfile, unresolvableBundles } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
@@ -124,7 +124,12 @@ if (!existsSync(join(profileDir, 'package.json'))) {
   record('失败', `profile 尚未初始化：${profileDir}`, undefined, 'node community/seed.mjs')
 } else {
   const pkg = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
-  const expected = droppedBundles({ internal: true, githubReachable, ...host })
+  // The drift check mirrors seed's repair path, which never weighs the network:
+  // a bundle already installed keeps working offline.
+  const expected = droppedBundles({ internal: true, githubReachable: true, ...host })
+  for (const [name, reason] of unresolvableBundles(pkg, bundleAnchors({ repoRoot, profileDir, dshHome }))) {
+    expected.set(name, reason)
+  }
   const changes = repairProfile(structuredClone(pkg), { tarballsUrl, dropped: expected })
   if (changes.length === 0) {
     record('通过', 'profile 配置与当前仓库一致')

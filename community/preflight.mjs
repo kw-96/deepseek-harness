@@ -6,6 +6,7 @@
  * Identifiers and comments are English; every message a user reads is Chinese.
  */
 
+import { lookup } from 'node:dns'
 import { connect } from 'node:net'
 
 /** Node range the harness supports (root package.json `engines.node`). */
@@ -60,31 +61,50 @@ export function nodeVersionSupported(version) {
  * @returns true when the host answered either probe.
  */
 export async function probe(url, timeoutMs = 4000) {
-  try {
-    await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
-    return true
-  } catch {
-    return await tcpReachable(new URL(url), timeoutMs)
+  // Two rounds: a single failed round cannot be told apart from a slow DNS
+  // answer or a proxy that dropped the first connection, and reporting a
+  // reachable host as unreachable would silently drop a bundle.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+      return true
+    } catch {
+      if (await tcpReachable(new URL(url), timeoutMs)) return true
+    }
   }
+  return false
 }
 
 /**
  * Open and immediately close a TCP connection to the URL's host and port.
+ * Every address the name resolves to is tried, because a host can answer on
+ * one (a loopback proxy) while another is blackholed, and reporting the
+ * reachable one as unreachable would drop a bundle the user wants.
  * @param url - the parsed URL.
- * @param timeoutMs - how long to wait for the connection.
- * @returns true when the connection was established.
+ * @param timeoutMs - how long to wait for each connection.
+ * @returns true when any address accepted the connection.
  */
 function tcpReachable(url, timeoutMs) {
   const port = Number(url.port) || (url.protocol === 'https:' ? 443 : 80)
   return new Promise((resolve) => {
-    const socket = connect({ host: url.hostname, port, timeout: timeoutMs })
-    const settle = (reachable) => {
-      socket.destroy()
-      resolve(reachable)
-    }
-    socket.once('connect', () => settle(true))
-    socket.once('timeout', () => settle(false))
-    socket.once('error', () => settle(false))
+    lookup(url.hostname, { all: true }, (error, addresses) => {
+      if (error || addresses.length === 0) {
+        resolve(false)
+        return
+      }
+      let pending = addresses.length
+      for (const { address } of addresses) {
+        const socket = connect({ host: address, port, timeout: timeoutMs })
+        const settle = (reachable) => {
+          socket.destroy()
+          if (reachable) resolve(true)
+          else if (--pending === 0) resolve(false)
+        }
+        socket.once('connect', () => settle(true))
+        socket.once('timeout', () => settle(false))
+        socket.once('error', () => settle(false))
+      }
+    })
   })
 }
 

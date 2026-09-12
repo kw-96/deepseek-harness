@@ -9,7 +9,7 @@
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           codex-shell · manager · marketplace
+    packages/           codex-left · codex-shell · manager · marketplace
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot
@@ -46,8 +46,9 @@ pnpm dsh web
 - **注册表** —— 所选注册表已不再提供的固定版本，例如已被作者下架的包。
 - **网络** —— 依赖是 `github:` 引用、而 github.com 不可达的组合包。
 - **架构** —— 原生依赖没有为该平台与 CPU 发布二进制的组合包。
+- **无来源** —— 没有任何依赖声明、也没有任何模块目录能解析出的行，例如 `dsh-plugin-manager` 从自己的目录写入、却没有对应安装的那一行。
 
-按平台划分的清单位于 `preflight.mjs`；当某个组合包新增原生依赖时，在表中补一行即可。
+只有首次播种才会权衡注册表与网络，因为那时还没有任何已装好的东西可失去。修复已有 profile 时，仅按 CPU 架构与无来源行移除组合包，绝不依据可达性探测：已安装的组合包离线也能用，而误报某主机不可达会把它删掉。按平台划分的清单位于 `preflight.mjs`；当某个组合包新增原生依赖时，在表中补一行即可。
 
 ## 重新构建插件
 

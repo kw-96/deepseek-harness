@@ -9,7 +9,7 @@ This directory makes the DeepSeek Harness checkout self-contained for deployment
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           codex-shell · manager · marketplace
+    packages/           codex-left · codex-shell · manager · marketplace
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot
@@ -46,8 +46,9 @@ The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it wr
 - **Registry** — a pinned version the chosen registry no longer serves, such as an unpublished package.
 - **Network** — a bundle whose dependency is a `github:` reference while github.com is unreachable.
 - **Architecture** — a bundle whose native dependency publishes no binary for this platform and CPU.
+- **Unsupplied** — a row no dependency declares and no module directory can resolve, such as a row `dsh-plugin-manager` wrote from its catalog without the matching install.
 
-The per-platform table lives in `preflight.mjs`; add a row there when a new bundle gains a native dependency.
+Only a fresh seed weighs the registry and the network, while nothing is installed yet to lose. Repairing an existing profile drops a bundle for the CPU architecture and for an unsupplied row, never on a reachability probe: an installed bundle keeps working offline, and a probe that wrongly reports a host unreachable would delete it. The per-platform table lives in `preflight.mjs`; add a row there when a new bundle gains a native dependency.
 
 ## Rebuilding the plugins
 

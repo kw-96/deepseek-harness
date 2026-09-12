@@ -6,6 +6,9 @@
  * Identifiers and comments are English; every message a user reads is Chinese.
  */
 
+import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { GITHUB_BUNDLES, INTERNAL_BUNDLES, NATIVE_BUNDLE_LIMITS, tarballAvailable } from './preflight.mjs'
 
 /** Placeholder seed substitutes with this checkout's tarballs directory. */
@@ -58,6 +61,49 @@ export async function unavailablePinned(template, registry, dropped) {
     unavailable.set(name, `所选 registry 已不再提供 ${name}@${spec}，该包可能已被作者下架`)
   }
   return unavailable
+}
+
+/**
+ * The directories a profile bundle may resolve from, most authoritative first:
+ * the dsh installation (`apps/cli`, the same anchor profile boot uses), the
+ * profile directory itself, then the shared profiles fallback the boot heals.
+ * @param paths - `{ repoRoot, profileDir, dshHome }` absolute directories.
+ * @returns the anchor directories, in resolution order.
+ */
+export function bundleAnchors({ repoRoot, profileDir, dshHome }) {
+  return [join(repoRoot, 'apps', 'cli'), profileDir, join(dshHome, 'profiles')]
+}
+
+/**
+ * Bundles the profile lists but nothing can supply: no dependency entry in the
+ * manifest, and no package resolvable from any anchor. `dsh-plugin-manager`
+ * writes such rows from its catalog, and a row nothing declares fails at boot
+ * with ERR_MODULE_NOT_FOUND.
+ * @param pkg - the parsed profile manifest.
+ * @param anchors - directories to resolve from, as `bundleAnchors` returns.
+ * @returns dropped bundle name to Chinese reason.
+ */
+export function unresolvableBundles(pkg, anchors) {
+  const dropped = new Map()
+  const dependencies = pkg.dependencies ?? {}
+  for (const name of pkg.dsh.profile.bundles ?? []) {
+    if (dependencies[name] !== undefined) continue
+    if (anchors.some(anchor => resolvableFrom(anchor, name))) continue
+    dropped.set(name, '没有任何依赖声明，也无法从 dsh 安装或 profile 中解析出该包')
+  }
+  return dropped
+}
+
+/**
+ * Whether a package resolves from one anchor directory, following Node's own
+ * node_modules lookup order so the answer matches what the Loader will import.
+ * @param anchor - absolute directory whose package.json anchors the search.
+ * @param name - package name to resolve.
+ * @returns true when a package.json for that name exists on the search path.
+ */
+function resolvableFrom(anchor, name) {
+  const searchPaths = createRequire(join(anchor, 'package.json')).resolve.paths(name) ?? []
+  return searchPaths.some(searchPath => existsSync(join(searchPath, name, 'package.json')))
 }
 
 /**
