@@ -19,6 +19,7 @@ community/
   doctor.mjs          read-only host report; names the command that fixes each problem
   preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
   profile.mjs         profile manifest build and repair
+  portable.mjs        packs a built, configured deployment into one archive
   README.md           this file
 ```
 
@@ -38,6 +39,10 @@ pnpm dsh web
 ## 部署前先做主机自检
 
 `node community/doctor.mjs` 只检查、不修改任何东西，每项检查输出一行，并给出修复该项失败所需的命令。它覆盖 Node 与 pnpm 版本、Git、Windows PowerShell 执行策略、CPU 架构、GitHub 与注册表可达性、仓库依赖是否安装，以及 profile 是否仍与本检出目录一致。只要有任何一项失败，它的退出码就是非零，因此也可以作为脚本里的前置检查。
+
+## 打便携包
+
+`node community/portable.mjs pack` 写出一份 `tar.gz`，内含完整检出目录与构建产物、已装好插件包的 profile、技能，以及一个把 `DSH_HOME` 固定在解压目录内的启动器。同架构的 Windows 主机解压后跑一次 `pnpm install`，再启动 `start.cmd` 即可 —— 不需要构建，也不需要重新配置插件。检出的 `node_modules` 不随包分发，因为其中数千个 junction 无法被忠实归档；`node community/portable.mjs check` 用于检查本机是否具备打包条件。
 
 ## 本机装不上的组合包
 

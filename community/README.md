@@ -19,6 +19,7 @@ community/
   doctor.mjs          read-only host report; names the command that fixes each problem
   preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
   profile.mjs         profile manifest build and repair
+  portable.mjs        packs a built, configured deployment into one archive
   README.md           this file
 ```
 
@@ -38,6 +39,10 @@ The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it wr
 ## Check the host before deploying
 
 `node community/doctor.mjs` inspects the machine without changing anything, prints one line per check, and names the command that fixes each failure. It covers the Node and pnpm versions, Git, the Windows PowerShell execution policy, the CPU architecture, GitHub and registry reachability, the repository install, and whether the profile still matches this checkout. It exits non-zero when any check fails, so it also works as a preflight step in a script.
+
+## Pack a portable archive
+
+`node community/portable.mjs pack` writes one `tar.gz` carrying the checkout with its build output, the profile with its installed plugin packages, the skills, and a launcher that keeps `DSH_HOME` inside the extracted folder. A same-architecture Windows host extracts it, runs `pnpm install` once, then starts `start.cmd` — no build, and no plugin configuration. The checkout's `node_modules` is not carried because its thousands of junctions cannot be archived faithfully; `node community/portable.mjs check` reports whether this host is ready to pack.
 
 ## Bundles this host cannot install
 
