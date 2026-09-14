@@ -29,7 +29,6 @@ function fakeShell(rules: readonly { match: RegExp; answers: readonly Answer[] }
       const command = spec.command
       calls.push(command)
       const rule = rules.find(candidate => candidate.match.test(command))
-      console.log('[fake] ' + command + '  → ' + (rule === undefined ? 'NO-MATCH' : JSON.stringify(rule.answers)))
       const answer = rule === undefined ? undefined : rule.answers.length > 1 ? rule.answers.shift() : rule.answers[0]
       return {
         exitCode: answer?.exitCode ?? 0,
