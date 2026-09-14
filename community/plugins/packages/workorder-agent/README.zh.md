@@ -1,4 +1,4 @@
-﻿# workorder-agent
+# workorder-agent
 
 [English](README.md) | 中文
 

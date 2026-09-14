@@ -2,7 +2,7 @@
 
 Status: implemented
 
-[中文](2026-09-14-codex-import-undo-and-preview.zh.md) | English
+English | [中文](2026-09-14-codex-import-undo-and-preview.zh.md)
 
 ## Problem
 

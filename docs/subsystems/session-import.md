@@ -27,6 +27,12 @@ interface CodexImportRun {
   readonly deferredActive: number
   /** The sessions this run imported. */
   readonly sessions: readonly CodexImportSession[]
+  /**
+   * Unix epoch milliseconds when the run was undone, or 0 while its sessions
+   * keep their archive state. Undo archives the imported sessions instead of
+   * deleting them, so the evidence stays in DSH and the action is reversible.
+   */
+  readonly undoneAt: number
 }
 ```
 
