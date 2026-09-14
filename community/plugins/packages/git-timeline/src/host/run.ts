@@ -24,7 +24,7 @@ const CONFIG_ENV_KEYS = [
  * `~/.gitconfig`，面板里的提交署名、身份来源就都会是空的；这里只补充
  * 定位配置所必需的那几个键，不接管其余环境。
  */
-function gitConfigEnv(): Record<string, string> {
+export function gitConfigEnv(): Record<string, string> {
   const env: Record<string, string> = {}
   for (const key of CONFIG_ENV_KEYS) {
     const value = process.env[key]

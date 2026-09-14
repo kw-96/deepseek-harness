@@ -169,3 +169,21 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'git/commit-message-empty': Record<string, never>
   }
 }
+
+/** 本机 GitHub 登录态（不含任何凭据内容）。 */
+export interface GithubStatus {
+  /** 是否安装了 gh CLI。 */
+  readonly ghInstalled: boolean
+  /** gh 是否已登录。 */
+  readonly ghLoggedIn: boolean
+  /** 已登录账号名；未登录时为 null。 */
+  readonly account: string | null
+  /** 生效的 git 凭据助手名；未配置时为 null。 */
+  readonly credentialHelper: string | null
+}
+
+/** 由 GitHub 账号推导出的提交署名。 */
+export interface GithubIdentity {
+  readonly name: string
+  readonly email: string
+}
