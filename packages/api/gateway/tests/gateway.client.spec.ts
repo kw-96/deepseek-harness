@@ -90,6 +90,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       signal?: AbortSignal,
     ) => Promise<RemoteResult<{ readonly ref: string }>>
     'probe/maybe': (value: string | null | undefined) => Promise<RemoteResult<string | null | undefined>>
+    'probe/limited': (cwd: string, limit?: number) => Promise<RemoteResult<string>>
     'probe/watch': (topic: string, signal?: AbortSignal) => AsyncIterable<string>
   }
 
@@ -203,23 +204,52 @@ function maybeDescriptor(): InvocationDescriptor {
   }
 }
 
-function streamDescriptor(): InvocationDescriptor {
+/**
+ * A declared-omissible numeric argument whose codec describes the present value
+ * only: the strict schema rejects undefined, so leaving it out must not parse.
+ */
+function omissibleDescriptor(): InvocationDescriptor {
   return {
-    id: '@fixture/probe#probe/watch',
+    id: '@fixture/probe#probe/limited',
     service: 'probe',
     namespace: 'probe',
-    method: 'watch',
-    mode: 'stream',
+    method: 'limited',
     invocation: { kind: 'direct' },
-    parameters: [{
-      name: 'topic',
-      wire: 'topic',
-      source: 'json',
-      codec: { mode: 'strict', typeSymbol: '@fixture#Topic', schema: z.string().min(1) },
-    }],
-    cancellation: { parameter: 'signal' },
-    result: { mode: 'strict', typeSymbol: '@fixture#WatchItem', schema: z.string().min(1) },
+    parameters: [
+      {
+        name: 'cwd',
+        wire: 'cwd',
+        source: 'json',
+        codec: { mode: 'strict', typeSymbol: '@fixture#Cwd', schema: z.string().min(1) },
+      },
+      {
+        name: 'limit',
+        wire: 'limit',
+        source: 'json',
+        acceptsUndefined: true,
+        codec: { mode: 'strict', typeSymbol: '@fixture#Limit', schema: z.number() },
+      },
+    ],
+    result: { mode: 'strict', typeSymbol: '@fixture#Limited', schema: z.string() },
   }
+}
+
+function streamDescriptor(): InvocationDescriptor {  return {
+  id: '@fixture/probe#probe/watch',
+  service: 'probe',
+  namespace: 'probe',
+  method: 'watch',
+  mode: 'stream',
+  invocation: { kind: 'direct' },
+  parameters: [{
+    name: 'topic',
+    wire: 'topic',
+    source: 'json',
+    codec: { mode: 'strict', typeSymbol: '@fixture#Topic', schema: z.string().min(1) },
+  }],
+  cancellation: { parameter: 'signal' },
+  result: { mode: 'strict', typeSymbol: '@fixture#WatchItem', schema: z.string().min(1) },
+}
 }
 
 type WebSocketGlobal = { WebSocket?: typeof WebSocket }
@@ -799,6 +829,35 @@ describe('Client Typert API', () => {
       '/api',
       'probe/maybe',
       { args: { value: null } },
+      expect.any(AbortSignal),
+    )
+
+    await dispose()
+  })
+
+  it('omits a declared-omissible argument without parsing the absent value', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>()
+      .mockResolvedValue({ ok: true, value: 'ok' })
+    const ctx = await bench(call)
+    const dispose = await ctx.remote.$mount({
+      package: '@fixture/omissible',
+      descriptors: [omissibleDescriptor()],
+    })
+
+    // The codec describes the present value only (a bare z.number()), so parsing
+    // the absent value must be skipped rather than rejected.
+    await expect(ctx.remote.probe.limited('E:/repo', undefined)).resolves.toStrictEqual({ ok: true, value: 'ok' })
+    expect(call).toHaveBeenCalledWith(
+      '/api',
+      'probe/limited',
+      { args: { cwd: 'E:/repo' } },
+      expect.any(AbortSignal),
+    )
+    await expect(ctx.remote.probe.limited('E:/repo', 7)).resolves.toStrictEqual({ ok: true, value: 'ok' })
+    expect(call).toHaveBeenLastCalledWith(
+      '/api',
+      'probe/limited',
+      { args: { cwd: 'E:/repo', limit: 7 } },
       expect.any(AbortSignal),
     )
 

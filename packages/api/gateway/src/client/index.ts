@@ -510,6 +510,13 @@ class ClientRemoteService extends Service implements ClientRemote {
     let valueIndex = 0
     descriptor.parameters.forEach((parameter, parameterIndex) => {
       if (parameterIndex === projection?.parameterIndex) return
+      // A declared-omissible parameter is left out of the wire payload rather
+      // than parsed: the caller omits it by passing undefined, and the value
+      // codec describes the present value only.
+      if (parameter.acceptsUndefined === true && values[valueIndex] === undefined) {
+        valueIndex += 1
+        return
+      }
       const value = parseInput(parameter.codec, values[valueIndex], endpoint, parameter.wire)
       if (value !== undefined) args[parameter.wire] = value
       valueIndex += 1

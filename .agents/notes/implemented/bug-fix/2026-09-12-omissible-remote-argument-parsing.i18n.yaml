@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-12-omissible-remote-argument-parsing.md
+2026-09-12-omissible-remote-argument-parsing.md: 9c810c4da68ef62d8fe06425c6ecbcae0df77a41
+2026-09-12-omissible-remote-argument-parsing.zh.md: fe1dcac01ad27d03c12aa54e2ceca1423cfe0db7
