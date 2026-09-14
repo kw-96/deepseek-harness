@@ -19,6 +19,23 @@ export type CodexImportKey =
   | 'updatedCount'
   | 'deferredActiveCount'
   | 'open'
+  | 'preview'
+  | 'previewing'
+  | 'previewTitle'
+  | 'previewEmpty'
+  | 'previewImported'
+  | 'previewUpdated'
+  | 'previewUnchanged'
+  | 'previewDeferred'
+  | 'previewFailed'
+  | 'undo'
+  | 'restore'
+  | 'undone'
+  | 'busy'
+  | 'kindImported'
+  | 'kindUpdated'
+  | 'kindUnchanged'
+  | 'kindDeferred'
 
 export const en: Record<CodexImportKey, string> = {
   title: 'Codex import',
@@ -35,6 +52,23 @@ export const en: Record<CodexImportKey, string> = {
   updatedCount: 'Updated {count}',
   deferredActiveCount: 'Deferred {count} active',
   open: 'Open',
+  preview: 'Preview',
+  previewing: 'Checking…',
+  previewTitle: 'What the next import would change',
+  previewEmpty: 'Nothing to import from the Codex store.',
+  previewImported: 'Import {count}',
+  previewUpdated: 'Update {count}',
+  previewUnchanged: 'Already current {count}',
+  previewDeferred: 'Deferred {count} active',
+  previewFailed: 'Preview failed.',
+  undo: 'Undo',
+  restore: 'Restore',
+  undone: 'Undone',
+  busy: 'Working…',
+  kindImported: 'would import',
+  kindUpdated: 'would update',
+  kindUnchanged: 'current',
+  kindDeferred: 'deferred',
 }
 
 export const zh: Record<CodexImportKey, string> = {
@@ -52,4 +86,21 @@ export const zh: Record<CodexImportKey, string> = {
   updatedCount: '已更新 {count} 项',
   deferredActiveCount: '活跃会话延后 {count} 项',
   open: '打开',
+  preview: '预览',
+  previewing: '检查中…',
+  previewTitle: '下次导入会带来的变化',
+  previewEmpty: 'Codex 存储里没有可导入的内容。',
+  previewImported: '将导入 {count} 项',
+  previewUpdated: '将更新 {count} 项',
+  previewUnchanged: '已是最新 {count} 项',
+  previewDeferred: '活跃会话延后 {count} 项',
+  previewFailed: '预览失败。',
+  undo: '撤销',
+  restore: '恢复',
+  undone: '已撤销',
+  busy: '处理中…',
+  kindImported: '将导入',
+  kindUpdated: '将更新',
+  kindUnchanged: '已最新',
+  kindDeferred: '延后',
 }

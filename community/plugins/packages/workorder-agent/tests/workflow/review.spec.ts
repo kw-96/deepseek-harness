@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -16,7 +16,7 @@ function store(): WorkorderStore {
 
 function issue(overrides: Partial<IssueSnapshot> = {}): IssueSnapshot {
   return {
-    id: 9001, projectName: '渠道美术', subject: '测试工单', submitterName: '提单人', assigneeName: '设计师',
+    id: 9001, projectName: '渠道美术', subject: '测试工单', submitterName: '提单人', submitterEmail: '', assigneeName: '设计师', assigneeEmail: '',
     statusName: '美术完成', gameProduct: '测试游戏', expectedDeliveryDate: '2026-09-09', artCategory: '子单',
     deliveryChannel: '', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '', totalHours: '', designQuantity: '',
     startDate: '', dueDate: '', createdOn: '', updatedOn: '2026-09-09T10:00:00.000Z', closedOn: '', ...overrides,
@@ -37,7 +37,7 @@ describe('单工单填写核验', () => {
     }, { reviewIssue })
     const reviewId = await workflow.reviewIssue({ traceId: 'trace-1', triggerType: 'webhook', issue: issue() })
     expect(reviewIssue).toHaveBeenCalledWith('trace-1', expect.objectContaining({ id: 9001 }))
-    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ automatic: true, sourceType: 'issue-review', message: expect.stringContaining('@提单人') }))
+    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ automatic: true, sourceType: 'issue-review', message: expect.stringContaining('：请补全易协作工单') }))
     expect(database.reviews.get(reviewId)).toMatchObject({
       issueId: 9001, triggerType: 'webhook', modelStatus: 'completed', modelOutput: '请补全缺失字段。',
       notificationStatus: 'sent', notificationTaskId: 'message-task',

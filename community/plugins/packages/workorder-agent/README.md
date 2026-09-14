@@ -1,4 +1,4 @@
-# workorder-agent
+﻿# workorder-agent
 
 English | [中文](README.zh.md)
 
@@ -16,14 +16,23 @@ The package declares official `dsh.bundle` metadata and is installed from the ta
 
 The frontend-first setup needs no preset environment variables:
 
-1. Open `/workorder-agent` on first startup and enter the Webhook token, Yixiezuo GCP user key, POPO group robot URL and secret, data directory, project ids, review model, and workorder-standard knowledge base.
+1. Open `/workorder-agent` on first startup and enter the Webhook token, Yixiezuo GCP user key, robot-app App ID / App Secret / receiver, data directory, project ids, review model, and workorder-standard knowledge base.
 2. Saving writes to the Harness `workorder-agent` settings namespace and reloads the runtime; the control plane Settings page can later update the model, maximum output tokens, knowledge base, and notification switches.
 3. Review provider and model id must be supplied together. Leaving both empty makes the background review Agent inherit Harness's default model selection.
-4. A POPO custom group robot only delivers to its configured group. The reminder text targets the submitter read from the workorder event and falls back to the assignee when the event has no submitter field.
+4. Missing-field reminders are direct messages to the **assignee** (the designer): operations files the workorder, a designer is assigned, and that designer fills the fields. The text shows the plain name without a mention, and the receiver is the assignee mailbox, falling back to the default receiver when absent.
 
-Environment variables are first-boot defaults only: `WEBHOOK_TOKEN`, `WEBHOOK_INGRESS_ENABLED`, `WEBHOOK_INGRESS_HOST`, `WEBHOOK_INGRESS_PORT`, `GCP_USER_KEY`, `GCP_MCP_URL`, `GCP_HOST`, `POPO_WEBHOOK_URL`, `POPO_WEBHOOK_SECRET`, `DATA_DIR`, project id variables, `REVIEW_ENABLED`, `REVIEW_MODEL_PROVIDER`, `REVIEW_MODEL`, `REVIEW_MAX_TOKENS`, `REVIEW_KNOWLEDGE_BASE`, and `REVIEW_NOTIFICATION_ENABLED`.
+Environment variables are first-boot defaults only: `WEBHOOK_TOKEN`, `WEBHOOK_INGRESS_ENABLED`, `WEBHOOK_INGRESS_HOST`, `WEBHOOK_INGRESS_PORT`, `GCP_USER_KEY`, `GCP_MCP_URL`, `GCP_HOST`, `POPO_APP_ID`, `POPO_APP_SECRET`, `POPO_APP_RECEIVER`, `DATA_DIR`, project id variables, `REVIEW_ENABLED`, `REVIEW_MODEL_PROVIDER`, `REVIEW_MODEL`, `REVIEW_MAX_TOKENS`, `REVIEW_KNOWLEDGE_BASE`, and `REVIEW_NOTIFICATION_ENABLED`.
 
 The control plane's `/api/admin/*` routes are unauthenticated and are served only by the local Harness web server. With `enabled: false`, the Host plugin does not mount the control plane. Missing required tokens show the bootstrap page; completing it loads the control plane without taking down the Web host.
+
+## POPO robot-app channel
+
+Missing-field reminders, inspection results, and vivo case pushes all go through the robot app (the custom group-robot webhook is no longer used):
+
+- `popoAppId` + `popoAppSecret` are exchanged for an accessToken at `/open-apis/robots/v1/token` (valid about one day; the plugin caches it and refreshes before expiry), then requests POST `/open-apis/robots/v1/im/send-msg` with the `Open-Access-Token` header.
+- `message` must be an object (for text it is `{content}`); passing a string makes the server answer `500 service busy`.
+- `popoAppReceiver` is the default receiver (user mailbox or group id): reminders address each workorder assignee mailbox individually, while inspection results and vivo pushes use this default.
+- Text is limited to 3000 characters (over-limit returns `65338`); an unresolvable receiver returns `65611` and one outside the robot's visible scope returns `65612`; the plugin translates these codes into readable Chinese.
 
 ## Yixiezuo event ingress
 

@@ -11,7 +11,7 @@ import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session-import-codex/remote'
-import type { CodexImportRun } from '@deepseek-ai/dsh-session-import-codex/types'
+import type { CodexImportRun, CodexImportScanValue } from '@deepseek-ai/dsh-session-import-codex/types'
 
 /** Host settings namespace the card edits; mirrored from the Host plugin. */
 export const CODEX_IMPORT_NS = 'codex-import'
@@ -25,7 +25,11 @@ export interface CodexImportSettings {
 export interface CodexImportCardState {
   autoSync: boolean
   running: boolean
+  /** True while a preview or an undo/restore round-trip is in flight. */
+  busy: boolean
   runs: readonly CodexImportRun[]
+  /** The last read-only preview, or null before the first one. */
+  preview: CodexImportScanValue | null
 }
 
 /** The registration-side face the card's slot entry injects. */
@@ -36,13 +40,18 @@ export interface CodexImportCardFace {
   }
   toggleSync: (value: boolean) => void
   runImport: () => void
+  preview: () => void
+  undo: (at: number) => void
+  restore: (at: number) => void
   openSession: (sessionId: SessionId) => void
 }
 
 const INITIAL: CodexImportCardState = {
   autoSync: false,
   running: false,
+  busy: false,
   runs: [],
+  preview: null,
 }
 
 /** Bridges the `codex-import` scope and the `codexImport` Remote onto the card. */
@@ -71,6 +80,9 @@ export class CodexImportCardController {
       hooks: { codexImportCard: this.store },
       toggleSync: (value) => { this.toggleSync(value) },
       runImport: () => { void this.runImport() },
+      preview: () => { void this.preview() },
+      undo: (at) => { void this.setArchived(at, true) },
+      restore: (at) => { void this.setArchived(at, false) },
       openSession: (sessionId) => { this.openSession(sessionId) },
     }
   }
@@ -104,9 +116,42 @@ export class CodexImportCardController {
     try {
       const carried = await this.ctx.remote.codexImport.run()
       if (this.disposed || !carried.ok) return
-      this.store.update((draft) => { draft.runs = [carried.value, ...draft.runs] })
+      // The run invalidates the preview the card may still be showing.
+      this.store.update((draft) => { draft.runs = [carried.value, ...draft.runs]; draft.preview = null })
     } finally {
       if (!this.disposed) this.store.update((draft) => { draft.running = false })
+    }
+  }
+
+  private async preview(): Promise<void> {
+    if (this.disposed || this.store.getSnapshot().busy) return
+    this.store.update((draft) => { draft.busy = true })
+    try {
+      const carried = await this.ctx.remote.codexImport.scan()
+      if (this.disposed) return
+      this.store.update((draft) => { draft.preview = carried.ok ? carried.value : null })
+    } finally {
+      if (!this.disposed) this.store.update((draft) => { draft.busy = false })
+    }
+  }
+
+  /**
+   * Archive or unarchive one run's sessions, then re-read history so the card
+   * shows the run's own `undoneAt` stamp instead of guessing at it.
+   * @param at - run time identifying the run.
+   * @param undone - true to undo, false to restore.
+   */
+  private async setArchived(at: number, undone: boolean): Promise<void> {
+    if (this.disposed || this.store.getSnapshot().busy) return
+    this.store.update((draft) => { draft.busy = true })
+    try {
+      const carried = undone
+        ? await this.ctx.remote.codexImport.undo(at)
+        : await this.ctx.remote.codexImport.restore(at)
+      if (this.disposed || !carried.ok) return
+      await this.refreshHistory()
+    } finally {
+      if (!this.disposed) this.store.update((draft) => { draft.busy = false })
     }
   }
 

@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 
 interface ColumnRow { name: string }
 
-export const LATEST_SCHEMA_VERSION = 6
+export const LATEST_SCHEMA_VERSION = 9
 
 function addColumn(db: Database.Database, table: string, definition: string): void {
   const name = definition.split(' ')[0] ?? ''
@@ -100,6 +100,12 @@ export function migrateSchema(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_vivo_cases_game ON vivo_cases(game, position);
     `)
     db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(6, ?)').run(new Date().toISOString())
+    addColumn(db, 'issues', "submitter_email TEXT NOT NULL DEFAULT ''")
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(7, ?)').run(new Date().toISOString())
+    addColumn(db, 'message_tasks', "receiver TEXT NOT NULL DEFAULT ''")
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(8, ?)').run(new Date().toISOString())
+    addColumn(db, 'issues', "assignee_email TEXT NOT NULL DEFAULT ''")
+    db.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(9, ?)').run(new Date().toISOString())
   })
   migrate()
 }

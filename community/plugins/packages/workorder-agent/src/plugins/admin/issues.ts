@@ -21,7 +21,11 @@ export interface AdminIssueView {
   projectName: string
   subject: string
   submitterName: string
+  /** 提单人邮箱（运营），仅用于展示与留痕。 */
+  submitterEmail: string
   assigneeName: string
+  /** 指派给邮箱（设计师）；缺项提醒的单聊接收人。 */
+  assigneeEmail: string
   statusName: string
   gameProduct: string
   deliveryChannel: string
@@ -47,7 +51,9 @@ export function toAdminIssue(issue: IssueSnapshot, host: string): AdminIssueView
     projectName: issue.projectName,
     subject: issue.subject,
     submitterName: issue.submitterName,
+    submitterEmail: issue.submitterEmail,
     assigneeName: issue.assigneeName,
+    assigneeEmail: issue.assigneeEmail,
     statusName: issue.statusName,
     gameProduct: issue.gameProduct,
     deliveryChannel: issueFieldText(issue.deliveryChannel),

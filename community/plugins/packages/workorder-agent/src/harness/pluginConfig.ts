@@ -1,4 +1,4 @@
-import z from '@deepseek-ai/schemastery'
+﻿import z from '@deepseek-ai/schemastery'
 import { buildAppConfig, DEFAULT_REVIEW_KNOWLEDGE_BASE, type AppConfig } from '../config.js'
 
 /** 工单 Host 插件的可热更新配置。 */
@@ -12,8 +12,9 @@ export interface PluginConfig {
   gcpUserKey: string
   gcpUrl: string
   gcpHost: string
-  popoWebhookUrl: string
-  popoWebhookSecret: string
+  popoAppId: string
+  popoAppSecret: string
+  popoAppReceiver: string
   completedStatusId: number
   projectIdChannelArt: number
   projectIdReturnBusiness: number
@@ -41,8 +42,9 @@ export const Config = z.object({
   gcpUserKey: z.string().role('secret').default('').description('易协作 GCP 用户 Key'),
   gcpUrl: z.string().default('https://mcp.netease.com/servers/gcp/mcp').description('GCP MCP 地址'),
   gcpHost: z.string().default('promoteart.pm.netease.com').description('易协作 Host'),
-  popoWebhookUrl: z.string().default('').description('POPO 群机器人地址'),
-  popoWebhookSecret: z.string().role('secret').default('').description('POPO 群机器人签名'),
+  popoAppId: z.string().default('').description('机器人应用 App ID（app 通道）'),
+  popoAppSecret: z.string().role('secret').default('').description('机器人应用 App Secret（app 通道）'),
+  popoAppReceiver: z.string().default('').description('机器人应用接收人：用户邮箱或群 ID'),
   completedStatusId: z.number().default(6).description('美术完成状态 ID'),
   projectIdChannelArt: z.number().default(7).description('渠道美术项目 ID'),
   projectIdReturnBusiness: z.number().default(2001).description('回流业务项目 ID'),
@@ -74,8 +76,9 @@ export function toAppConfig(plugin: PluginConfig): AppConfig {
     gcpUserKey: plugin.gcpUserKey,
     gcpUrl: plugin.gcpUrl,
     gcpHost: plugin.gcpHost,
-    popoWebhookUrl: plugin.popoWebhookUrl,
-    popoWebhookSecret: plugin.popoWebhookSecret,
+    popoAppId: plugin.popoAppId,
+    popoAppSecret: plugin.popoAppSecret,
+    popoAppReceiver: plugin.popoAppReceiver,
     completedStatusId: plugin.completedStatusId,
     projectIdChannelArt: plugin.projectIdChannelArt,
     projectIdReturnBusiness: plugin.projectIdReturnBusiness,

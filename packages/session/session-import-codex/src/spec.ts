@@ -23,6 +23,7 @@ export const codexImportRunSchema = z.object({
   skippedEmpty: z.number().int().nonnegative(),
   deferredActive: z.number().int().nonnegative().default(0),
   sessions: z.array(codexImportSessionSchema),
+  undoneAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),
 }) satisfies z.ZodType<CodexImportRun>
 
 /** Durable run record inferred from {@link codexImportRunSchema}. */

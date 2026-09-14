@@ -40,9 +40,33 @@ The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it wr
 
 `node community/doctor.mjs` inspects the machine without changing anything, prints one line per check, and names the command that fixes each failure. It covers the Node and pnpm versions, Git, the Windows PowerShell execution policy, the CPU architecture, GitHub and registry reachability, the repository install, and whether the profile still matches this checkout. It exits non-zero when any check fails, so it also works as a preflight step in a script.
 
+## One command per host
+
+`node community/setup-host.mjs` runs the deploy chain above in order and is idempotent, so the same command works on a fresh clone, on a host that is already deployed, and on one that only needs a rebuild:
+
+| Mode | Effect |
+| --- | --- |
+| `check` (default) | Runs `preflight.mjs`, `doctor.mjs`, and `portable.mjs check`, then the known-trap checks below. Changes nothing. |
+| `install` | `pnpm install` → `pnpm run build` → `node community/seed.mjs` → the same self-check, then names the start command. |
+| `pack` | Delegates to `portable.mjs pack` for same-architecture hosts that should not build at all. |
+
+It adds no second implementation of any step; the value is ordering plus the trap checks we hit while operating this fleet, each of which otherwise fails far from its cause:
+
+- **Composition drift.** `verify-profile.mjs` reads every bundle's patch without starting the server: it fails on a duplicated insert-row id and reports any row whose package cannot be resolved from the profile, the repository, or the bundle's own dependency tree. This is the check that catches a plugin installed by hand — or half-installed — before the next boot, instead of after it.
+- **pnpm major drift.** A profile whose `node_modules` came from pnpm v10 and a host running pnpm v11 fails with `ERR_PNPM_UNEXPECTED_STORE` the moment any plugin is added. The check names both versions and the fix: install with the profile's pnpm major, or relink the profile deliberately (`pnpm install` inside it) after a backup.
+- **Git-hosted bundles.** A `github:` dependency whose build script pnpm blocks needs its exact key under `allowBuilds` in the profile's `pnpm-workspace.yaml`; the check reports a missing entry before the install fails.
+- **Restart discipline.** Adding or changing a plugin's Remote methods requires restarting `dsh web`; the typert manifest is cached per package name and HMR does not refresh it.
+- **Snapshot before upgrades.** When `dsh-undo-savepoint` is installed, the check prints the snapshot command to run before upgrading or editing plugins.
+
 ## Pack a portable archive
 
-`node community/portable.mjs pack` writes one `tar.gz` carrying the checkout with its build output, the profile with its installed plugin packages, the skills, and a launcher that keeps `DSH_HOME` inside the extracted folder. A same-architecture Windows host extracts it, runs `pnpm install` once, then starts `start.cmd` — no build, and no plugin configuration. The checkout's `node_modules` is not carried because its thousands of junctions cannot be archived faithfully; `node community/portable.mjs check` reports whether this host is ready to pack.
+`node community/portable.mjs pack` writes one `tar.gz` carrying the checkout with its build output, a bundled Node.js and pnpm, the offline pnpm store both installs read from, a ready-made profile holding every plugin, the skills, the global configuration, and a launcher that pins `DSH_HOME` inside the extracted folder. A clean Windows host of the same architecture extracts it and double-clicks `DeepSeek Harness.exe` (or `start.cmd`): no runtime to install, no network, and the first launch installs offline from the store that traveled with the archive.
+
+- Artifacts are named per architecture (`dsh-portable-x64-<date>.tar.gz`, `dsh-portable-arm64-<date>.tar.gz`) and run only on that architecture, so pack on the host you intend to deploy to.
+- Neither the checkout's nor the profile's `node_modules` travels: pnpm records them as absolute junctions on Windows, which do not survive relocation. The archive carries the store and the manifests instead, and the target rebuilds both trees offline on first launch.
+- A plugin the host only reached through a development junction, with no dependency entry of its own, is unpacked from `community/plugins/tarballs/` into the shared `$DSH_HOME/profiles/node_modules` fallback, so the target never reinstalls it.
+- A pinned version the registry no longer publishes is repacked from the host's installed copy as a `file:` tarball instead of silently moving to another version, and the run reports it.
+- `node community/portable.mjs check` verifies this host is packable.
 
 ## Bundles this host cannot install
 

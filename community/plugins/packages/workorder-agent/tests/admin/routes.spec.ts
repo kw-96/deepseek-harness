@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -28,7 +28,7 @@ const config: AppConfig = {
 
 function issue(): IssueSnapshot {
   return {
-    id: 101, projectName: '渠道美术', subject: '测试工单', submitterName: '提单人', assigneeName: '设计师',
+    id: 101, projectName: '渠道美术', subject: '测试工单', submitterName: '提单人', submitterEmail: '', assigneeName: '设计师', assigneeEmail: '',
     statusName: '美术完成', gameProduct: '测试游戏', expectedDeliveryDate: '2026-09-09', artCategory: '子单',
     deliveryChannel: '', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '', totalHours: '', designQuantity: '',
     startDate: '', dueDate: '', createdOn: '', updatedOn: '2026-09-09T10:00:00.000Z', closedOn: '',

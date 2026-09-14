@@ -107,9 +107,54 @@ export interface CodexImportRun {
   readonly deferredActive: number
   /** The sessions this run imported. */
   readonly sessions: readonly CodexImportSession[]
+  /**
+   * Unix epoch milliseconds when the run was undone, or 0 while its sessions
+   * keep their archive state. Undo archives the imported sessions instead of
+   * deleting them, so the evidence stays in DSH and the action is reversible.
+   */
+  readonly undoneAt: number
 }
 
 /** The Remote `history` result: recorded runs, newest first. */
 export interface CodexImportHistoryValue {
   readonly runs: readonly CodexImportRun[]
+}
+
+/** The Remote `undo`/`restore` result: how many sessions changed archive state. */
+export interface CodexImportUndoValue {
+  /** Run time identifying the affected run. */
+  readonly at: number
+  /** Whether the run is now marked undone. */
+  readonly undone: boolean
+  /** Sessions whose archive state changed. */
+  readonly changed: number
+  /** Sessions the registry no longer knows; they were skipped, not fatal. */
+  readonly failed: number
+}
+
+/** What a sweep would do with one Codex thread. */
+export type CodexImportScanVerdict = 'imported' | 'updated' | 'unchanged' | 'deferred-active'
+
+/** One thread a read-only preview reports on. */
+export interface CodexImportScanEntry {
+  /** Codex thread id. */
+  readonly threadId: string
+  /** DSH session id the sweep would write (`codex-<threadId>`). */
+  readonly sessionId: SessionId
+  /** Imported session title, or the empty string when Codex recorded none. */
+  readonly title: string
+  /** Working directory recorded on the snapshot header. */
+  readonly cwd: string
+  /** What the sweep would do with this thread. */
+  readonly kind: CodexImportScanVerdict
+  /** DSH events this thread converts to. */
+  readonly events: number
+}
+
+/** The Remote `scan` result: what the next sweep would do, computed read-only. */
+export interface CodexImportScanValue {
+  /** Counts in the sweep's own vocabulary. */
+  readonly summary: CodexImportSummary
+  /** Per-thread verdicts, in sweep order. */
+  readonly entries: readonly CodexImportScanEntry[]
 }

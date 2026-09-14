@@ -1,10 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto'
+﻿import { createHash, randomUUID } from 'node:crypto'
 import { todayInShanghai } from '../../domain/dates.js'
 import { buildInspectionMessage } from '../../domain/message.js'
 import { inspectIssue } from '../../domain/rules.js'
 import type { InspectionRequest, InspectionResult, InspectionType } from '../../domain/types.js'
 import type { GcpIssueService } from '../gcp/service.js'
-import { TEST_NOTIFICATION } from '../popo/client.js'
+import { buildTestNotification } from '../../domain/testNotification.js'
 import type { PopoDeliveryService } from '../popo/delivery.js'
 import type { MessageTaskResult } from '../store/message/types.js'
 import type { PreviewRecord, WorkorderStore } from '../store/store.js'
@@ -26,12 +26,14 @@ export class InspectionWorkflow {
     private readonly store: WorkorderStore,
     private readonly delivery: PopoDeliveryService,
     private readonly gcpHost: string,
+    private readonly testReceiver: string,
   ) {}
 
   /** 发送固定内容的测试通知，不查询工单。 */
   async sendTestNotification(): Promise<string> {
     const key = `test-notification:${todayInShanghai()}:${randomUUID()}`
-    const result = await this.sendOnce(key, TEST_NOTIFICATION, 'test-notification', undefined, 'manual-test')
+    const { message } = buildTestNotification(this.testReceiver)
+    const result = await this.sendOnce(key, message, 'test-notification', undefined, 'manual-test')
     if (result.status !== 'sent' || !result.taskId) throw new Error('固定测试通知未发送')
     return result.taskId
   }
@@ -122,8 +124,8 @@ export class InspectionWorkflow {
 
   private sendOnce(
     key: string, message: string, sourceType: string, sourceId: string | undefined,
-    actor: string, automatic = false,
+    actor: string, automatic = false, receiver?: string,
   ): Promise<MessageTaskResult> {
-    return this.delivery.deliver({ key, message, sourceType, sourceId, actor, automatic })
+    return this.delivery.deliver({ key, message, sourceType, sourceId, actor, automatic, receiver })
   }
 }

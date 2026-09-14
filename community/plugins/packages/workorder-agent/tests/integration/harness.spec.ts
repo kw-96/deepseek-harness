@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+﻿import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
@@ -24,7 +24,7 @@ describe('DeepSeek Harness 自研 Bundle', () => {
     expect(host?.config).toMatchObject({ enabled: true })
     const configKeys = Object.keys(host?.config ?? {})
     for (const key of ['dataDir', 'webhookToken', 'gcpUserKey', 'gcpUrl', 'gcpHost',
-      'popoWebhookUrl', 'popoWebhookSecret', 'completedStatusId',
+      'popoAppId', 'popoAppSecret', 'popoAppReceiver', 'completedStatusId',
       'projectIdChannelArt', 'projectIdReturnBusiness', 'projectIdAiOperations',
       'reviewEnabled', 'reviewProvider', 'reviewModel', 'reviewMaxTokens',
       'reviewKnowledgeBase', 'reviewNotificationEnabled']) {

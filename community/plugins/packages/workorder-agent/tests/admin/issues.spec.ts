@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { issueFieldText, toAdminIssue } from '../../src/plugins/admin/issues.js'
 import type { IssueSnapshot } from '../../src/domain/types.js'
 
 const issue: IssueSnapshot = {
-  id: 49678, projectName: '渠道美术', subject: '主题', submitterName: '提单人', assigneeName: '用户', statusName: '美术完成',
+  id: 49678, projectName: '渠道美术', subject: '主题', submitterName: '提单人', submitterEmail: '', assigneeName: '用户', assigneeEmail: '', statusName: '美术完成',
   gameProduct: '游戏', expectedDeliveryDate: '2026-08-14', artCategory: '子单',
   deliveryChannel: { name: '渠道A' }, returnDeliveryChannel: '', aiDeliveryChannel: '',
   aiPipelineTime: '是', totalHours: '1.00', designQuantity: { value: 3 },

@@ -37,6 +37,12 @@ function coreValue(fields: UnknownRecord[], identify: string): unknown {
   return fieldValue(fields, identify) ?? fieldValue(fields, identify.replace(/_id$/, ''))
 }
 
+/** 读取人员对象里的邮箱，用于机器人应用通道 @ 提醒。 */
+function personMail(value: unknown): string {
+  const person = record(record(value).user ?? value)
+  return String(person.mail ?? person.email ?? person.email_address ?? '').trim()
+}
+
 function snapshot(
   id: number,
   projectName: string,
@@ -56,7 +62,9 @@ export function mapIssueDetail(payload: unknown, fallbackProjectName: string): I
   return snapshot(id, display(base.project) || display(base.project_name) || fallbackProjectName.trim(), {
     subject: display(base.subject),
     submitterName: display(base.author ?? base.created_by ?? base.creator),
+    submitterEmail: personMail(base.author ?? base.created_by ?? base.creator),
     assigneeName: display(base.assigned_to ?? coreValue(core, 'assigned_to')),
+    assigneeEmail: personMail(base.assigned_to ?? coreValue(core, 'assigned_to')),
     statusName: display(base.status ?? coreValue(core, 'status_id')),
     gameProduct: display(fieldValue(custom, 'cf_127')),
     expectedDeliveryDate: display(fieldValue(custom, 'cf_7')),
@@ -83,7 +91,9 @@ export function mapListIssue(payload: unknown, fallbackProjectName: string): Iss
   return snapshot(id, display(row.project) || fallbackProjectName.trim(), {
     subject: display(row.subject),
     submitterName: display(row.author ?? row.created_by ?? row.creator),
+    submitterEmail: personMail(row.author ?? row.created_by ?? row.creator),
     assigneeName: display(row.assigned_to),
+    assigneeEmail: personMail(row.assigned_to),
     statusName: display(row.status),
     gameProduct: display(row.cf_127),
     expectedDeliveryDate: display(row.cf_7),

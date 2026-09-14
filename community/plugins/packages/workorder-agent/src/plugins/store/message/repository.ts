@@ -20,10 +20,11 @@ export class MessageRepository {
     this.db.transaction(() => {
       this.db.prepare(`INSERT INTO message_tasks
         (id,delivery_key,source_type,source_id,actor,message,message_hash,status,chunk_count,
-         sent_chunk_count,attempts,max_attempts,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,'pending',?,0,0,?,?,?)`).run(
+         sent_chunk_count,attempts,max_attempts,created_at,updated_at,receiver)
+        VALUES(?,?,?,?,?,?,?,'pending',?,0,0,?,?,?,?)`).run(
         id, input.deliveryKey, input.sourceType, input.sourceId ?? null, input.actor,
         input.message, input.messageHash, input.chunks.length, MAX_ATTEMPTS, createdAt, createdAt,
+        input.receiver,
       )
       const insert = this.db.prepare(`INSERT INTO message_chunks
         (task_id,sequence,content,content_hash,byte_length,character_length,status,attempts,created_at,updated_at)
@@ -51,7 +52,7 @@ export class MessageRepository {
     const task = this.db.prepare(`SELECT id,delivery_key deliveryKey,source_type sourceType,
       source_id sourceId,actor,message,message_hash messageHash,status,chunk_count chunkCount,
       sent_chunk_count sentChunkCount,attempts,error,created_at createdAt,updated_at updatedAt,
-      completed_at completedAt FROM message_tasks WHERE id=?`).get(id) as MessageTaskDetail | undefined
+      completed_at completedAt,receiver FROM message_tasks WHERE id=?`).get(id) as MessageTaskDetail | undefined
     if (!task) return undefined
     const chunks = this.db.prepare(`SELECT sequence "index",sequence+1 position,content,
       content_hash contentHash,byte_length byteLength,character_length characterLength,status,

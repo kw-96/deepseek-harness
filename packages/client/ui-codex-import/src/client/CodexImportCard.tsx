@@ -25,6 +25,14 @@ function runKey(at: number, index: number): string {
   return `${at}-${index}`
 }
 
+/** Locale key for one preview verdict; wire discriminants never reach the UI. */
+const KIND_KEYS = {
+  imported: 'kindImported',
+  updated: 'kindUpdated',
+  unchanged: 'kindUnchanged',
+  'deferred-active': 'kindDeferred',
+} as const
+
 /** Run fields the count pills read. */
 interface RunCountsProps {
   run: { at: number; imported: number; updated: number; deferredActive: number }
@@ -50,7 +58,7 @@ function RunCounts(props: RunCountsProps) {
  * @returns the card.
  */
 export function CodexImportCard(props: CodexImportCardProps) {
-  const { t, toggleSync, runImport, openSession } = props
+  const { t, toggleSync, runImport, preview, undo, restore, openSession } = props
   const state = props.useCodexImportCard(snapshot => snapshot)
   // Card disclosure: matches the sibling plugin cards, collapsed by default,
   // so the header names the plugin over its description before any controls.
@@ -117,7 +125,45 @@ export function CodexImportCard(props: CodexImportCardProps) {
             >
               {state.running ? t('running') : t('run')}
             </button>
+            <button
+              type="button"
+              className={css.run}
+              disabled={state.busy}
+              onClick={() => { preview() }}
+            >
+              {state.busy ? t('previewing') : t('preview')}
+            </button>
           </div>
+
+          {state.preview !== null && (
+            <div className={css.history}>
+              <h4 className={css.historyTitle}>{t('previewTitle')}</h4>
+              {state.preview.entries.length === 0
+                ? <p className={css.empty}>{t('previewEmpty')}</p>
+                : (
+                  <ul className={css.runs}>
+                    <li className={css.run}>
+                      <div className={css.runHead}>
+                        <span className={css.runCount}>{t('previewImported', { count: state.preview.summary.imported })}</span>
+                        <span className={css.runCount}>{t('previewUpdated', { count: state.preview.summary.updated })}</span>
+                        <span className={css.runCount}>{t('previewUnchanged', { count: state.preview.summary.skippedExisting })}</span>
+                        {state.preview.summary.deferredActive > 0 && (
+                          <span className={css.runCount}>{t('previewDeferred', { count: state.preview.summary.deferredActive })}</span>
+                        )}
+                      </div>
+                      <ul className={css.sessions}>
+                        {state.preview.entries.map(entry => (
+                          <li key={entry.sessionId} className={css.session}>
+                            <span className={css.sessionTitle}>{entry.title === '' ? entry.sessionId : entry.title}</span>
+                            <span className={css.runCount}>{t(KIND_KEYS[entry.kind])}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  </ul>
+                )}
+            </div>
+          )}
 
           <div className={css.history}>
             <h4 className={css.historyTitle}>{t('historyTitle')}</h4>
@@ -135,6 +181,15 @@ export function CodexImportCard(props: CodexImportCardProps) {
                             <>
                               <div className={css.runHead}>
                                 <RunCounts run={run} t={t} />
+                                {run.undoneAt > 0 && <span className={css.runCount}>{t('undone')}</span>}
+                                <span className={css.open} role="group">
+                                  <button type="button" className={css.open} disabled={state.busy} onClick={() => { undo(run.at) }}>
+                                    {t('undo')}
+                                  </button>
+                                  <button type="button" className={css.open} disabled={state.busy} onClick={() => { restore(run.at) }}>
+                                    {t('restore')}
+                                  </button>
+                                </span>
                               </div>
                               <p className={css.none}>{t('noSessions')}</p>
                             </>
@@ -148,25 +203,36 @@ export function CodexImportCard(props: CodexImportCardProps) {
                                 onClick={() => { toggleRun(key) }}
                               >
                                 <RunCounts run={run} t={t} />
+                                {run.undoneAt > 0 && <span className={css.runCount}>{t('undone')}</span>}
                                 <IconChevronDownOutline14 className={clsx(css.chevron, isOpen && css.chevronOpen)} />
                               </button>
                               {isOpen && (
-                                <ul className={css.sessions}>
-                                  {run.sessions.map(session => (
-                                    <li key={session.id} className={css.session}>
-                                      <span className={css.sessionTitle}>
-                                        {session.title === '' ? session.id : session.title}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        className={css.open}
-                                        onClick={() => { openSession(session.id) }}
-                                      >
-                                        {t('open')}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
+                                <>
+                                  <div className={css.runHead}>
+                                    <button type="button" className={css.open} disabled={state.busy} onClick={() => { undo(run.at) }}>
+                                      {t('undo')}
+                                    </button>
+                                    <button type="button" className={css.open} disabled={state.busy} onClick={() => { restore(run.at) }}>
+                                      {t('restore')}
+                                    </button>
+                                  </div>
+                                  <ul className={css.sessions}>
+                                    {run.sessions.map(session => (
+                                      <li key={session.id} className={css.session}>
+                                        <span className={css.sessionTitle}>
+                                          {session.title === '' ? session.id : session.title}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className={css.open}
+                                          onClick={() => { openSession(session.id) }}
+                                        >
+                                          {t('open')}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </>
                               )}
                             </>
                           )}

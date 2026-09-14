@@ -70,11 +70,12 @@ export class IssueReviewWorkflow {
   ): Promise<{ status: ReviewNotificationStatus; taskId?: string; error?: string }> {
     if (violations.length === 0) return { status: 'not-required' }
     if (!this.review.notificationEnabled) return { status: 'disabled' }
-    const message = buildIssueReviewMessage(issue, violations, modelOutput, this.host)
+    const { message, receiver } = buildIssueReviewMessage(issue, violations, modelOutput, this.host)
     try {
       const result = await this.delivery.deliver({
         key: `issue-review:${issue.id}:${issue.updatedOn}:${violations.map((item) => item.ruleId).join(',')}`,
         message,
+        receiver,
         sourceType: 'issue-review',
         sourceId: String(issue.id),
         actor: 'workorder-review',

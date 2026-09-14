@@ -29,6 +29,26 @@ function submitterFromWebhook(payloadJson: string, fallback: string): string {
 }
 
 /**
+ * 从事件载荷中按候选字段读取人员邮箱。
+ * @param payloadJson 原始事件载荷
+ * @param fields 事件对象上的候选字段名
+ */
+function mailFromWebhook(payloadJson: string, fields: string[]): string {
+  try {
+    const body = record(JSON.parse(payloadJson))
+    const issue = record(record(body.data).issue ?? body.issue)
+    for (const field of fields) {
+      const person = record(issue[field] ?? body[field])
+      const mail = String(person.mail ?? person.email ?? '').trim()
+      if (mail) return mail
+    }
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+/**
  * 判断编辑事件是否把状态改成了目标状态。
  * @param issue 载荷中的事件对象
  * @param statusId 目标状态 ID（美术完成）
@@ -151,6 +171,8 @@ export class GcpWebhookHandler {
       const snapshot = {
         ...mapped,
         submitterName: submitterFromWebhook(task.payloadJson, mapped.submitterName || mapped.assigneeName),
+        submitterEmail: mapped.submitterEmail || mailFromWebhook(task.payloadJson, ['author', 'created_by', 'creator']),
+        assigneeEmail: mapped.assigneeEmail || mailFromWebhook(task.payloadJson, ['assigned_to']),
       }
       this.store.issues.upsert(snapshot)
       const reviewId = await this.reviews.reviewIssue({ traceId: task.traceId, triggerType: 'webhook', issue: snapshot })

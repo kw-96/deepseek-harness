@@ -4,7 +4,9 @@ import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { CodexImportHistoryValue, CodexImportRun } from '@deepseek-ai/dsh-session-import-codex/types'
+import type {
+  CodexImportHistoryValue, CodexImportRun, CodexImportScanValue, CodexImportUndoValue,
+} from '@deepseek-ai/dsh-session-import-codex/types'
 import { CodexImportCardController, type CodexImportSettings } from '../src/client/codex-import-card-controller.ts'
 
 /** `run` 远端方法解析出的携带信封。 */
@@ -41,15 +43,35 @@ function makeScope(autoSync: boolean | undefined) {
 function makeContext() {
   const run = vi.fn(async (): Promise<RunResult> => ({
     ok: true,
-    value: { at: 200, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-t1'), title: '标题' }] },
+    value: {
+      at: 200, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0,
+      sessions: [{ id: SessionId('codex-t1'), title: '标题' }],
+    },
   }))
   const history = vi.fn(async (): Promise<HistoryResult> => ({ ok: true, value: { runs: [] } }))
-  const remote = { codexImport: { run, history } }
+  const scan = vi.fn(async (): Promise<RemoteResult<CodexImportScanValue>> => ({
+    ok: true,
+    value: {
+      summary: { imported: 2, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 },
+      entries: [{
+        threadId: 't1', sessionId: SessionId('codex-t1'), title: '标题', cwd: 'E:/x', kind: 'imported', events: 3,
+      }],
+    },
+  }))
+  const undo = vi.fn(async (): Promise<RemoteResult<CodexImportUndoValue>> => ({
+    ok: true,
+    value: { at: 200, undone: true, changed: 1, failed: 0 },
+  }))
+  const restore = vi.fn(async (): Promise<RemoteResult<CodexImportUndoValue>> => ({
+    ok: true,
+    value: { at: 200, undone: false, changed: 1, failed: 0 },
+  }))
+  const remote = { codexImport: { run, history, scan, undo, restore } }
   const sessions = { open: vi.fn() }
   const ctx = new Context()
   ctx.provide('remote', remote)
   ctx.provide('sessions', sessions)
-  return { ctx, remote, sessions }
+  return { ctx, remote, sessions, undo }
 }
 
 describe('CodexImportCardController', () => {
@@ -176,6 +198,29 @@ describe('CodexImportCardController', () => {
     await vi.waitFor(() => {
       expect(remote.codexImport.history).toHaveBeenCalled()
     })
-    expect(face.hooks.codexImportCard.getSnapshot()).toEqual({ autoSync: true, running: true, runs: [] })
+    expect(face.hooks.codexImportCard.getSnapshot()).toEqual({ autoSync: true, running: true, busy: false, runs: [], preview: null })
+  })
+
+  it('previews the next sweep through the remote and stores the verdicts', async () => {
+    const { ctx, remote } = makeContext()
+    const controller = new CodexImportCardController(ctx, makeScope(false).scope)
+    const face = controller.inject()
+    face.preview()
+    await vi.waitFor(() => { expect(remote.codexImport.scan).toHaveBeenCalled() })
+    const snapshot = face.hooks.codexImportCard.getSnapshot()
+    expect(snapshot.busy).toBe(false)
+    expect(snapshot.preview?.summary.imported).toBe(2)
+    expect(snapshot.preview?.entries[0]?.kind).toBe('imported')
+  })
+
+  it('undoes a run through the remote and re-reads history afterwards', async () => {
+    const { ctx, remote, undo } = makeContext()
+    const controller = new CodexImportCardController(ctx, makeScope(false).scope)
+    const face = controller.inject()
+    face.undo(200)
+    await vi.waitFor(() => { expect(undo).toHaveBeenCalledWith(200) })
+    // History is re-read so the card shows the host's own undoneAt stamp.
+    await vi.waitFor(() => { expect(remote.codexImport.history).toHaveBeenCalledTimes(2) })
+    await vi.waitFor(() => { expect(face.hooks.codexImportCard.getSnapshot().busy).toBe(false) })
   })
 })

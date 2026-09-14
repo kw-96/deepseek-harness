@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -22,7 +22,7 @@ afterEach(() => {
 function row(partial: Partial<StatsRow>): StatsRow {
   return {
     expectedDeliveryDate: '2026-08-27', projectName: '渠道美术', artCategory: '资源位',
-    aiPipelineTime: '是', designQuantity: 10, gameProduct: '蛋仔派对', assigneeName: '邵灵玉',
+    aiPipelineTime: '是', designQuantity: 10, gameProduct: '蛋仔派对', assigneeName: '邵灵玉', assigneeEmail: '',
     ...partial,
   }
 }
@@ -75,9 +75,9 @@ describe('工单数据统计口径', () => {
 
   it('项目固定顺序在前，游戏与指派给按数量降序，空值显示占位名称', () => {
     const report = aggregateStats([
-      row({ projectName: '回流业务', gameProduct: '光遇', assigneeName: '劳庆文', designQuantity: 20 }),
-      row({ projectName: '渠道美术', gameProduct: '', assigneeName: '', designQuantity: 30 }),
-      row({ projectName: '其他项目', gameProduct: '蛋仔派对', assigneeName: '邵灵玉', designQuantity: 10 }),
+      row({ projectName: '回流业务', gameProduct: '光遇', assigneeName: '劳庆文', assigneeEmail: '', designQuantity: 20 }),
+      row({ projectName: '渠道美术', gameProduct: '', assigneeName: '', assigneeEmail: '', designQuantity: 30 }),
+      row({ projectName: '其他项目', gameProduct: '蛋仔派对', assigneeName: '邵灵玉', assigneeEmail: '', designQuantity: 10 }),
     ])
     expect(report.projects.map((item) => item.name)).toEqual(['渠道美术', '回流业务', '其他项目'])
     expect(report.games.map((item) => item.name)).toEqual(['（空/未填）', '光遇', '蛋仔派对'])
@@ -87,7 +87,7 @@ describe('工单数据统计口径', () => {
   it('服务按期望交付时间（含端点）筛选并返回工单条数', () => {
     const store = new WorkorderStore(databasePath())
     const snapshot: IssueSnapshot = {
-      id: 1, projectName: '渠道美术', subject: '主题', submitterName: '提单人', assigneeName: '邵灵玉', statusName: '美术完成',
+      id: 1, projectName: '渠道美术', subject: '主题', submitterName: '提单人', submitterEmail: '', assigneeName: '邵灵玉', assigneeEmail: '', statusName: '美术完成',
       gameProduct: '蛋仔派对', expectedDeliveryDate: '2026-08-27', artCategory: '资源位',
       deliveryChannel: 'VIVO', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '是',
       totalHours: 2, designQuantity: 12, startDate: '2026-08-26', dueDate: '2026-08-28',

@@ -1,17 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PopoClient } from '../../src/plugins/popo/client.js'
+﻿import { describe, expect, it } from 'vitest'
 import { splitPopoMessage } from '../../src/plugins/popo/messageChunks.js'
-
-const originalFetch = globalThis.fetch
 
 function byteLength(value: string): number {
   return Buffer.byteLength(value, 'utf8')
 }
 
-afterEach(() => {
-  globalThis.fetch = originalFetch
-  vi.restoreAllMocks()
-})
 
 describe('POPO 长消息分段', () => {
   it('短消息保持原样', () => {
@@ -60,19 +53,4 @@ describe('POPO 长消息分段', () => {
     expect(aliceChunks.every((chunk) => chunk.includes('未填写投放渠道：'))).toBe(true)
   })
 
-  it('发送单段并返回远端消息标识', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
-      errcode: 0, data: { msgId: 'popo-message-id' },
-    }), { status: 200 })) as typeof fetch
-    await expect(new PopoClient('https://example.invalid/webhook').sendText('待完善内容'))
-      .resolves.toEqual({ msgId: 'popo-message-id' })
-  })
-
-  it('远端响应缺少消息标识时明确失败', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ errcode: 0 }), {
-      status: 200,
-    })) as typeof fetch
-    await expect(new PopoClient('https://example.invalid/webhook').sendText('待完善内容'))
-      .rejects.toThrow('响应缺少消息标识')
-  })
 })

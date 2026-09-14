@@ -54,7 +54,11 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Settings card and Remote
 
-The plugin serves a `codex-import` settings namespace (one field, `autoSync`, default `false`) and a `codexImport` Remote namespace with `run()` and `history()`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and durable import history in a height-bounded, internally scrolling column whose runs fold to reveal per-session open buttons. The toggle gates both the immediate automatic sweep and periodic re-scans (`syncIntervalMs`); the manual button always runs.
+The plugin serves a `codex-import` settings namespace (one field, `autoSync`, default `false`) and a `codexImport` Remote namespace with `run()`, `scan()`, `history()`, `undo(at)`, and `restore(at)`. The companion client package `@deepseek-ai/dsh-client-ui-codex-import` renders a card in the Web **Plugins** configuration tab from that namespace: a sync toggle, a manual import button, and durable import history in a height-bounded, internally scrolling column whose runs fold to reveal per-session open buttons. The toggle gates both the immediate automatic sweep and periodic re-scans (`syncIntervalMs`); the manual button always runs.
+
+`scan()` previews the next sweep without writing anything: it returns the counts the sweep would produce plus one entry per thread (`threadId`, `sessionId`, `title`, `cwd`, `kind`, `events`). The preview shares the sweep's enumeration and snapshot builder, so it cannot disagree with the run it describes; it never persists a session, creates a workspace or project, or appends history.
+
+Undo archives the sessions one recorded run imported and stamps the run (`undoneAt`); restore unarchives them and clears the stamp. Archiving is DSH's own session lifecycle, so undo never deletes the imported evidence, never touches the session log, and stays reversible from the sidebar's archived group. Sessions the workspace registry no longer knows are counted in `failed` instead of aborting the run's remaining sessions; a request for a run time that was never recorded is rejected.
 
 ### Item mapping
 

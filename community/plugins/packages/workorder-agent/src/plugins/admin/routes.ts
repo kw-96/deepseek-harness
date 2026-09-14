@@ -56,7 +56,9 @@ export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependenci
       webhookProcessingEnabled: store.getFlag('webhook_processing_enabled'),
     },
     configured: {
-      gcpUserKey: Boolean(config.gcp.userKey), popoWebhook: Boolean(config.popo.url),
+      gcpUserKey: Boolean(config.gcp.userKey),
+      popoApp: Boolean(config.popo.app.id && config.popo.app.secret && config.popo.app.receiver),
+      popoReceiver: config.popo.app.receiver,
       webhookEntry: Boolean(config.webhookToken),
     },
     review: { enabled: config.review.enabled, notificationEnabled: config.review.notificationEnabled,
@@ -174,9 +176,10 @@ export function installAdminRoutes(app: Hono, dependencies: AdminRouteDependenci
     }
   })
   app.get('/api/admin/popo/capabilities', (context) => context.json({
-    configured: Boolean(config.popo.url), signed: Boolean(config.popo.secret), available: store.health().ready,
+    configured: Boolean(config.popo.app.id && config.popo.app.receiver),
+    signed: false, available: store.health().ready,
     features: { chunking: true, chunkTracking: true, resumeFailed: true, fullResend: true, recall: false },
-    recallReason: '自定义群机器人 Webhook 未提供已授权的撤回能力',
+    recallReason: '机器人应用消息接口未提供已授权的撤回能力',
   }))
   app.get('/api/admin/popo/messages', (context) => {
     const limit = Math.min(Math.max(Number(context.req.query('limit') ?? 30), 1), 100)

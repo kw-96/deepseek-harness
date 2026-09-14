@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 import { inspectIssue } from '../../src/domain/rules.js'
 import type { IssueSnapshot } from '../../src/domain/types.js'
 
@@ -6,8 +6,8 @@ const base: IssueSnapshot = {
   id: 1,
   projectName: '渠道美术',
   subject: '测试工单',
-  submitterName: '提单人',
-  assigneeName: '测试用户',
+  submitterName: '提单人', submitterEmail: '',
+  assigneeName: '测试用户', assigneeEmail: '',
   statusName: '美术完成',
   gameProduct: '',
   expectedDeliveryDate: '2026-08-14',

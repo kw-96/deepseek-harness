@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -144,8 +144,8 @@ describe('独立易协作事件入口', () => {
   it('编辑事件缺少项目时回退到本地快照归属', async () => {
     const store = database()
     store.issues.upsert({
-      id: 404, projectName: '回流业务', subject: '测试工单', submitterName: '提单人',
-      assigneeName: '设计师', statusName: '美术完成',
+      id: 404, projectName: '回流业务', subject: '测试工单', submitterName: '提单人', submitterEmail: '',
+      assigneeName: '设计师', assigneeEmail: '', statusName: '美术完成',
       gameProduct: '测试游戏', expectedDeliveryDate: '2026-09-09', artCategory: '子单',
       deliveryChannel: '', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '是',
       totalHours: 1, designQuantity: 1, startDate: '', dueDate: '', createdOn: '', updatedOn: '', closedOn: '',

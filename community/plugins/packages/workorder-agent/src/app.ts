@@ -7,8 +7,9 @@ import { installAdminRoutes, type PluginSettingsWrite } from './plugins/admin/ro
 import { createRateLimit } from './plugins/admin/rateLimit.js'
 import { GcpClient } from './plugins/gcp/client.js'
 import { GcpIssueService } from './plugins/gcp/service.js'
-import { PopoClient } from './plugins/popo/client.js'
+import { PopoAppClient } from './plugins/popo/appClient.js'
 import { PopoDeliveryService } from './plugins/popo/delivery.js'
+import type { MessageSender } from './plugins/popo/sender.js'
 import { startScheduler } from './plugins/scheduler/scheduler.js'
 import { WorkorderStatsService } from './plugins/stats/service.js'
 import { WorkorderStore } from './plugins/store/store.js'
@@ -23,6 +24,19 @@ import { InspectionWorkflow } from './plugins/workflow/service.js'
 export interface AppRuntime {
   app: Hono
   close: () => Promise<void>
+}
+
+/**
+ * 构造 POPO 机器人应用发送器（App 凭证换 token 后按接收人发送）。
+ * @param config 业务运行配置
+ * @returns 文本发送器
+ */
+function createSender(config: AppConfig): MessageSender {
+  return new PopoAppClient({
+    appId: config.popo.app.id,
+    appSecret: config.popo.app.secret,
+    receiver: config.popo.app.receiver,
+  })
 }
 
 /**
@@ -55,8 +69,8 @@ export async function createApp(
   await gcp.connect()
   const store = new WorkorderStore(join(config.dataDir, 'db', 'workorder-agent.sqlite'))
   const issues = new GcpIssueService(gcp, config.projects, config.completedStatusId, store.issues)
-  const delivery = new PopoDeliveryService(store, new PopoClient(config.popo.url, config.popo.secret))
-  const workflow = new InspectionWorkflow(issues, store, delivery, config.gcp.host)
+  const delivery = new PopoDeliveryService(store, createSender(config))
+  const workflow = new InspectionWorkflow(issues, store, delivery, config.gcp.host, config.popo.app.receiver)
   const review = new IssueReviewWorkflow(store, delivery, config.gcp.host, config.review, agentRouter)
   const stats = new WorkorderStatsService(store)
   const vivo = new VivoService(store, config.vivo, delivery)

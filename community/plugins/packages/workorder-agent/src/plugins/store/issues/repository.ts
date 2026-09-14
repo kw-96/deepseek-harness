@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { IssueSnapshot } from '../../../domain/types.js'
 
-const COLUMNS = `id,project_name,subject,submitter_name,assignee_name,status_name,game_product,
+const COLUMNS = `id,project_name,subject,submitter_name,submitter_email,assignee_name,assignee_email,status_name,game_product,
   expected_delivery_date,art_category,delivery_channel,return_delivery_channel,
   ai_delivery_channel,ai_pipeline_time,total_hours,design_quantity,start_date,due_date,
   created_on,updated_on,closed_on,synced_at`
@@ -11,7 +11,9 @@ interface IssueRow {
   project_name: string
   subject: string
   submitter_name: string
+  submitter_email: string
   assignee_name: string
+  assignee_email: string
   status_name: string
   game_product: string
   expected_delivery_date: string
@@ -50,7 +52,9 @@ function toSnapshot(row: IssueRow): IssueSnapshot {
     projectName: row.project_name,
     subject: row.subject,
     submitterName: row.submitter_name,
+    submitterEmail: row.submitter_email,
     assigneeName: row.assignee_name,
+    assigneeEmail: row.assignee_email,
     statusName: row.status_name,
     gameProduct: row.game_product,
     expectedDeliveryDate: row.expected_delivery_date,
@@ -131,14 +135,16 @@ export class IssueRepository {
   /** 覆盖写入工单快照。 */
   upsert(issue: IssueSnapshot): void {
     this.db.prepare(`INSERT INTO issues(
-      id,project_name,subject,submitter_name,assignee_name,status_name,game_product,expected_delivery_date,
+      id,project_name,subject,submitter_name,submitter_email,assignee_name,assignee_email,status_name,game_product,expected_delivery_date,
       art_category,delivery_channel,return_delivery_channel,ai_delivery_channel,ai_pipeline_time,
       total_hours,design_quantity,start_date,due_date,created_on,updated_on,closed_on,synced_at
-    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET
       project_name=excluded.project_name,subject=excluded.subject,
       submitter_name=CASE WHEN excluded.submitter_name='' THEN issues.submitter_name ELSE excluded.submitter_name END,
+      submitter_email=CASE WHEN excluded.submitter_email='' THEN issues.submitter_email ELSE excluded.submitter_email END,
       assignee_name=excluded.assignee_name,
+      assignee_email=CASE WHEN excluded.assignee_email='' THEN issues.assignee_email ELSE excluded.assignee_email END,
       status_name=excluded.status_name,game_product=excluded.game_product,
       expected_delivery_date=excluded.expected_delivery_date,art_category=excluded.art_category,
       delivery_channel=excluded.delivery_channel,return_delivery_channel=excluded.return_delivery_channel,
@@ -146,8 +152,8 @@ export class IssueRepository {
       total_hours=excluded.total_hours,design_quantity=excluded.design_quantity,
       start_date=excluded.start_date,due_date=excluded.due_date,created_on=excluded.created_on,
       updated_on=excluded.updated_on,closed_on=excluded.closed_on,synced_at=excluded.synced_at`).run(
-      issue.id, issue.projectName, issue.subject, issue.submitterName, issue.assigneeName, issue.statusName,
-      issue.gameProduct,
+      issue.id, issue.projectName, issue.subject, issue.submitterName, issue.submitterEmail,
+      issue.assigneeName, issue.assigneeEmail, issue.statusName, issue.gameProduct,
       issue.expectedDeliveryDate, issue.artCategory, cell(issue.deliveryChannel),
       cell(issue.returnDeliveryChannel), cell(issue.aiDeliveryChannel), cell(issue.aiPipelineTime),
       cell(issue.totalHours), cell(issue.designQuantity), issue.startDate, issue.dueDate,

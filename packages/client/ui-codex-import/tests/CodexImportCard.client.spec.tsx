@@ -8,11 +8,25 @@ import type { CodexImportCardState } from '../src/client/codex-import-card-contr
 
 afterEach(cleanup)
 
-function renderCard(state: CodexImportCardState) {
+/**
+ * Complete one card state with the defaults every case shares: the preview
+ * panel and the busy flag are additive fields, so a case that only cares about
+ * history still renders exactly the history card.
+ */
+function withDefaults(state: Partial<CodexImportCardState>): CodexImportCardState {
+  return { autoSync: false, running: false, busy: false, runs: [], preview: null, ...state }
+}
+
+function renderCard(state: Partial<CodexImportCardState>) {
   const toggleSync = vi.fn()
   const runImport = vi.fn()
   const openSession = vi.fn()
-  const makeProps = (s: CodexImportCardState) => ({
+  const preview = vi.fn()
+  const undo = vi.fn()
+  const restore = vi.fn()
+  const makeProps = (raw: Partial<CodexImportCardState>) => {
+    const s = withDefaults(raw)
+    return {
     t: ((key: string, params?: { count?: number }) => {
       if (key === 'importedCount') return `Imported ${params?.count ?? 0}`
       if (key === 'updatedCount') return `Updated ${params?.count ?? 0}`
@@ -26,8 +40,12 @@ function renderCard(state: CodexImportCardState) {
     useCodexImportCard: (selector: (snapshot: CodexImportCardState) => CodexImportCardState) => selector(s),
     toggleSync,
     runImport,
+    preview,
+    undo,
+    restore,
     openSession,
-  } as unknown as Parameters<typeof CodexImportCard>[0])
+    } as unknown as Parameters<typeof CodexImportCard>[0]
+  }
   const view = render(<CodexImportCard {...makeProps(state)} />)
   const openCard = (): void => {
     fireEvent.click(screen.getByRole('button', { name: 'expand: Codex import' }))
@@ -38,6 +56,9 @@ function renderCard(state: CodexImportCardState) {
     rerender: (next: CodexImportCardState) => { view.rerender(<CodexImportCard {...makeProps(next)} />) },
     toggleSync,
     runImport,
+    preview,
+    undo,
+    restore,
     openSession,
   }
 }
@@ -83,7 +104,7 @@ describe('CodexImportCard', () => {
     const { openCard, openSession } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: sessionId, title: '整理校验表' }] }],
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: sessionId, title: '整理校验表' }] }],
     })
     openCard()
     expect(screen.getByText('Imported 1')).toBeDefined()
@@ -96,7 +117,7 @@ describe('CodexImportCard', () => {
     const { openCard } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-t2'), title: '' }] }],
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-t2'), title: '' }] }],
     })
     openCard()
     expect(screen.getByText('codex-t2')).toBeDefined()
@@ -117,7 +138,7 @@ describe('CodexImportCard', () => {
     const { openCard } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 0, deferredActive: 0, sessions: [] }],
+      runs: [{ at: 100, imported: 0, updated: 0, skippedExisting: 2, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [] }],
     })
     openCard()
     expect(screen.getByText('noSessions')).toBeDefined()
@@ -128,8 +149,8 @@ describe('CodexImportCard', () => {
       autoSync: true,
       running: false,
       runs: [
-        { at: 200, imported: 2, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-new'), title: '最新会话' }] },
-        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-old'), title: '较早会话' }] },
+        { at: 200, imported: 2, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-new'), title: '最新会话' }] },
+        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-old'), title: '较早会话' }] },
       ],
     })
     openCard()
@@ -149,7 +170,7 @@ describe('CodexImportCard', () => {
     const { openCard, rerender } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] }],
+      runs: [{ at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] }],
     })
     openCard()
     expect(screen.getByText('第一轮会话')).toBeDefined()
@@ -157,10 +178,48 @@ describe('CodexImportCard', () => {
       autoSync: true,
       running: false,
       runs: [
-        { at: 300, imported: 3, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-latest'), title: '新导入会话' }] },
-        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] },
+        { at: 300, imported: 3, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-latest'), title: '新导入会话' }] },
+        { at: 100, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [{ id: SessionId('codex-first'), title: '第一轮会话' }] },
       ],
     })
     expect(screen.getByText('新导入会话')).toBeDefined()
+  })
+
+  it('renders preview verdicts and starts a preview on demand', () => {
+    const { openCard, preview } = renderCard({
+      preview: {
+        summary: { imported: 2, updated: 1, skippedExisting: 3, skippedEmpty: 0, deferredActive: 0 },
+        entries: [{
+          threadId: 't1', sessionId: SessionId('codex-thread-1'), title: '待导入会话', cwd: 'E:/x', kind: 'imported', events: 5,
+        }],
+      },
+    })
+    openCard()
+    expect(screen.getByText('previewImported')).toBeDefined()
+    expect(screen.getByText('待导入会话')).toBeDefined()
+    expect(screen.getByText('kindImported')).toBeDefined()
+    fireEvent.click(screen.getByText('preview'))
+    expect(preview).toHaveBeenCalled()
+  })
+
+  it('marks an undone run and routes undo and restore for it', () => {
+    const { openCard, undo, restore } = renderCard({
+      runs: [{
+        at: 500,
+        imported: 1,
+        updated: 0,
+        skippedExisting: 0,
+        skippedEmpty: 0,
+        deferredActive: 0,
+        undoneAt: 1700000000000,
+        sessions: [{ id: SessionId('codex-thread-9'), title: '已撤销会话' }],
+      }],
+    })
+    openCard()
+    expect(screen.getByText('undone')).toBeDefined()
+    fireEvent.click(screen.getByText('undo'))
+    expect(undo).toHaveBeenCalledWith(500)
+    fireEvent.click(screen.getByText('restore'))
+    expect(restore).toHaveBeenCalledWith(500)
   })
 })

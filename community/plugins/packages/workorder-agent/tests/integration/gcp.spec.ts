@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../../src/config.js'
 import { mapIssueDetail, mapListIssue, parseIssuePage } from '../../src/plugins/gcp/mapper.js'
 import { GcpIssueService } from '../../src/plugins/gcp/service.js'
@@ -7,7 +7,9 @@ import { issueDetailResponse, issueListItem, issueListResponse } from '../fixtur
 function stubRequiredConfig(): void {
   vi.stubEnv('WEBHOOK_TOKEN', 'webhook-token')
   vi.stubEnv('GCP_USER_KEY', 'user-key')
-  vi.stubEnv('POPO_WEBHOOK_URL', 'https://example.invalid/webhook')
+  vi.stubEnv('POPO_APP_ID', 'app-1')
+  vi.stubEnv('POPO_APP_SECRET', 'secret-1')
+  vi.stubEnv('POPO_APP_RECEIVER', 'someone@corp.netease.com')
 }
 
 describe('易协作配置契约', () => {
@@ -35,8 +37,8 @@ describe('易协作真实响应映射', () => {
       id: 81001,
       projectName: '渠道美术',
       subject: '脱敏工单甲',
-      submitterName: '',
-      assigneeName: '脱敏用户',
+      submitterName: '', submitterEmail: '',
+      assigneeName: '脱敏用户', assigneeEmail: '',
       statusName: '美术完成',
       gameProduct: '脱敏游戏',
       expectedDeliveryDate: '2026-08-14',
@@ -51,8 +53,8 @@ describe('易协作真实响应映射', () => {
       id: 81001,
       projectName: 'AI运营活动',
       subject: '脱敏工单甲',
-      submitterName: '',
-      assigneeName: '脱敏用户',
+      submitterName: '', submitterEmail: '',
+      assigneeName: '脱敏用户', assigneeEmail: '',
       statusName: '美术完成',
       gameProduct: '脱敏游戏',
       expectedDeliveryDate: '2026-08-14',

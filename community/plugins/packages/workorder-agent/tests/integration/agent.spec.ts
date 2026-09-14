@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import { HarnessWorkorderAgent, WORKORDER_AGENT_ID } from '../../src/harness/agent.js'
 import { WORKORDER_SKILL_NAME } from '../../src/harness/skill.js'
 
 function issue(id: number) {
   return {
-    id, projectName: '渠道美术', subject: '主题', submitterName: '提单人', assigneeName: '用户',
+    id, projectName: '渠道美术', subject: '主题', submitterName: '提单人', submitterEmail: '', assigneeName: '用户', assigneeEmail: '',
     statusName: '美术完成', gameProduct: '', expectedDeliveryDate: '', artCategory: '',
     deliveryChannel: '', returnDeliveryChannel: '', aiDeliveryChannel: '', aiPipelineTime: '',
     totalHours: '', designQuantity: '', startDate: '', dueDate: '', createdOn: '', updatedOn: '', closedOn: '',

@@ -53,3 +53,7 @@ worktrees/
 native/system/test/bin/
 
 .data/
+# 便携打包：下载缓存与打好的归档都是本地产物
+community/portable/.downloads/
+dsh-portable-*.tar.gz
+.portable-staging/

@@ -10,7 +10,6 @@ import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { SessionId, SESSION_FORMAT_VERSION, type SessionHeader } from '@deepseek-ai/dsh-session/types'
 import { SessionAlreadyExistsError } from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-settings'
 import { convertCodexThread } from './convert.ts'
@@ -21,11 +20,10 @@ import {
   DEFAULT_CODEX_IMPORT_SETTINGS,
   type CodexImportSettings,
 } from './settings.ts'
-import { loadCodexThreads } from './sqlite.ts'
-import { loadCodexArchivedThreads, readCodexRollout } from './archive/read.ts'
-import { loadCodexProjects, loadCodexThreadIndex, type CodexProjectIndexEntry, type CodexThreadIndexEntry } from './state.ts'
-import type { CodexImportSession, CodexImportSweepResult, CodexThreadRecord, ImportBounds } from './types.ts'
-import { CodexImportReconciler, type CodexImportSnapshot } from './workspace.ts'
+import { collectRecords, runImportScan } from './scan.ts'
+import { loadCodexProjects, type CodexProjectIndexEntry } from './state.ts'
+import type { CodexImportSession, CodexImportSweepResult, ImportBounds } from './types.ts'
+import { CodexImportReconciler, importSnapshot } from './workspace.ts'
 
 export { CodexImportController } from './remote.ts'
 export type { CodexImportControllerConfig, CodexImportRunner } from './remote.ts'
@@ -121,42 +119,6 @@ export function resolveConfig(config: Config, env: NodeJS.ProcessEnv): ResolvedC
   }
 }
 
-/** The fixed prefix every imported session id carries. */
-const IMPORTED_ID_PREFIX = 'codex-'
-
-/** The imported session id derived from one Codex thread id. */
-function importedSessionId(threadId: string): SessionId {
-  return SessionId(`${IMPORTED_ID_PREFIX}${threadId}`)
-}
-
-/** Build a complete stable DSH snapshot from one non-empty Codex conversion. */
-function importSnapshot(
-  record: ReturnType<typeof convertCodexThread>,
-  threadId: string,
-  fallbackCwd: string,
-): CodexImportSnapshot {
-  const id = importedSessionId(threadId)
-  // The sweep skips empty conversions, so the first event always exists.
-  // oxlint-disable-next-line typescript/no-non-null-assertion
-  const createdAt = record.events[0]!.time
-  const cwd = isAbsolute(record.cwd) ? record.cwd : fallbackCwd
-  const header: SessionHeader = {
-    version: SESSION_FORMAT_VERSION,
-    id,
-    createdAt,
-    cwd,
-    isSeeded: false,
-    delegationDepth: 0,
-  }
-  const title = record.events.find(event => event.type === 'session/title')
-  return {
-    id,
-    header,
-    events: record.events,
-    title: title?.type === 'session/title' ? title.data.title : '',
-  }
-}
-
 /** Compare two root lists for durable project reconciliation. */
 function sameRoots(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((root, index) => root === right[index])
@@ -197,31 +159,11 @@ export async function runImportSweep(
   const summary = { imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0 }
   const sessions: CodexImportSession[] = []
   const reconciler = new CodexImportReconciler(ctx)
-  let currentRecords
-  try {
-    currentRecords = await loadCodexThreads(config.codexHome)
-  } catch (error: unknown) {
-    ctx.logger.warn(`session-import-codex: could not read the Codex thread store at ${JSON.stringify(config.codexHome)}: ${String(error)}`)
-  }
-  let archivedRecords: CodexThreadRecord[]
-  try {
-    archivedRecords = await loadCodexArchivedThreads(config.codexHome)
-  } catch (error: unknown) {
-    ctx.logger.warn(`session-import-codex: could not read Codex archived sessions at ${JSON.stringify(join(config.codexHome, 'archived_sessions'))}: ${String(error)}`)
-    archivedRecords = []
-  }
-  let indexEntries: CodexThreadIndexEntry[]
-  try {
-    indexEntries = await loadCodexThreadIndex(config.codexHome)
-  } catch (error: unknown) {
-    ctx.logger.warn(`session-import-codex: could not read the Codex state index at ${JSON.stringify(config.codexHome)}: ${String(error)}`)
-    indexEntries = []
-  }
-  if (currentRecords === undefined && archivedRecords.length === 0 && indexEntries.length === 0) {
+  const { records, empty } = await collectRecords(ctx, config)
+  if (empty) {
     ctx.logger.info(`session-import-codex: no current, archived, or indexed Codex thread store under ${JSON.stringify(config.codexHome)}; nothing to import`)
     return { summary, sessions }
   }
-  const indexById = new Map(indexEntries.map(entry => [entry.threadId, entry]))
   let codexProjects: CodexProjectIndexEntry[]
   try {
     codexProjects = await loadCodexProjects(config.codexHome)
@@ -233,27 +175,6 @@ export async function runImportSweep(
     await reconcileProjects(ctx, codexProjects)
   } catch (error: unknown) {
     ctx.logger.warn(`session-import-codex: could not reconcile Codex projects: ${String(error)}`)
-  }
-  const current = currentRecords ?? []
-  const currentIds = new Set(current.map(record => record.threadId))
-  const records: CodexThreadRecord[] = [...current, ...archivedRecords.filter(record => !currentIds.has(record.threadId))]
-  const covered = new Set(records.map(record => record.threadId))
-  for (const entry of indexEntries) {
-    if (covered.has(entry.threadId)) continue
-    const record = await readCodexRollout(entry.rolloutPath)
-    if (record === undefined) continue
-    records.push(record)
-    covered.add(record.threadId)
-  }
-  for (let index = 0; index < records.length; index += 1) {
-    const record = records[index] as CodexThreadRecord
-    const indexed = indexById.get(record.threadId)
-    if (indexed === undefined) continue
-    records[index] = {
-      ...record,
-      ...(indexed.cwd === undefined ? {} : { cwd: indexed.cwd }),
-      ...(indexed.name === undefined ? {} : { title: indexed.name }),
-    }
   }
   for (const record of records) {
     if (signal.aborted) break
@@ -306,8 +227,11 @@ export function apply(ctx: Context, config: Config): void {
     ctx.logger.info(`session-import-codex: sweep finished (imported ${result.summary.imported}, updated ${result.summary.updated}, unchanged ${result.summary.skippedExisting}, deferred-active ${result.summary.deferredActive}, skipped ${result.summary.skippedEmpty} empty)`)
   }
 
-  // The card's manual button and history list.
-  ctx.plugin(CodexImportController, { run: runner })
+  // The card's manual button, read-only preview, and history list.
+  ctx.plugin(CodexImportController, {
+    run: runner,
+    scan: (signal: AbortSignal) => runImportScan(ctx, resolved, signal),
+  })
 
   // The card's sync toggle gates both its initial automatic scan and the timer.
   let autoSync = DEFAULT_CODEX_IMPORT_SETTINGS.autoSync

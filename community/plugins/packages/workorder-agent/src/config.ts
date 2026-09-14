@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+﻿import { join } from 'node:path'
 import type { ProjectMap } from './plugins/gcp/service.js'
 
 /** 默认提单规范，作为模型审核的可编辑知识库初始内容。 */
@@ -31,8 +31,9 @@ export interface AppConfigInput {
   gcpUserKey: string
   gcpUrl?: string
   gcpHost?: string
-  popoWebhookUrl: string
-  popoWebhookSecret?: string
+  popoAppId?: string
+  popoAppSecret?: string
+  popoAppReceiver?: string
   completedStatusId?: number
   projectIdChannelArt?: number
   projectIdReturnBusiness?: number
@@ -58,7 +59,8 @@ export interface AppConfig {
   projects: ProjectMap
   completedStatusId: number
   gcp: { url: string; host: string; userKey: string }
-  popo: { url: string; secret?: string }
+  /** POPO 机器人应用通道：App 凭证换 token 后发送，接收人为用户邮箱或群 ID。 */
+  popo: { app: { id: string; secret: string; receiver: string } }
   review: {
     enabled: boolean
     provider?: string
@@ -79,10 +81,16 @@ export interface AppConfig {
 export function buildAppConfig(input: AppConfigInput): AppConfig {
   const webhookToken = input.webhookToken.trim()
   const gcpUserKey = input.gcpUserKey.trim()
-  const popoWebhookUrl = input.popoWebhookUrl.trim()
   if (!webhookToken) throw new Error('缺少配置：WEBHOOK_TOKEN')
   if (!gcpUserKey) throw new Error('缺少配置：GCP_USER_KEY')
-  if (!popoWebhookUrl) throw new Error('缺少配置：POPO_WEBHOOK_URL')
+  const popoApp = {
+    id: input.popoAppId?.trim() ?? '',
+    secret: input.popoAppSecret?.trim() ?? '',
+    receiver: input.popoAppReceiver?.trim() ?? '',
+  }
+  if (!popoApp.id) throw new Error('缺少配置：POPO_APP_ID')
+  if (!popoApp.secret) throw new Error('缺少配置：POPO_APP_SECRET')
+  if (!popoApp.receiver) throw new Error('缺少配置：POPO_APP_RECEIVER')
   const provider = input.reviewProvider?.trim() || undefined
   const model = input.reviewModel?.trim() || undefined
   if (Boolean(provider) !== Boolean(model)) throw new Error('审核模型服务商与模型 ID 必须同时填写')
@@ -107,7 +115,7 @@ export function buildAppConfig(input: AppConfigInput): AppConfig {
       host: input.gcpHost?.trim() || 'promoteart.pm.netease.com',
       userKey: gcpUserKey,
     },
-    popo: { url: popoWebhookUrl, secret: input.popoWebhookSecret?.trim() || undefined },
+    popo: { app: popoApp },
     review: {
       enabled: input.reviewEnabled ?? true,
       ...provider && model ? { provider, model } : {},
@@ -133,8 +141,9 @@ export function loadConfig(): AppConfig {
     gcpUserKey: required('GCP_USER_KEY'),
     gcpUrl: process.env.GCP_MCP_URL?.trim(),
     gcpHost: process.env.GCP_HOST?.trim(),
-    popoWebhookUrl: required('POPO_WEBHOOK_URL'),
-    popoWebhookSecret: process.env.POPO_WEBHOOK_SECRET?.trim(),
+    popoAppId: process.env.POPO_APP_ID?.trim(),
+    popoAppSecret: process.env.POPO_APP_SECRET?.trim(),
+    popoAppReceiver: process.env.POPO_APP_RECEIVER?.trim(),
     completedStatusId: process.env.GCP_COMPLETED_STATUS_ID
       ? Number(process.env.GCP_COMPLETED_STATUS_ID)
       : 6,

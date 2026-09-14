@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+﻿import { Hono } from 'hono'
 import { PRODUCT_NAME } from '../brand.js'
 import type { PluginConfig } from './pluginConfig.js'
 
@@ -52,10 +52,11 @@ button:disabled{opacity:.5;cursor:default}
 <form id="form">
   ${field('Webhook 令牌', 'webhookToken', '', 'password', true)}
   ${field('易协作 GCP 用户 Key', 'gcpUserKey', '', 'password', true)}
-  ${field('POPO 群机器人地址', 'popoWebhookUrl', '', 'text', true)}
+  ${field('机器人应用 App ID', 'popoAppId', '', 'text', true)}
+  ${field('机器人应用 App Secret', 'popoAppSecret', '', 'password', true)}
+  ${field('机器人应用接收人（邮箱或群 ID）', 'popoAppReceiver', '', 'text', true)}
   ${field('易协作 MCP 地址', 'gcpUrl', config.gcpUrl)}
   ${field('易协作 Host', 'gcpHost', config.gcpHost)}
-  ${field('POPO 群机器人签名', 'popoWebhookSecret', '', 'password')}
   ${field('数据目录', 'dataDir', config.dataDir)}
   ${field('美术完成状态 ID', 'completedStatusId', String(config.completedStatusId))}
   ${field('渠道美术项目 ID', 'projectIdChannelArt', String(config.projectIdChannelArt))}
@@ -78,7 +79,6 @@ document.getElementById('form').addEventListener('submit',async(event)=>{
   const msg=document.getElementById('msg');
   button.disabled=true;msg.className='';msg.textContent='正在保存…';
   const patch={};
-  for(const id of ['webhookToken','gcpUserKey','popoWebhookUrl','gcpUrl','gcpHost','popoWebhookSecret','dataDir','reviewProvider','reviewModel','reviewKnowledgeBase',...numbers]){
     const value=document.getElementById(id).value;
     patch[id]=numbers.includes(id)?Number(value):value.trim();
   }
@@ -103,7 +103,7 @@ export function bootstrapRoute(config: PluginConfig, write: BootstrapWrite): Hon
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       return context.json({ ok: false, error: '请求内容无效' }, 400)
     }
-    const required = ['webhookToken', 'gcpUserKey', 'popoWebhookUrl']
+    const required = ['webhookToken', 'gcpUserKey', 'popoAppId', 'popoAppSecret', 'popoAppReceiver']
     const missing = required.filter((key) => typeof body[key] !== 'string' || body[key].trim() === '')
     if (missing.length > 0) {
       return context.json({ ok: false, error: `缺少必填项：${missing.join('、')}` }, 400)

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { WorkorderStore } from '../store/store.js'
 import type { MessageTaskDetail, MessageTaskResult } from '../store/message/types.js'
 import { splitPopoMessage } from './messageChunks.js'
-import type { PopoClient } from './client.js'
+import type { MessageSender } from './sender.js'
 
 export interface DeliveryInput {
   key: string
@@ -11,13 +11,15 @@ export interface DeliveryInput {
   sourceId?: string
   actor: string
   automatic?: boolean
+  /** 本条消息的接收人；缺省用发送器默认接收人（例如单聊发给提单人本人）。 */
+  receiver?: string
 }
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
 
 /** 可靠 POPO 投递服务，负责持久化分段、顺序发送和失败续发。 */
 export class PopoDeliveryService {
-  constructor(private readonly store: WorkorderStore, private readonly client: PopoClient) {}
+  constructor(private readonly store: WorkorderStore, private readonly client: MessageSender) {}
 
   /** 创建或复用消息任务并同步推进发送。 */
   async deliver(input: DeliveryInput): Promise<MessageTaskResult> {
@@ -35,7 +37,7 @@ export class PopoDeliveryService {
     const task = this.store.messages.create({
       deliveryKey: input.key, sourceType: input.sourceType, sourceId: input.sourceId,
       actor: input.actor, message: input.message, messageHash: hash(input.message),
-      chunks: splitPopoMessage(input.message),
+      chunks: splitPopoMessage(input.message), receiver: input.receiver ?? '',
     })
     try {
       const result = await this.process(task.id)
@@ -70,7 +72,8 @@ export class PopoDeliveryService {
         throw new Error('消息任务租约已失效')
       }
       try {
-        const response = await this.client.sendText(chunk.content)
+        // 单聊场景各分段都发往同一接收人（任务级接收人优先）。
+        const response = await this.client.sendText(chunk.content, task.receiver ? { receiver: task.receiver } : {})
         if (!this.store.messages.completeChunk(task.id, chunk.index, task.leaseOwner, response.msgId)) {
           const uncertain = new Error('POPO 已接收消息，但本地状态保存失败，禁止自动重发')
           this.store.messages.failChunk(task, chunk.index, uncertain.message, true)

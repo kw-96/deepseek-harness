@@ -31,19 +31,28 @@ export function buildInspectionMessage(title: string, violations: Violation[], h
   return lines.join('\n')
 }
 
-/** 生成面向提单人的单工单补全提醒文本。 */
+/**
+ * 生成面向**指派给（设计师）**的单工单补全提醒文本。
+ * 工单由运营提单、指派给设计师，字段由设计师本人补齐，因此该提醒以单聊发给指派给，
+ * 正文只显示姓名、不使用 @ 占位；接收人取不到邮箱时由调用方回退默认接收人。
+ * @param issue 工单快照
+ * @param violations 规则缺项
+ * @param modelOutput 模型审核结论
+ * @param host 易协作 Host
+ */
 export function buildIssueReviewMessage(
   issue: IssueSnapshot,
   violations: Array<{ ruleId: string; message: string }>,
   modelOutput: string,
   host: string,
-): string {
-  const submitter = issue.submitterName || issue.assigneeName || '相关提单人'
-  return [
+): { message: string; receiver: string } {
+  const assignee = issue.assigneeName || '相关设计师'
+  const message = [
     '【工单补全提醒】',
-    `@${submitter}：请补全易协作工单 [#${issue.id}](${issueUrl(host, issue.id)})。`,
+    `${assignee}：请补全易协作工单 [#${issue.id}](${issueUrl(host, issue.id)})。`,
     `规则核验：${violations.map((item) => item.message).join('；')}`,
     `模型审核：${modelOutput}`,
     '补全后可再次在 Ticket Hub 执行“填写核验”。',
   ].join('\n')
+  return { message, receiver: issue.assigneeEmail }
 }

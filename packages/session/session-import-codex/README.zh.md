@@ -54,7 +54,11 @@ kind: "package-reference"
 
 ### 设置卡片与 Remote
 
-插件提供 `codex-import` 设置命名空间（一个字段 `autoSync`，默认 `false`）和带有 `run()`、`history()` 的 `codexImport` Remote 命名空间。配套客户端包 `@deepseek-ai/dsh-client-ui-codex-import` 在 Web **插件**配置标签中渲染同步开关、手动导入按钮以及高度受限、内部滚动、逐轮可折叠展开的持久导入历史（逐会话打开按钮）。该开关同时控制即时自动扫描和定时重扫（`syncIntervalMs`）；手动按钮始终可用。
+插件提供 `codex-import` 设置命名空间（一个字段 `autoSync`，默认 `false`）和带有 `run()`、`scan()`、`history()`、`undo(at)`、`restore(at)` 的 `codexImport` Remote 命名空间。配套客户端包 `@deepseek-ai/dsh-client-ui-codex-import` 在 Web **插件**配置标签中渲染同步开关、手动导入按钮以及高度受限、内部滚动、逐轮可折叠展开的持久导入历史（逐会话打开按钮）。该开关同时控制即时自动扫描和定时重扫（`syncIntervalMs`）；手动按钮始终可用。
+
+`scan()` 在不写入任何东西的前提下预览下一轮导入：返回与 sweep 同口径的计数，外加每个线程一条明细（`threadId`、`sessionId`、`title`、`cwd`、`kind`、`events`）。预览与 sweep 共用同一套枚举与快照构造，因此不会与实际执行结果不一致；它不会落盘会话、不会创建或改动工作区/项目，也不会写入导入历史。
+
+撤销会把某一次导入创建的会话**归档**并给该轮记录打上 `undoneAt` 标记；恢复则取消归档并清除标记。归档走的是 DSH 自己的会话生命周期，因此撤销不删除导入证据、不触碰会话日志，并且可以从侧栏「归档」分组里随时恢复。工作区注册表已经不再认识的会话会被计入 `failed`，而不会中断同一轮里其它会话的处理；对从未记录过的轮次时间戳发起撤销会被拒绝。
 
 ### 条目映射
 

@@ -382,4 +382,74 @@ describe('session-import-codex through a real Loader composition', () => {
       SessionId('codex-thread-2'),
     ])
   })
+
+  it('scan previews the next sweep without writing anything', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    await mkdir(join(root, 'codex'))
+    const first = await loadComposition(compositionRows())
+    await writeCodexFixture(join(root, 'codex'))
+
+    const preview = await first.codexImport.scan()
+    expect(preview.summary).toMatchObject({ imported: 2, updated: 0, skippedExisting: 0, deferredActive: 0 })
+    expect(preview.entries.map(entry => entry.sessionId)).toEqual([
+      SessionId('codex-thread-1'),
+      SessionId('codex-thread-2'),
+    ])
+    expect(preview.entries[0]).toMatchObject({ title: '整理校验表', kind: 'imported' })
+    expect(preview.entries.every(entry => entry.events > 0)).toBe(true)
+
+    // The preview must not write: no session, no workspace, no history entry.
+    expect(await first.sessionPersistence.stat(SessionId('codex-thread-1'))).toBeUndefined()
+    expect(first.workspaceRegistry.list()).toHaveLength(0)
+    expect((await first.codexImport.history()).runs).toHaveLength(0)
+
+    // After a real sweep the same preview reports the threads as already current.
+    await first.codexImport.run()
+    const after = await first.codexImport.scan()
+    expect(after.summary).toMatchObject({ imported: 0, updated: 0, skippedExisting: 2 })
+    expect(after.entries.every(entry => entry.kind === 'unchanged')).toBe(true)
+  })
+
+  it('undo archives one run and restore brings its sessions back', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    await mkdir(join(root, 'codex'))
+    const first = await loadComposition(compositionRows())
+    await writeCodexFixture(join(root, 'codex'))
+
+    const run = await first.codexImport.run()
+    expect(run.imported).toBe(2)
+    expect(run.undoneAt).toBe(0)
+    expect(first.workspaceRegistry.archivedSessionIds).toEqual([])
+
+    const undone = await first.codexImport.undo(run.at)
+    expect(undone).toMatchObject({ at: run.at, undone: true, changed: 2, failed: 0 })
+    expect([...first.workspaceRegistry.archivedSessionIds]).toEqual([
+      SessionId('codex-thread-1'),
+      SessionId('codex-thread-2'),
+    ])
+
+    // Repeating undo is a no-op: the stamp already says the run is undone.
+    expect(await first.codexImport.undo(run.at)).toMatchObject({ changed: 0, failed: 0 })
+
+    // The stamp survives a reload, so history keeps showing the run as undone.
+    const second = await loadComposition(compositionRows())
+    const replayed = await second.codexImport.history()
+    expect(replayed.runs.find(entry => entry.at === run.at)?.undoneAt).toBeGreaterThan(0)
+    expect([...second.workspaceRegistry.archivedSessionIds]).toEqual([
+      SessionId('codex-thread-1'),
+      SessionId('codex-thread-2'),
+    ])
+
+    const restored = await second.codexImport.restore(run.at)
+    expect(restored).toMatchObject({ undone: false, changed: 2, failed: 0 })
+    expect(second.workspaceRegistry.archivedSessionIds).toEqual([])
+    expect((await second.codexImport.history()).runs.find(entry => entry.at === run.at)?.undoneAt).toBe(0)
+  })
+
+  it('undo refuses a run time that was never recorded', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-session-import-codex-'))
+    await mkdir(join(root, 'codex'))
+    const composition = await loadComposition(compositionRows())
+    await expect(composition.codexImport.undo(1)).rejects.toThrow(/no import run is recorded/)
+  })
 })

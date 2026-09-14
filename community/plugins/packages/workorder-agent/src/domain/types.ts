@@ -7,7 +7,11 @@ export interface IssueSnapshot {
   projectName: string
   subject: string
   submitterName: string
+  /** 提单人邮箱；仅用于展示与留痕。 */
+  submitterEmail: string
   assigneeName: string
+  /** 指派给邮箱；缺项提醒的单聊接收人（设计师本人）。 */
+  assigneeEmail: string
   statusName: string
   gameProduct: string
   expectedDeliveryDate: string

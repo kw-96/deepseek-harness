@@ -1,4 +1,4 @@
-# workorder-agent
+﻿# workorder-agent
 
 [English](README.md) | 中文
 
@@ -16,14 +16,23 @@
 
 配置以前端为主，不需要预置环境变量：
 
-1. 首次启动后打开 `/workorder-agent`，填写 Webhook 令牌、易协作 GCP 用户 Key、POPO 群机器人地址与签名、数据目录、项目 ID，以及审核模型和提单规范知识库。
+1. 首次启动后打开 `/workorder-agent`，填写 Webhook 令牌、易协作 GCP 用户 Key、机器人应用 App ID / App Secret / 接收人、数据目录、项目 ID，以及审核模型和提单规范知识库。
 2. 保存后配置写入 Harness 的 `workorder-agent` 设置命名空间并立即重载；控制面「设置」页可继续修改模型、最大输出 token、知识库和通知开关。
 3. 审核模型服务商与模型 ID 必须同时填写；两者都留空时，后台审核 Agent 继承 Harness 默认模型选择。
-4. POPO 自定义群机器人只能发送到已配置群组，因此提醒消息以工单事件的提单人字段为目标文本；事件未包含提单人时回退为指派给。
+4. 缺项提醒是单聊发给**指派给（设计师）**本人：工单由运营提单、指派给设计师，字段由设计师补齐，因此正文只写姓名、不使用 @，接收人取该工单的指派给邮箱（缺失时回退默认接收人）。
 
-环境变量仅在存在时作为首次默认值回退：`WEBHOOK_TOKEN`、`WEBHOOK_INGRESS_ENABLED`、`WEBHOOK_INGRESS_HOST`、`WEBHOOK_INGRESS_PORT`、`GCP_USER_KEY`、`GCP_MCP_URL`、`GCP_HOST`、`POPO_WEBHOOK_URL`、`POPO_WEBHOOK_SECRET`、`DATA_DIR`、项目 ID 系列变量，以及 `REVIEW_ENABLED`、`REVIEW_MODEL_PROVIDER`、`REVIEW_MODEL`、`REVIEW_MAX_TOKENS`、`REVIEW_KNOWLEDGE_BASE`、`REVIEW_NOTIFICATION_ENABLED`。
+环境变量仅在存在时作为首次默认值回退：`WEBHOOK_TOKEN`、`WEBHOOK_INGRESS_ENABLED`、`WEBHOOK_INGRESS_HOST`、`WEBHOOK_INGRESS_PORT`、`GCP_USER_KEY`、`GCP_MCP_URL`、`GCP_HOST`、`POPO_APP_ID`、`POPO_APP_SECRET`、`POPO_APP_RECEIVER`、`DATA_DIR`、项目 ID 系列变量，以及 `REVIEW_ENABLED`、`REVIEW_MODEL_PROVIDER`、`REVIEW_MODEL`、`REVIEW_MAX_TOKENS`、`REVIEW_KNOWLEDGE_BASE`、`REVIEW_NOTIFICATION_ENABLED`。
 
 控制面的 `/api/admin/*` 接口不做鉴权，只由本机 Harness Web 服务提供。`enabled` 为 false 时 Host 插件不会挂载控制面；必要令牌缺失时显示引导页，补全后自动加载控制面，两者都不会拖垮 Web 宿主。
+
+## POPO 机器人应用通道
+
+缺项提醒、巡检结果与 vivo 案例推送统一走机器人应用（不再使用自定义群机器人 Webhook）：
+
+- `popoAppId` + `popoAppSecret` 先向 `/open-apis/robots/v1/token` 换取 accessToken（约 1 天有效，插件缓存并在到期前自动刷新），再以 `Open-Access-Token` 头 POST `/open-apis/robots/v1/im/send-msg`。
+- `message` 必须是对象（text 类型取 `{content}`）；把 `message` 传成字符串会让服务端返回 `500 服务繁忙`。
+- `popoAppReceiver` 填默认接收人（用户邮箱或群 ID）：缺项提醒按工单的指派给邮箱逐条指定接收人，巡检结果与 vivo 推送走该默认值。
+- 文本上限 3000 字符（超出返回 `65338`）；接收人不可解析返回 `65611`，不在机器人可见范围返回 `65612`，插件会把这些错误码翻译为可读中文。
 
 ## 易协作事件入口
 

@@ -11,7 +11,7 @@ export interface IssueSnapshotCache {
 }
 
 const LIST_COLUMNS = [
-  'id', 'subject', 'status', 'assigned_to', 'project',
+  'id', 'subject', 'status', 'assigned_to', 'author', 'project',
   'start_date', 'due_date', 'created_on', 'updated_on', 'closed_on', 'spent_hours',
   'cf_7', 'cf_127', 'cf_128', 'cf_129', 'cf_134', 'cf_2000', 'cf_2002', 'cf_2005',
 ]
@@ -67,7 +67,12 @@ export class GcpIssueService {
   private resolve(row: unknown, projectName: string): IssueSnapshot {
     const listed = mapListIssue(row, projectName)
     const cached = this.cache?.get(listed.id)
-    if (cached && listed.updatedOn && cached.updatedOn === listed.updatedOn) return cached
+    // 远端未更新且本地已存有提醒所需邮箱时复用快照；否则回写，避免新增字段长期为空。
+    const reusable = cached !== undefined
+      && listed.updatedOn !== ''
+      && cached.updatedOn === listed.updatedOn
+      && (listed.assigneeEmail === '' || cached.assigneeEmail !== '')
+    if (reusable) return cached
     this.cache?.upsert(listed)
     return listed
   }

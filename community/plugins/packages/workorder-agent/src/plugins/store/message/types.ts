@@ -9,6 +9,8 @@ export interface MessageTaskInput {
   message: string
   messageHash: string
   chunks: string[]
+  /** 接收人（用户邮箱或群 ID）；空串表示使用发送器的默认接收人。 */
+  receiver: string
 }
 
 export interface MessageTaskView {
@@ -46,6 +48,8 @@ export interface MessageTaskDetail extends MessageTaskView {
   message: string
   messageHash: string
   chunks: MessageChunkView[]
+  /** 任务级接收人；空串表示用发送器默认接收人。 */
+  receiver: string
   canResume: boolean
   canRecall: false
 }

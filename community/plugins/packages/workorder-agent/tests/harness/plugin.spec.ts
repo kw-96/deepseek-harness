@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+﻿import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import { Config, toAppConfig, type PluginConfig } from '../../src/harness/pluginConfig.js'
@@ -18,8 +18,9 @@ const valid: PluginConfig = {
   gcpUserKey: 'user-key',
   gcpUrl: 'https://example.invalid/mcp',
   gcpHost: 'promoteart.pm.netease.com',
-  popoWebhookUrl: 'https://example.invalid/webhook',
-  popoWebhookSecret: '',
+  popoAppId: 'app-1',
+  popoAppSecret: 'secret-1',
+  popoAppReceiver: 'someone@corp.netease.com',
   completedStatusId: 6,
   projectIdChannelArt: 7,
   projectIdReturnBusiness: 2001,
@@ -51,7 +52,7 @@ describe('工单插件配置', () => {
     const config = toAppConfig(valid)
     expect(config.projects).toEqual({ 渠道美术: 7, 回流业务: 2001, AI运营活动: 2004 })
     expect(config.gcp.userKey).toBe('user-key')
-    expect(config.popo.url).toBe('https://example.invalid/webhook')
+    expect(config.popo.app).toMatchObject({ id: 'app-1', receiver: 'someone@corp.netease.com' })
     expect(config.review.knowledgeBase).toBe('提单规范')
   })
 
