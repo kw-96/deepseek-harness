@@ -1,6 +1,7 @@
 /** 写操作：暂存、取消暂存、提交（含修补）、推送、拉取、抓取。 */
 
 import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { GitActionResponse, GitCommitResponse } from '../types.js'
 import { GIT_NETWORK_TIMEOUT_MS, git, lastLine, repoRoot } from './run.js'
 
@@ -74,6 +75,29 @@ export async function discard(shell: ShellExecutor, cwd: string, paths: readonly
  * @param message 提交信息（必须非空）
  * @param amend 是否 `--amend`
  */
+/**
+ * 暂存区为空时先暂存已跟踪文件的改动。
+ *
+ * 面板的「提交和推送」不单独暂存，空索引直接提交必被 git 拒绝（no changes added to
+ * commit）——这正是面板只报 gateway/internal 的那次失败。未跟踪文件不在此范围，
+ * 它们在面板里由「全部暂存」处理。
+ * @param shell shell 执行器
+ * @param root 仓库根
+ */
+async function stageTrackedWhenIndexEmpty(shell: ShellExecutor, root: string): Promise<void> {
+  const staged = await git(shell, root, ['diff', '--cached', '--name-only'])
+  if (staged.stdout.trim() !== '') return
+  await git(shell, root, ['add', '-u'])
+  const after = await git(shell, root, ['diff', '--cached', '--name-only'])
+  if (after.stdout.trim() === '') {
+    throw new RemoteError(
+      'git/nothing-to-commit',
+      '没有可提交的更改：已跟踪文件没有改动；未跟踪的新文件请先在面板点「全部暂存」',
+      {},
+    )
+  }
+}
+
 export async function commit(
   shell: ShellExecutor,
   cwd: string,
@@ -82,7 +106,8 @@ export async function commit(
 ): Promise<GitCommitResponse> {
   const root = await requireRoot(shell, cwd)
   const text = message.trim()
-  if (text === '') throw new Error('提交信息不能为空')
+  if (text === '') throw new RemoteError('git/commit-message-empty', '提交信息不能为空', {})
+  if (!amend) await stageTrackedWhenIndexEmpty(shell, root)
   const args = amend ? ['commit', '--amend', '-m', text] : ['commit', '-m', text]
   const out = await git(shell, root, args)
   const hash = await git(shell, root, ['rev-parse', '--short', 'HEAD'])

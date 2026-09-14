@@ -158,3 +158,14 @@ export interface GitCommitResponse { shortHash: string | null; detail: string }
 
 /** 模型生成的提交信息与它使用的路由。 */
 export interface GitMessageResponse { message: string; provider: string; model: string }
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** git 以非零状态退出：保留 git 原话与命令，面板可直接展示。 */
+    'git/command-failed': { readonly command: string; readonly exitCode: number }
+    /** 提交时既无暂存内容，也没有已跟踪改动可以自动暂存。 */
+    'git/nothing-to-commit': Record<string, never>
+    /** 提交信息为空。 */
+    'git/commit-message-empty': Record<string, never>
+  }
+}

@@ -1,6 +1,7 @@
 /** 在 ctx.shell 上执行 git：统一引号、超时与错误上抛。 */
 
 import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 
 export const GIT_TIMEOUT_MS = 30_000
 /** 网络类操作（fetch/pull/push）的超时上限。 */
@@ -57,7 +58,12 @@ export async function git(
   const result = await shell.run(spec)
   if (result.exitCode !== 0) {
     const detail = result.stderr.text.trim() || result.stdout.text.trim() || `git exited ${String(result.exitCode)}`
-    throw new Error(detail)
+    // 结构化失败保留 git 原话：直接 throw 会被 typert 折成空消息的 gateway/internal。
+    throw new RemoteError('git/command-failed', detail, {
+      command: args.join(' '),
+      // 被信号终止的进程没有退出码；-1 让负载保持数值型。
+      exitCode: result.exitCode ?? -1,
+    })
   }
   return { stdout: result.stdout.text, stderr: result.stderr.text }
 }
