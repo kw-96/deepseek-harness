@@ -20,6 +20,8 @@ export const zh = {
   'duration.hours': '{hours}小时{minutes}分',
   'duration.title.live': '已运行 {duration}',
   'duration.title.done': '耗时 {duration}',
+  'action.stop': '停止',
+  'action.stopping': '停止中',
 } as const
 
 /** English dictionary, key-identical to the Chinese source of truth. */
@@ -39,6 +41,8 @@ export const en: Record<JobKey, string> = {
   'duration.hours': '{hours}h {minutes}m',
   'duration.title.live': 'Running for {duration}',
   'duration.title.done': 'Took {duration}',
+  'action.stop': 'Stop',
+  'action.stopping': 'Stopping',
 }
 
 /** Key domain of the `job` namespace (zh is the source of truth). */

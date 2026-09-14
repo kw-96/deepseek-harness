@@ -30,6 +30,8 @@ async function bench(): Promise<{ ctx: Context; fiber: ReturnType<Context['plugi
     },
   } as never, () => null)
   ctx.provide('sessions', {})
+  // The header action cancels a live job through the generated session RPC.
+  ctx.provide('remote.session', { killJob: async () => ({ ok: true, value: { accepted: true, outcome: 'requested' } }) } as never)
   // The locale plugin binds a settings scope, which reads the connection handle
   // and the forwarded-event port.
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
@@ -47,7 +49,7 @@ async function bench(): Promise<{ ctx: Context; fiber: ReturnType<Context['plugi
 
 describe('ui-job browser half', () => {
   it('declares the services it binds', () => {
-    expect(inject).toEqual(['sessions', 'slots', 'locale'])
+    expect(inject).toEqual(['sessions', 'slots', 'locale', 'remote.session'])
   })
 
   it('registers the header action, and fiber teardown removes it (HMR safety)', async () => {

@@ -35,7 +35,10 @@ function job(over: Partial<JobView> = {}): JobView {
   }
 }
 
-function props(jobs: readonly JobView[] | undefined): JobListActionProps {
+function props(
+  jobs: readonly JobView[] | undefined,
+  stopJob: JobListActionProps['stopJob'] = vi.fn(),
+): JobListActionProps {
   const state = {
     ids: [SESSION],
     byId: {},
@@ -48,18 +51,20 @@ function props(jobs: readonly JobView[] | undefined): JobListActionProps {
   function useSessions<T>(select: (snapshot: SessionListState) => T): T {
     return select(state)
   }
-  return { sessionId: SESSION, useSessions, t } as unknown as JobListActionProps
+  return { sessionId: SESSION, useSessions, stopJob, t } as unknown as JobListActionProps
 }
 
 /**
  * Rows in render order as `[kind, label, status, duration]`. Adjacent spans
  * carry no whitespace between them, so the cells are read one element at a
- * time rather than split out of a flattened string.
+ * time rather than split out of a flattened string. The live-row stop control
+ * is a button and is asserted separately.
  */
 function rowCells(): string[][] {
   return within(screen.getByRole('list', { name: zh['list.aria'] }))
     .getAllByRole('listitem')
     .map(row => [...row.children]
+      .filter(cell => cell.tagName === 'SPAN')
       .map(cell => cell.textContent ?? '')
       .filter(text => text !== ''))
 }
@@ -237,5 +242,34 @@ describe('JobListAction wire tolerance', () => {
     ])} />)
     fireEvent.click(screen.getByRole('button'))
     expect(rowCells().map(cells => cells[1])).toEqual(['later', 'earlier'])
+  })
+})
+
+describe('JobListAction stop control', () => {
+  /** Open the popover so the rows exist. */
+  const openList = (): void => {
+    fireEvent.click(screen.getByRole('button', { name: /个后台任务/ }))
+  }
+
+  it('offers a stop control on a live row and forwards the job id', () => {
+    const stopJob = vi.fn()
+    render(<JobListAction {...props([job()], stopJob)} />)
+    openList()
+    fireEvent.click(screen.getByRole('button', { name: '停止: pnpm run build' }))
+    expect(stopJob).toHaveBeenCalledWith('bash-1')
+  })
+
+  it('disables the control and renames it while the job is stopping', () => {
+    render(<JobListAction {...props([job({ status: 'stopping' })])} />)
+    openList()
+    const control = screen.getByRole('button', { name: '停止: pnpm run build' })
+    expect(control.hasAttribute('disabled')).toBe(true)
+    expect(control.textContent).toBe('停止中')
+  })
+
+  it('offers no stop control on a settled row', () => {
+    render(<JobListAction {...props([job({ status: 'completed', finishedAt: START + 1_000 })])} />)
+    openList()
+    expect(screen.queryByRole('button', { name: '停止: pnpm run build' })).toBeNull()
   })
 })

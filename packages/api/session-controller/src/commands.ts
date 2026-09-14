@@ -10,6 +10,7 @@ import type {
 } from '@deepseek-ai/dsh-attachment'
 import type { FileUploadReceiptId } from '@deepseek-ai/dsh-client-file-upload/types'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
+import type {} from '@deepseek-ai/dsh-jobs'
 import {
   ReasoningEffortId, assistantStreamChunks, createUserMessage, freezeMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -41,6 +42,8 @@ import type {
   SessionCreateValue,
   SessionForkRequest,
   SessionForkValue,
+  SessionKillJobRequest,
+  SessionKillJobValue,
   SessionPromptRequest,
   SessionPromptValue,
   SessionRenameRequest,
@@ -508,6 +511,70 @@ export class SessionCommandController {
     }
     agent.cancel({ kind: 'user' }, { keepInbox: true })
     return { accepted: true }
+  }
+
+  /**
+   * Cancel one background job owned by this Session, from the session header's
+   * job list. The jobs registry enforces ownership: passing this Session's
+   * Agent means another Session's job is refused rather than cancelled.
+   * @param request - Session, job id, and optional operator reason.
+   * @returns acknowledgement carrying whether a live job was cancelled.
+   */
+  killJob(request: SessionKillJobRequest): SessionKillJobValue {
+    const agent = this.ctx.agents.get(request.sessionId)
+    if (agent === undefined) {
+      throw new RemoteError(
+        'session/not-found',
+        `session "${request.sessionId}" not found (not attached)`,
+        { sessionId: request.sessionId },
+      )
+    }
+    if (hasApiSessionSubagentOwner(this.ctx, agent.session, agent)) {
+      throw apiSessionSubagentOwnershipError(request.sessionId)
+    }
+    // Optional service: a deployment may mount the session API without any
+    // background-job registry, and that absence must not make the whole
+    // controller wait for the service before it can activate.
+    const jobs = this.ctx.get('jobs')
+    if (jobs === undefined) {
+      throw new RemoteError(
+        'session/job-not-found',
+        'this deployment mounts no background-job registry',
+        { jobId: request.jobId },
+      )
+    }
+    let outcome: SessionKillJobValue['outcome']
+    try {
+      outcome = jobs.kill(request.jobId, agent, request.reason)
+    } catch (error: unknown) {
+      // The registry rejects an unknown id and a job owned by another Session;
+      // both are reported as one not-found code with the registry's own reason.
+      throw new RemoteError(
+        'session/job-not-found',
+        error instanceof Error ? error.message : String(error),
+        { jobId: request.jobId },
+      )
+    }
+    // `kill()` marks the terminal delivery reported, so the registry will never
+    // send its own completion notice. Without this the model would keep acting
+    // as if the job were still running; the notice is injected (not followed
+    // up) so it reaches the owner with its next step without waking it.
+    if (outcome === 'requested') {
+      agent.inject(createUserMessage({
+        content: [{
+          type: 'text',
+          text: `Background job ${request.jobId} was stopped by the user from the session header.`
+            + ' It will not produce further output; any output it already produced stays readable with job_output.',
+        }],
+        source: {
+          kind: 'plugin',
+          plugin: 'session-controller',
+          form: 'notice',
+          summary: `job ${request.jobId} stopped by the user`,
+        },
+      }))
+    }
+    return { accepted: true, outcome }
   }
 
   private async resolveAgent(sessionId: SessionId): Promise<Agent> {

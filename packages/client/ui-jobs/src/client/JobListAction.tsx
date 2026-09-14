@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { SessionJob as JobView } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import { IconChevronDownOutline14, StateDot, useDismissOnOutsidePointer, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import css from './JobListAction.module.css'
 
+/** Actions the header action injects for the job-registry round trip. */
+export interface JobListActionInjected {
+  /** Cancel one live job owned by this session. */
+  stopJob: (jobId: JobId) => void
+}
+
 /** Full props for the session-header background-job action. */
 export type JobListActionProps =
-  PropsRuntime<'conversation.session.header.actions'> & PropsLocale<typeof NS>
+  PropsRuntime<'conversation.session.header.actions'>
+  & PropsLocale<typeof NS>
+  & InjectFace<JobListActionInjected>
 
 /** Stable empty list so a session with no jobs keeps one array identity. */
 const NO_TASKS: readonly JobView[] = []
@@ -91,7 +100,7 @@ function ordered(jobs: readonly JobView[]): JobView[] {
  * @param props - runtime slot currency plus the namespace translator.
  * @returns the trigger and its popover list, or null when there is nothing to show.
  */
-export function JobListAction({ sessionId, useSessions, t }: JobListActionProps) {
+export function JobListAction({ sessionId, useSessions, stopJob, t }: JobListActionProps) {
   const jobs = useSessions(state => state.jobsBySession[sessionId]) ?? NO_TASKS
   const [open, setOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -172,6 +181,19 @@ export function JobListAction({ sessionId, useSessions, t }: JobListActionProps)
                   >
                     {duration}
                   </span>
+                  {live
+                    ? (
+                      <button
+                        type="button"
+                        className={css.stop}
+                        disabled={job.status === 'stopping'}
+                        aria-label={`${t('action.stop')}: ${job.label}`}
+                        onClick={() => { stopJob(job.id) }}
+                      >
+                        {job.status === 'stopping' ? t('action.stopping') : t('action.stop')}
+                      </button>
+                    )
+                    : null}
                 </li>
               )
             })}

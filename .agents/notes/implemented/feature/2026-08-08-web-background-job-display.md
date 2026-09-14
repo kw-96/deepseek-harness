@@ -95,7 +95,7 @@ A running one-shot background subagent therefore appears both there and in the s
 
 **No web path calls `ctx.jobs.read()`.** It consumes the single output cursor, so a browser read would silently take bytes the model's `job_output` will never see. This is an invariant worth a test rather than a convention, because the failure is invisible at the call site.
 
-**No cancellation.** That phase owes a decision the seam does not currently answer: `kill()` marks terminal delivery reported, so a human interrupt written against the `kill()` contract would leave the model believing its task is still running.
+**No cancellation here.** Superseded for live rows by [stopping one background job from the session header](2026-09-14-session-job-stop-control.md), which answers the open decision this bullet recorded: the command injects its own notice to the owning agent, because `kill()` marks the terminal delivery reported and the registry therefore stops sending one.
 
 **No output watermark on the frame.** The output phase's delta channel is where an anchor field earns its place; one added now would have no reader.
 

@@ -202,6 +202,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/attachment-invalid': { readonly reason: string }
     'session/queue-item-not-found': { readonly itemId: MessageId }
     'session/steer-unavailable': { readonly itemId: MessageId }
+    'session/job-not-found': { readonly jobId: JobId }
     'session/title-invalid': { readonly sessionId: SessionId }
     'session/fork-unavailable': { readonly sessionId: SessionId }
     'subagent/not-found': {
@@ -354,6 +355,21 @@ export interface SessionCancelRequest {
 /** Receipt after cancellation is admitted to the live Agent. */
 export interface SessionCancelValue {
   readonly accepted: true
+}
+
+/** Background-job cancellation requested from the session header. */
+export interface SessionKillJobRequest {
+  readonly sessionId: SessionId
+  readonly jobId: JobId
+  /** Operator-supplied reason recorded on the job's cancellation. */
+  readonly reason?: string
+}
+
+/** Receipt after a background-job cancellation is admitted. */
+export interface SessionKillJobValue {
+  readonly accepted: true
+  /** `requested` cancelled a live job; `already-finished` found it settled. */
+  readonly outcome: 'requested' | 'already-finished'
 }
 
 /** Request to open one path prepared by a Session-aware caller on the Host desktop. */

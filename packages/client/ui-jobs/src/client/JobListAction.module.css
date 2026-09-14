@@ -124,3 +124,24 @@
 .duration {
   font-variant-numeric: tabular-nums;
 }
+
+/* Live rows only: cancel one background job through the session API. */
+.stop {
+  border: 0;
+  border-radius: 6px;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stop:hover:enabled,
+.stop:focus-visible:enabled {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.stop:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
