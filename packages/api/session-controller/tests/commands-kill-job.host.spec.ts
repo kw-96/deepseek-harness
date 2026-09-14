@@ -96,7 +96,7 @@ describe('SessionCommandController.killJob', () => {
   it('cancels a live job, notices the owning agent, and reports the request', async () => {
     const { ctx, controller, session, agent } = await harness({ withJobs: true })
     const job = producer()
-    const jobId = ctx.jobs.start({ ...job.spec, owner: ctx.agents.get(session.id) })
+    const jobId = ctx.jobs.start({ ...job.spec, owner: agent })
     expect(jobId).toBe(firstJobId())
 
     expect(controller.killJob({ sessionId: session.id, jobId, reason: 'test' }))
@@ -112,7 +112,7 @@ describe('SessionCommandController.killJob', () => {
   it('reports a settled job as already finished without noticing the agent', async () => {
     const { ctx, controller, session, agent } = await harness({ withJobs: true })
     const job = producer()
-    const jobId = ctx.jobs.start({ ...job.spec, owner: ctx.agents.get(session.id) })
+    const jobId = ctx.jobs.start({ ...job.spec, owner: agent })
     job.settle({ status: 'completed' })
     // The registry records the terminal status after the producer's promise
     // settles, so the kill must observe a finished job rather than race it.

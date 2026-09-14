@@ -140,7 +140,10 @@ describe('CodexImportCardController', () => {
     face.runImport()
     face.runImport()
     expect(remote.codexImport.run).toHaveBeenCalledTimes(1)
-    resolve?.({ ok: true, value: { at: 1, imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [] } })
+    resolve?.({
+      ok: true,
+      value: { at: 1, imported: 0, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [] },
+    })
     await vi.waitFor(() => {
       expect(face.hooks.codexImportCard.getSnapshot().running).toBe(false)
     })
@@ -194,7 +197,10 @@ describe('CodexImportCardController', () => {
     face.toggleSync(false)
     notify()
     resolveHistory?.({ ok: true, value: { runs: [] } })
-    resolveRun?.({ ok: true, value: { at: 1, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, sessions: [] } })
+    resolveRun?.({
+      ok: true,
+      value: { at: 1, imported: 1, updated: 0, skippedExisting: 0, skippedEmpty: 0, deferredActive: 0, undoneAt: 0, sessions: [] },
+    })
     await vi.waitFor(() => {
       expect(remote.codexImport.history).toHaveBeenCalled()
     })

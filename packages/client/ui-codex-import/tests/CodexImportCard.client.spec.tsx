@@ -27,23 +27,23 @@ function renderCard(state: Partial<CodexImportCardState>) {
   const makeProps = (raw: Partial<CodexImportCardState>) => {
     const s = withDefaults(raw)
     return {
-    t: ((key: string, params?: { count?: number }) => {
-      if (key === 'importedCount') return `Imported ${params?.count ?? 0}`
-      if (key === 'updatedCount') return `Updated ${params?.count ?? 0}`
-      if (key === 'deferredActiveCount') return `Deferred ${params?.count ?? 0}`
-      if (key === 'title') return 'Codex import'
-      if (key === 'description') return 'Import local Codex threads'
-      if (key === 'run') return 'Import now'
-      if (key === 'open') return 'Open'
-      return key
-    }),
-    useCodexImportCard: (selector: (snapshot: CodexImportCardState) => CodexImportCardState) => selector(s),
-    toggleSync,
-    runImport,
-    preview,
-    undo,
-    restore,
-    openSession,
+      t: ((key: string, params?: { count?: number }) => {
+        if (key === 'importedCount') return `Imported ${params?.count ?? 0}`
+        if (key === 'updatedCount') return `Updated ${params?.count ?? 0}`
+        if (key === 'deferredActiveCount') return `Deferred ${params?.count ?? 0}`
+        if (key === 'title') return 'Codex import'
+        if (key === 'description') return 'Import local Codex threads'
+        if (key === 'run') return 'Import now'
+        if (key === 'open') return 'Open'
+        return key
+      }),
+      useCodexImportCard: (selector: (snapshot: CodexImportCardState) => CodexImportCardState) => selector(s),
+      toggleSync,
+      runImport,
+      preview,
+      undo,
+      restore,
+      openSession,
     } as unknown as Parameters<typeof CodexImportCard>[0]
   }
   const view = render(<CodexImportCard {...makeProps(state)} />)
@@ -53,7 +53,7 @@ function renderCard(state: Partial<CodexImportCardState>) {
   return {
     view,
     openCard,
-    rerender: (next: CodexImportCardState) => { view.rerender(<CodexImportCard {...makeProps(next)} />) },
+    rerender: (next: Partial<CodexImportCardState>) => { view.rerender(<CodexImportCard {...makeProps(next)} />) },
     toggleSync,
     runImport,
     preview,
@@ -127,7 +127,7 @@ describe('CodexImportCard', () => {
     const { openCard } = renderCard({
       autoSync: true,
       running: false,
-      runs: [{ at: 100, imported: 0, updated: 2, skippedExisting: 0, skippedEmpty: 0, deferredActive: 1, sessions: [] }],
+      runs: [{ at: 100, imported: 0, updated: 2, skippedExisting: 0, skippedEmpty: 0, deferredActive: 1, undoneAt: 0, sessions: [] }],
     })
     openCard()
     expect(screen.getByText('Updated 2')).toBeDefined()
