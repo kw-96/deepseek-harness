@@ -6,18 +6,20 @@ import { spawnSync } from 'node:child_process'
 const archive = resolve(process.argv[2] ?? '')
 const flavor = process.argv[3]
 if (process.argv[2] === undefined) throw new Error('usage: node scripts/verify-package.mjs <package.tgz>')
-const flavors = ['manager', 'marketplace', 'codex-shell', 'workorder-agent']
+const flavors = ['manager', 'marketplace', 'codex-shell', 'codex-left', 'workorder-agent']
 if (!flavors.includes(flavor)) throw new Error(`package flavor must be one of ${flavors.join(', ')}`)
 const packageNames = {
   manager: 'dsh-plugin-manager',
   marketplace: '@ruihuahe/dsh-plugin-marketplace',
   'codex-shell': 'dsh-codex-shell',
+  'codex-left': 'dsh-codex-left',
   'workorder-agent': 'workorder-agent',
 }
 const entryFiles = {
   manager: ['client.js', 'index.js', 'remote.js'],
   marketplace: ['client.js', 'index.js', 'remote.js'],
   'codex-shell': ['client.js', 'index.js', 'remote.js'],
+  'codex-left': ['client.js', 'index.js', 'remote.js'],
   'workorder-agent': ['harness/host.js'],
 }
 
@@ -31,8 +33,8 @@ try {
   if (typeof manifest.dsh?.bundle?.patch !== 'string') throw new Error('package does not declare dsh.bundle')
   await Promise.all(entryFiles[flavor].map(file => readFile(join(packageRoot, 'lib', file))))
   const requiredDocs = flavor === 'workorder-agent'
-    ? ['cordis.patch.yml', 'README.md', 'README.zh-CN.md']
-    : ['cordis.patch.yml', 'README.md', 'README.zh-CN.md', 'LICENSE']
+    ? ['cordis.patch.yml', 'README.md', 'README.zh.md']
+    : ['cordis.patch.yml', 'README.md', 'README.zh.md', 'LICENSE']
   await Promise.all(requiredDocs.map(file => readFile(join(packageRoot, file))))
   const pending = entryFiles[flavor].map(file => join(packageRoot, 'lib', file))
   const visited = new Set()

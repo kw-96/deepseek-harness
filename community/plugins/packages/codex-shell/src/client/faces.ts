@@ -1,29 +1,19 @@
 /**
  * Local structural faces for the 0.1.2 harness client seams this plugin rides.
  * The published client type lines moved faster than community plugins, so the
- * plugin compiles against minimal structural contracts (the same pattern the
- * shipped community sidebars use) instead of the volatile SlotMap merges.
- * Runtime names are still validated fail-loud by the harness slot core.
+ * plugin compiles against minimal structural contracts instead of the volatile
+ * SlotMap merges. Runtime names are still validated fail-loud by the harness
+ * slot core.
  */
 
-import type { ReactNode } from 'react'
-import type { FsListResponse, ProjectView } from 'dsh-codex-shell/types'
-
 export type SessionId = string
-export type WorkspaceId = string
 
-export type { ProjectView } from 'dsh-codex-shell/types'
-
-/** Minimal durable session row the sidebar renders. */
+/** Minimal durable session row the bottom panel reads (cwd of the current session). */
 export interface SessionSummaryLike {
   id: SessionId
-  title?: string
   displayTitle: string
   cwd?: string
-  parentId?: SessionId
-  origin?: 'subagent'
   running: boolean
-  completed?: boolean
   blank: boolean
   updatedAt: number
 }
@@ -35,26 +25,8 @@ export interface SessionListStateLike {
   phase: string
 }
 
-export interface WorkspaceViewLike {
-  workspaceId: WorkspaceId
-  title: string
-  path: string
-  sessionIds: readonly SessionId[]
-}
-
-export interface WorkspaceSnapshotLike {
-  items: readonly WorkspaceViewLike[]
-  archivedSessionIds: readonly SessionId[]
-  phase: string
-}
-
-/** Snapshot-selector hook shape the framework injects (useSessions/useWorkspaces). */
+/** Snapshot-selector hook shape the framework injects (useSessions). */
 export type SelectorHook<S> = <T>(selector: (state: S) => T) => T
-
-export interface SearchResultLike {
-  sessionId: SessionId
-  snippet: string
-}
 
 export type RemoteOk<T> = { ok: true; value: T }
 export type RemoteErr = { ok: false; error: { code: string; message: string } }
@@ -62,7 +34,6 @@ export type RemoteResult<T> = RemoteOk<T> | RemoteErr
 
 /** codexShell remote namespace face (mounted by this plugin's own contribution). */
 export interface CodexShellRemoteFace {
-  fsList(path: string): Promise<RemoteResult<FsListResponse>>
   terminalOpen(sessionId: string, options?: {
     cwd?: string
     name?: string
@@ -84,17 +55,11 @@ export interface CodexShellRemoteFace {
       origin: 'ui' | 'agent'
     }[]
   }>>
-  terminalSend(sessionId: string, terminalId: string, text: string): Promise<RemoteResult<{ output: string; status: { kind: string }; waitReason: string; truncated: boolean }>>
   terminalFollow(sessionId: string, terminalId: string, signal?: AbortSignal): AsyncIterable<{ seq: number; chunk: string }>
   terminalWrite(sessionId: string, terminalId: string, data: string): Promise<RemoteResult<{ ok: true }>>
   terminalResize(sessionId: string, terminalId: string, cols: number, rows: number): Promise<RemoteResult<{ ok: true }>>
   terminalRead(sessionId: string, terminalId: string): Promise<RemoteResult<{ output: string; truncated: boolean }>>
   terminalClose(sessionId: string, terminalId: string): Promise<RemoteResult<{ ok: true }>>
-  projectList(): Promise<RemoteResult<{ projects: readonly ProjectView[] }>>
-  projectCreate(request: { name: string; roots?: readonly string[] }): Promise<RemoteResult<{ project: ProjectView }>>
-  projectRename(request: { projectId: string; name: string }): Promise<RemoteResult<{ project: ProjectView }>>
-  projectSetRoots(request: { projectId: string; roots: readonly string[] }): Promise<RemoteResult<{ project: ProjectView }>>
-  projectDelete(request: { projectId: string }): Promise<RemoteResult<{ deleted: boolean }>>
 }
 
 /** Typert client remote face the gateway provides. */
@@ -131,38 +96,6 @@ export interface SlotsFace {
   subscribe(key: string, listener: () => void): () => void
 }
 
-/** Sessions service face the browser drives. */
-export interface SessionsFace {
-  create(options?: { workspaceId?: WorkspaceId; cwd?: string; sessionId?: SessionId }): Promise<SessionId>
-  open(sessionId: SessionId): void
-  search(query: string, signal: AbortSignal): Promise<RemoteResult<{ items: readonly SearchResultLike[]; hasMore: boolean }>>
-  searchResultLimit: number
-  binding(sessionId: SessionId): { session: { rename(title: string): Promise<RemoteResult<unknown>> } } | undefined
-  fork(options: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>
-}
-
-/** Workspaces service face the browser drives. */
-export interface WorkspacesFace {
-  rename(workspaceId: WorkspaceId, title: string): Promise<unknown>
-  delete(workspaceId: WorkspaceId): Promise<void>
-  insertBefore(workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId): Promise<void>
-  archiveSession(sessionId: SessionId): Promise<void>
-  /** 取消归档：把会话恢复到分组面（工作区归属从未改变，位置原样回来）。 */
-  unarchiveSession(sessionId: SessionId): Promise<void>
-  insertSessionBefore(workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>
-  attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
-  moveSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
-  detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<unknown>
-  create(input: { path: string }): Promise<WorkspaceViewLike>
-}
-
-/** Render-slot prop shape the framework injects on the sidebar browser. */
-export type RenderSlotFn = (
-  name: string,
-  owner: unknown,
-  options?: { fallback?: ReactNode },
-) => ReactNode
-
 /** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动底部行开合。 */
 export interface LayoutFace {
   openBottom(): void
@@ -170,9 +103,3 @@ export interface LayoutFace {
 }
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string
-
-/** Minimal observable source shape (renderer-bound hooks and occupancy sources). */
-export interface HostObservableLike<T> {
-  getSnapshot(): T
-  subscribe(listener: () => void): () => void
-}

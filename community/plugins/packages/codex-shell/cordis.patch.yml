@@ -1,6 +1,7 @@
-# dsh-codex-shell bundle patch: insert the Codex-styled integrated shell.
-# The plugin ships one Host half (Typert Remote `codexShell` over fs/shell
-# services) and one Client half (sidebar browser + right panel + overlay).
+# dsh-codex-shell bundle patch: insert the multi-tab bottom terminal.
+# The plugin ships one Host half (Typert Remote `codexShell` over the terminal
+# service) and one Client half (the host's bottom row + session-header toggle).
+# The Codex-style left navigation rail ships separately as dsh-codex-left.
 # Install:
 #   dsh plugin --profile <name> add dsh-codex-shell@<version>
 # or insert this row into the profile's cordis.patch.yml manually.

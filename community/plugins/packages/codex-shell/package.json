@@ -1,7 +1,7 @@
 {
   "name": "dsh-codex-shell",
-  "version": "0.6.5",
-  "description": "Codex-styled integrated workspace shell for DeepSeek Harness (DSH): Codex-app-style sidebar browser, bottom multi-tab terminal, and session context actions - one bundle plugin; the right-hand panel stays with the host's native details column",
+  "version": "0.7.0",
+  "description": "Multi-tab interactive bottom terminal for DeepSeek Harness (DSH): a self-contained pwsh/bash + Agent-follow terminal in the host's bottom row, in one bundle plugin. The Codex-style left navigation rail (sessions / projects / workspaces, new-session project picker) lives in the separate dsh-codex-left plugin.",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",
@@ -9,9 +9,8 @@
     "dsh",
     "cordis",
     "codex",
-    "codex-style",
-    "sidebar",
     "terminal",
+    "bottom-panel",
     "web-ui"
   ],
   "license": "MIT",
@@ -63,8 +62,8 @@
     "lib/remote.js",
     "cordis.patch.yml",
     "README.md",
-    "README.zh-CN.md",
-    "DESIGN.md",
+    "README.zh.md",
+    "PRODUCT.md",
     "LICENSE"
   ],
   "dsh": {
@@ -76,10 +75,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-api-gateway",
         "@deepseek-ai/dsh-api-session-controller",
-        "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-connection"
       ]
     }
@@ -91,7 +88,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.host.json && tsdown --config tsdown.host.config.ts && tsc -p tsconfig.client.json && tsdown --config tsdown.client.config.ts",
     "test": "pnpm run contracts && vitest run",
     "test:watch": "vitest",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-codex-shell-0.6.5.tgz codex-shell",
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-codex-shell-0.7.0.tgz codex-shell",
     "prepare": "pnpm run build"
   },
   "dependencies": {
@@ -105,13 +102,10 @@
     "@deepseek-ai/dsh-agent": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-api-gateway": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-api-session-controller": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-api-workspace-controller": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-layout": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-client-ui-workspace": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-fs": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-terminal": "^0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",
@@ -122,7 +116,6 @@
     "@deepseek-ai/dsh-agent": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-layout": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-fs": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-session": "^0.1.5-rc.1",
     "@deepseek-ai/dsh-terminal": "file:../../tarballs/deepseek-ai-dsh-terminal-0.1.2-rc.3.tgz",
     "@deepseek-ai/dsh-typert-protocol": "^0.1.5-rc.1",

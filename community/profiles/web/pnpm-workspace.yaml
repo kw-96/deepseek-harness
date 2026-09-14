@@ -12,8 +12,6 @@ allowBuilds:
   better-sqlite3: false
 
 publicHoistPattern: '@dap-dsh-plugins/netease-auth'
-minimumReleaseAgeExclude:
-  - dsh-ocr-local@0.2.7
 overrides:
   '@xberg-io/xberg': 1.0.0-rc.15
   '@deepseek-ai/dsh-pwsh-local': 0.1.2-rc.1

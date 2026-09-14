@@ -1,0 +1,12 @@
+# dsh-codex-left bundle patch: insert the Codex-style left navigation rail.
+# The plugin ships one Host half (Typert Remote `codexLeft` over fs +
+# workspaceRegistry: directory listing and the project tier) and one Client half
+# (the sidebar browser, the add-workspace dialog, and the new-session project
+# picker). The bottom terminal ships separately as dsh-codex-shell; the sidebar's
+# "open in terminal" entry is disabled while that plugin is absent.
+# Install:
+#   dsh plugin --profile <name> add dsh-codex-left@<version>
+# or insert this row into the profile's cordis.patch.yml manually.
+- insert:
+    - id: codex-left
+      name: dsh-codex-left

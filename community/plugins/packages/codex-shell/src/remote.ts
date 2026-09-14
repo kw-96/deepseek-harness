@@ -1,13 +1,16 @@
+/**
+ * Typert Remote 贡献：底栏终端的 PTY 读写与输出流。
+ *
+ * `terminalOpen` 同时被 dsh-codex-left 的侧栏会话菜单调用（「在终端中打开」），
+ * 因此服务名 `codexShell` 是跨插件的稳定接口：改名前需同步左侧插件。
+ */
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type {
-  FsListResponse, ProjectCreateRequest, ProjectDeleteRequest, ProjectDeleteResponse, ProjectListResponse,
-  ProjectRenameRequest, ProjectSetRootsRequest, ProjectValue,
-  TerminalFollowFrame, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse, TerminalReadResponse,
-  TerminalResizeResponse, TerminalSendResponse, TerminalWriteResponse,
+  TerminalFollowFrame, TerminalListResponse, TerminalOpenOptions, TerminalOpenResponse,
+  TerminalReadResponse, TerminalResizeResponse, TerminalSendResponse, TerminalWriteResponse,
 } from './types.js'
 import {
-  fsListValue, projectDeleteValue, projectListValue, projectValue,
   terminalFollowValue, terminalListValue, terminalOkValue, terminalOpenOptions, terminalOpenValue,
   terminalReadValue, terminalSendValue,
 } from './types.js'
@@ -32,7 +35,6 @@ const streamDescriptor = (
   cancellation: { parameter: 'signal' as const },
 })
 const descriptors = [
-  descriptor('fsList', [parameter('path', z.string())], fsListValue, 'FsListResponse'),
   descriptor('terminalOpen', [
     parameter('sessionId', z.string()),
     parameter('options', terminalOpenOptions.optional()),
@@ -49,11 +51,6 @@ const descriptors = [
   ], terminalOkValue, 'TerminalResizeResponse'),
   descriptor('terminalRead', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalReadValue, 'TerminalReadResponse'),
   descriptor('terminalClose', [parameter('sessionId', z.string()), parameter('terminalId', z.string())], terminalOkValue, 'TerminalCloseResponse'),
-  descriptor('projectList', [], projectListValue, 'ProjectListResponse'),
-  descriptor('projectCreate', [parameter('request', z.object({ name: z.string(), roots: z.array(z.string()).optional() }))], projectValue, 'ProjectValue'),
-  descriptor('projectRename', [parameter('request', z.object({ projectId: z.string(), name: z.string() }))], projectValue, 'ProjectValue'),
-  descriptor('projectSetRoots', [parameter('request', z.object({ projectId: z.string(), roots: z.array(z.string()) }))], projectValue, 'ProjectValue'),
-  descriptor('projectDelete', [parameter('request', z.object({ projectId: z.string() }))], projectDeleteValue, 'ProjectDeleteResponse'),
 ] as const
 
 export const TYPERT_REMOTE: TypertRemoteContribution = { package: 'dsh-codex-shell', descriptors }
@@ -64,7 +61,6 @@ export const TYPERT = {
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface TypertRemoteMap {
-    'codexShell/fsList': (path: string) => Promise<RemoteResult<FsListResponse>>
     'codexShell/terminalOpen': (sessionId: string, options?: TerminalOpenOptions) => Promise<RemoteResult<TerminalOpenResponse>>
     'codexShell/terminalList': (sessionId: string) => Promise<RemoteResult<TerminalListResponse>>
     'codexShell/terminalSend': (sessionId: string, terminalId: string, text: string) => Promise<RemoteResult<TerminalSendResponse>>
@@ -73,11 +69,6 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'codexShell/terminalResize': (sessionId: string, terminalId: string, cols: number, rows: number) => Promise<RemoteResult<TerminalResizeResponse>>
     'codexShell/terminalRead': (sessionId: string, terminalId: string) => Promise<RemoteResult<TerminalReadResponse>>
     'codexShell/terminalClose': (sessionId: string, terminalId: string) => Promise<RemoteResult<{ ok: true }>>
-    'codexShell/projectList': () => Promise<RemoteResult<ProjectListResponse>>
-    'codexShell/projectCreate': (request: ProjectCreateRequest) => Promise<RemoteResult<ProjectValue>>
-    'codexShell/projectRename': (request: ProjectRenameRequest) => Promise<RemoteResult<ProjectValue>>
-    'codexShell/projectSetRoots': (request: ProjectSetRootsRequest) => Promise<RemoteResult<ProjectValue>>
-    'codexShell/projectDelete': (request: ProjectDeleteRequest) => Promise<RemoteResult<ProjectDeleteResponse>>
   }
 }
 
