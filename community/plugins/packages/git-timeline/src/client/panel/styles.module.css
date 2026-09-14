@@ -33,7 +33,7 @@
 .messageInput {
   width: 100%;
   min-height: 58px;
-  max-height: 120px;
+  max-height: 160px;
   box-sizing: border-box;
   border: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
@@ -43,6 +43,8 @@
   color: inherit;
   font: inherit;
   line-height: 1.5;
+  /* 内容超出上限时在框内滚动：模型生成的提交信息可能有多行，不能裁掉后段。 */
+  overflow-y: auto;
   resize: vertical;
 }
 
@@ -523,9 +525,9 @@
   display: flex;
   min-height: 26px;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   border-top: 0.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-  padding: 0 8px;
+  padding: 0 6px;
   color: var(--dsw-alias-label-tertiary, #818589);
   font-size: 11px;
   flex: none;
@@ -536,6 +538,13 @@
   min-width: 0;
   align-items: center;
   gap: 4px;
+  /* 工作区与账号都属于可压缩项：空间不足时先收它们，别去挤分支与通道状态。 */
+  flex: 0 1 auto;
+}
+
+/* 仅图标：通道状态由颜色与悬停说明表达，文字会挤掉分支名与工作区名。 */
+.netText {
+  display: none;
 }
 
 .bottomStrong {
@@ -569,11 +578,9 @@
   flex: 1;
 }
 
-.bottomLabel {
-  opacity: 0.75;
-}
-
+/* 右侧两个长文本都必须能被压缩，否则会把左侧挤成单字。 */
 .bottomText {
+  min-width: 0;
   max-width: 140px;
   overflow: hidden;
   color: var(--dsw-alias-label-secondary, #61656b);
@@ -740,6 +747,61 @@
 
 .diffContext {
   color: var(--dsw-alias-label-secondary, #61656b);
+}
+
+/* ── 底部栏：网络直连状态 ──────────────────────────── */
+
+.netButton {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  /* 通道状态是状态本身，不参与被压缩：压缩留给工作区与账号。 */
+  flex: none;
+}
+
+.netButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.netButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.netReady {
+  color: var(--dsw-alias-state-business-primary, #4d90fe);
+}
+
+/* 通道被阻断时给出的修复动作（改写远程地址）。 */
+.netFixButton {
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  color: var(--dsw-alias-state-warn-primary, #f59e0b);
+  font: inherit;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+}
+
+.netFixButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.2));
+}
+
+.netFixButton:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ── 底部栏分支切换器 ──────────────────────────────── */

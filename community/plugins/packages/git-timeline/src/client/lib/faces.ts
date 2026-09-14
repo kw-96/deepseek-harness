@@ -5,8 +5,8 @@
 
 import type { ComponentType } from 'react'
 import type {
-  GitActionResponse, GitBranches, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity, GitLogResponse,
-  GitMessageResponse, GitMessageText, GitStatusResponse,
+  GitActionResponse, GitBranches, GitChannelStatus, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity,
+  GitLogResponse, GitMessageResponse, GitMessageText, GitStatusResponse, GitSwitchResult,
 } from '../../types.js'
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string
@@ -53,6 +53,8 @@ export interface GitPanelRemoteFace {
   identity(cwd: string): Promise<RemoteResult<GitIdentity>>
   setIdentity(cwd: string, name: string, email: string, scope: 'global' | 'local'): Promise<RemoteResult<GitActionResponse>>
   message(sessionId: string, cwd: string): Promise<RemoteResult<GitMessageResponse>>
+  channelStatus(cwd: string): Promise<RemoteResult<GitChannelStatus>>
+  switchRemote(cwd: string, target: 'ssh' | 'https'): Promise<RemoteResult<GitSwitchResult>>
 }
 
 /** 解包后的面板 API：组件直接消费的形态（RemoteResult 已在装配层解开）。 */
@@ -78,6 +80,8 @@ export interface GitPanelApi {
   identity(cwd: string): Promise<GitIdentity>
   setIdentity(cwd: string, name: string, email: string, scope: 'global' | 'local'): Promise<GitActionResponse>
   message(sessionId: string, cwd: string): Promise<GitMessageResponse>
+  channelStatus(cwd: string): Promise<GitChannelStatus>
+  switchRemote(cwd: string, target: 'ssh' | 'https'): Promise<GitSwitchResult>
 }
 
 /**

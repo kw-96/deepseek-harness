@@ -5,6 +5,7 @@ import type { GitIdentity, GitLogResponse, GitStatusResponse } from '../../types
 import { draftMessage, previousMessage } from './actions.js'
 import { loadCommitFileState, loadCommitState, loadDiffState } from './details.js'
 import { useBranchMenu } from './useBranchMenu.js'
+import { useChannelProbe } from './useChannelProbe.js'
 import { usePanelSync } from './usePanelSync.js'
 import {
   runCheckout, runCommit, runCreateBranch, runDiscard, runRemote, runSetIdentity, runToggleAll, runToggleStage,
@@ -71,8 +72,9 @@ export function useGitPanel(options: UseGitPanelOptions): GitPanelController {
   const refresh = useCallback(async (): Promise<void> => {
     if (cwd === undefined) return
     const current = injected.current.api
+    // 实参个数须与描述符一致：可省参数显式占位，默认值由宿主决定。
     const [nextStatus, nextLog, nextIdentity] = await Promise.all([
-      current.status(cwd), current.log(cwd), current.identity(cwd),
+      current.status(cwd), current.log(cwd, undefined), current.identity(cwd),
     ])
     setStatus(nextStatus)
     setLog(nextLog)
@@ -148,6 +150,8 @@ export function useGitPanel(options: UseGitPanelOptions): GitPanelController {
     onError: message => { setError(message) },
   })
 
+  const network = useChannelProbe({ cwd, api, refresh })
+
   const generate = (): void => {
     setGenerating(true)
     setError(null)
@@ -175,6 +179,11 @@ export function useGitPanel(options: UseGitPanelOptions): GitPanelController {
     closeCommitDetail: () => { setOpenCommit(null); setDetail(null); setOpenCommitFile(null); setCommitDiff(null) },
     openCommitFile, commitDiff, toggleCommitFile,
     ...branchMenu,
+    channel: network.status,
+    probing: network.probing,
+    switching: network.switching,
+    reprobe: network.reprobe,
+    useSsh: network.useSsh,
     saveIdentity: (name, email, scope) => {
       void run(async () => await runSetIdentity(context(), name, email, scope))
     },

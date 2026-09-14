@@ -1,6 +1,6 @@
 /** Changes 区：提交信息框（含模型生成）、提交方式按钮组、变更分组列表。 */
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, Sparkles } from 'lucide-react'
 import { ChangeGroup } from './ChangeGroup.js'
 import type { GitEntry, GitStatusResponse } from '../../types.js'
@@ -50,10 +50,19 @@ export function Changes(props: ChangesProps): React.ReactNode {
     props.onDiscard(entry)
   }
 
+  // 跟随内容增高：模型生成的信息可能有多行，固定高度会把它裁掉。
+  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+  useLayoutEffect(() => {
+    const element = messageRef.current
+    if (element === null) return
+    element.style.height = 'auto'
+    element.style.height = `${String(element.scrollHeight)}px`
+  }, [message])
+
   return (
     <div className={css.changes}>
       <div className={css.messageBox}>
-        <textarea className={css.messageInput} value={message} rows={3}
+        <textarea ref={messageRef} className={css.messageInput} value={message} rows={3}
           placeholder={t('messagePlaceholder')} aria-label={t('messagePlaceholder')}
           onChange={(event) => { onMessage(event.target.value) }}
           onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); onCommit() } }} />

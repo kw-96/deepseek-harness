@@ -6,7 +6,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { BlockAssembler, createUserMessage, type GenerateOptions, type Message } from '@deepseek-ai/dsh-llm'
+import {
+  BlockAssembler, createUserMessage, ReasoningEffortId, type ContentBlock, type GenerateOptions, type Message,
+} from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
 import type { GitMessageResponse } from '../types.js'
@@ -14,8 +16,13 @@ import { readDiff, readStatus } from './status.js'
 
 /** 送进模型的差异字节上限。 */
 const MAX_DIFF_BYTES = 24 * 1024
-/** 生成的最大 token 数。 */
-const MAX_OUTPUT_TOKENS = 512
+/**
+ * 生成的最大 token 数。
+ *
+ * 必须为正文留足预算：会话默认可能把推理开在最高档，而推理与正文共享这一
+ * 上限，预算不足时正文会整段缺失。
+ */
+const MAX_OUTPUT_TOKENS = 2048
 
 /** 本插件读取的 Agent / Session / LLM 结构面。 */
 interface SessionFace {
@@ -50,16 +57,35 @@ function buildInput(
   ].join('\n')
 }
 
-/** 把拼装结果收敛成提交信息文本。 */
-function readText(assembler: BlockAssembler): string {
+/** 一次生成里出现过的块类型统计。 */
+function describeBlocks(blocks: readonly ContentBlock[]): string {
+  const counts = new Map<string, number>()
+  for (const block of blocks) counts.set(block.type, (counts.get(block.type) ?? 0) + 1)
+  if (counts.size === 0) return '没有任何内容块'
+  return [...counts].map(([type, count]) => `${type}×${String(count)}`).join('、')
+}
+
+/**
+ * 把拼装结果收敛成提交信息文本。
+ *
+ * 正文为空时报错必须说明实际返回了什么：会话默认可能把推理开在最高档，
+ * 推理占满输出预算时正文会整段缺失，只报「没有文本」无法定位。
+ * @param assembler 一次生成的块拼装器
+ * @returns 提交信息文本
+ */
+export function readText(assembler: BlockAssembler): string {
   const finish = assembler.finish
   if (finish.kind === 'error' || finish.kind === 'aborted') throw new Error(finish.failure.message)
-  const text = assembler.blocks()
+  const blocks = assembler.blocks()
+  const text = blocks
     .map(block => (block.type === 'text' ? block.text : ''))
     .filter(part => part !== '')
     .join('\n')
     .trim()
-  if (text === '') throw new Error('模型没有返回提交信息文本')
+  if (text === '') {
+    // 说明实际返回了什么：只有推理块时最可能是推理占满了输出预算。
+    throw new Error(`模型没有返回提交信息文本（本次返回：${describeBlocks(blocks)}）`)
+  }
   return text
 }
 
@@ -103,6 +129,9 @@ export async function generateCommitMessage(
     messages,
     system: SYSTEM_PROMPT,
     maxTokens: MAX_OUTPUT_TOKENS,
+    // 关掉推理：会话默认可能开在最高档，推理与正文共享输出上限，正文会整段缺失；
+    // 一次性的提交信息生成不需要推理。
+    reasoningEffort: ReasoningEffortId('off'),
     sessionId: session.id,
   }
   const llm = ctx.get('llm') as LlmFace | undefined

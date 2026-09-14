@@ -58,6 +58,8 @@ function panelApi(git: GitPanelRemoteFace): GitPanelApi {
     identity: async cwd => unwrap(await git.identity(cwd)),
     setIdentity: async (cwd, name, email, scope) => unwrap(await git.setIdentity(cwd, name, email, scope)),
     message: async (sessionId, cwd) => unwrap(await git.message(sessionId, cwd)),
+    channelStatus: async cwd => unwrap(await git.channelStatus(cwd)),
+    switchRemote: async (cwd, target) => unwrap(await git.switchRemote(cwd, target)),
   }
 }
 

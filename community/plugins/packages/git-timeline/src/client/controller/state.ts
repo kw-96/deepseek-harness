@@ -1,6 +1,8 @@
 /** 面板状态类型与提交动作定义（控制器、组件、测试共用）。 */
 
-import type { GitCommitDetail, GitEntry, GitIdentity, GitLogResponse, GitStatusResponse } from '../../types.js'
+import type {
+  GitChannelStatus, GitCommitDetail, GitEntry, GitIdentity, GitLogResponse, GitStatusResponse,
+} from '../../types.js'
 import type { GitPanelApi, TFn, WorkspaceChangeFace } from '../lib/faces.js'
 
 /** 提交按钮当前绑定的动作。 */
@@ -102,5 +104,15 @@ export interface GitPanelController {
   stageAll: () => void
   unstageAll: () => void
   generate: () => void
+  /** 网络通道状态；未探测时为 null。 */
+  channel: GitChannelStatus | null
+  /** 是否正在探测通道或切换远程。 */
+  probing: boolean
+  /** 是否正在切换远程地址。 */
+  switching: boolean
+  /** 重新探测通道。 */
+  reprobe: () => void
+  /** 把当前远程切换到 SSH 形态。 */
+  useSsh: () => void
   workspaceName: string
 }

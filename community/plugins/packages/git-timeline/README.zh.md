@@ -21,7 +21,7 @@ DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 
 │  ●─┐  整理 Git 面板        [dev]                     │  ← 泳道 + 提交标题 + 分支/标签徽标
 │  │ ●  修复别名冲突         [tag: v0.2.0]             │
 ├ 底部栏（固定） ────────────────────────────────────┤
-│  ⎇ dev ↑1 ⟳            工作区 repo     dev·dev@x.cn  │  ← 分支/刷新/工作区名/Git 账号
+│  ⎇ dev ↑1 ⟳ ⊕            repo              dev       │  ← 分支/刷新/通道/工作区名/Git 用户名
 └──────────────────────────────────────────────────┘
 ```
 
@@ -29,6 +29,7 @@ DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 
 
 - **Changes 区**（高度固定为面板一半，容器内滚动）
   - 提交信息输入框，右上角图标按钮调用**当前会话正在使用的模型**（取自会话日志最后一条 `request/header` 的 provider/model）生成描述并填入；`Ctrl+Enter` 直接提交
+  - 输入框随内容自动增高（上限 160 像素），超过后在框内滚动，模型生成的多行信息不会被裁掉
   - 提交按钮 + 右侧下拉：`提交` / `提交(修改)`（`--amend`）/ `提交和推送` / `提交和同步`（提交 → 拉取 → 推送），选择即切换按钮绑定；切到 `提交(修改)` 且输入框为空时自动预填上一条提交信息
   - 变更文件列表：`已暂存` 与 `更改` 两组，每行显示状态字母（M/A/D/U，冲突显示 `!`）、文件名、目录路径；组头可一键全部暂存/取消暂存
   - 行内操作：悬停出现 `+`（暂存）/ `−`（取消暂存）与 `⟲`（丢弃改动，需二次确认；未跟踪文件不给该入口）
@@ -38,9 +39,14 @@ DeepSeek Harness（DSH）官方右栏（`ui-sidebar-right`）里的**完整 Git 
   - 每行：提交标题 + 短哈希/作者/相对时间 + 分支与标签徽标（当前分支高亮）
   - 工具栏：跳转到当前历史记录项（滚动到最新并高亮）、从所有远程存储库中抓取、拉取、推送、刷新
   - **提交详情**：点击提交行就地展开该提交的哈希、作者与时间、合并提交父数、以及改动文件清单（A/M/D/R）；再点文件行可就地展开**该提交内该文件的差异**
-- **Git 账号**：点击底部栏账号区展开就地配置（姓名/邮箱 + 全局或仅本仓库 + 保存）；未配置时显示「设置 Git 账号」并给出提示，悬停可看当前署名的来源配置文件
-- **底部栏**（固定）：**分支切换器**（点击展开本地分支列表，勾选当前分支，点击即 `git checkout`；底部输入框可新建分支并切换，名称先过 `git check-ref-format`）、当前分支（含 ahead/behind）、刷新、当前工作区名称、Git 账号（`user.name · user.email`）
+- **Git 账号**：点击底部栏账号区展开就地配置（姓名/邮箱 + 全局或仅本仓库 + 保存）；未配置时显示「设置 Git 账号」并给出提示，悬停可看完整署名与来源配置文件
+- **底部栏**（固定）：**分支切换器**（点击展开本地分支列表，勾选当前分支，点击即 `git checkout`；底部输入框可新建分支并切换，名称先过 `git check-ref-format`）、当前分支（含 ahead/behind）、刷新、网络通道状态、当前工作区名称、Git 用户名（`user.name`；未设姓名时退回邮箱）
+  - 空间分配：分支、刷新与通道状态不参与压缩；工作区与账号可收缩并省略，通道状态以图标加悬停说明呈现，避免挤占左侧
 - **自动刷新**：订阅官方 `remote.workspaceFiles.changes` 会话文件变更流，写入后去抖 400 毫秒重读工作区状态（提交历史不重拉），展开中的差异同步刷新
+- **网络通道检测**：打开面板时真实探测两条通道——对 `github.com` 发起 TLS 连接并索取 HTTP 响应（只连上 TCP 不算通），以及 SSH 的 22 与 443 两个入口；HTTPS 被阻断而 SSH 可用时，底部栏直接给出「改用 SSH」动作，一键把远程地址改写成 SSH 形态
+  - 不需要额外安装加速程序，也不需要管理员权限
+  - 探测结果来自真实请求，不使用近似判断，因此不会在通道不通时谎报就绪
+  - HTTPS 与 SSH 都不可用时如实报告，并提示检查网络
 - 顶部**没有**路径栏与搜索框（按要求精简）
 - 只读读取与显式写操作分开：写操作只有暂存/取消暂存/丢弃/提交/推送/拉取/抓取/切换分支/新建分支
 
@@ -65,7 +71,7 @@ dsh plugin --profile web remove dsh-git-timeline
 node community/plugins/dev.mjs git-timeline     # junction 挂载 + Cordis HMR + watch 构建
 cd community/plugins/packages/git-timeline
 pnpm run build     # tsc + tsdown（host/client 双面）
-pnpm test          # vitest（36 项）
+pnpm test          # vitest（76 项）
 ```
 
 注意：**改动 `src/remote.ts`（Remote 方法面）后必须重启 `dsh web`** —— typert-loader 按包名缓存插件 manifest 且永不过期，HMR 不会重新导入它；只改界面/文案时热替换即可。
@@ -87,11 +93,13 @@ pnpm test          # vitest（36 项）
 | `discard(cwd, paths)` | 丢弃已跟踪路径的工作区改动（`git restore --worktree`） |
 | `stage(cwd, paths)` / `unstage(cwd, paths)` | 按路径暂存 / 取消暂存 |
 | `stageAll(cwd)` / `unstageAll(cwd)` | 全部暂存 / 取消暂存 |
-| `commit(cwd, message, amend)` | 提交（`amend` 为真时 `--amend`），返回新短哈希 |
-| `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | 推送 / 拉取（`--no-edit`）/ 抓取全部远程并清理 |
+| `commit(cwd, message, amend)` | 提交（`amend` 为真时 `--amend`），返回新短哈希；本地钩子无法启动时跳过钩子重试一次并在回执里说明 |
+| `push(cwd)` / `pull(cwd)` / `fetch(cwd)` | 推送 / 拉取（`--no-edit`）/ 抓取全部远程并清理；推送时若本地钩子无法启动（Git for Windows 的 `sh` 建不了信号管道），会跳过钩子重试一次并在回执里说明 |
 | `identity(cwd)` | 提交署名 + 来源配置文件（`--show-origin`，回退 `git var GIT_COMMITTER_IDENT`） |
 | `setIdentity(cwd, name, email, scope)` | 写入署名（`global` 写用户级配置，`local` 只写当前仓库） |
 | `message(sessionId, cwd)` | 用该会话的模型路由生成提交信息 |
+| `channelStatus(cwd)` | 网络通道状态：HTTPS 探测（TLS/HTTP 两层）、SSH 两个入口、可执行建议与推导出的 SSH 地址 |
+| `switchRemote(cwd, target)` | 把远程地址切换为 SSH 或 HTTPS 形态（只改写远程 URL，不动工作区内容） |
 
 所有命令经 `ctx.shell` 执行 git（普通 30 秒、网络类 120 秒超时）；可省参数在描述符里显式声明 `acceptsUndefined`。
 
@@ -99,12 +107,14 @@ pnpm test          # vitest（36 项）
 
 1. 取会话最后一条 `request/header` 的 `config.provider/model`（即「当前会话使用的模型」）；没有记录时给出明确提示。
 2. 组装输入：分支、改动文件清单、以及暂存侧（没有暂存则未暂存）的 diff（上限 24 KB，超出标注截断）。
-3. 经 `ctx.llm.stream()` 发一次**一次性辅助请求**（`system` 要求简体中文、主题 ≤72 字符、必要时补要点），用 `BlockAssembler` 拼出文本回填输入框。
+3. 经 `ctx.llm.stream()` 发一次**一次性辅助请求**（`reasoningEffort: off`、输出上限 2048、`system` 要求简体中文、主题 ≤72 字符、必要时补要点），用 `BlockAssembler` 拼出文本回填输入框；正文为空时报错会列出本次实际返回的块类型
 
 ## 已知限制与后续工作
 
 - 提交信息生成是插件侧的一次性辅助调用，**不写回会话转写**（与 UI 自身的摘要同级，不是 agent loop 的请求）。
 - 丢弃改动只覆盖已跟踪路径；未跟踪文件不提供删除入口（避免误删尚未纳入版本控制的文件）。
 - 提交详情只列改动文件，不内嵌该提交的差异（属后续工作）。
+- 通道检测只诊断与切换远程地址，**不代理、不转发**网络流量：HTTPS 被阻断时它给出改用 SSH 的路径，而不是替 git 绕过阻断。
+- 探测要真发请求，因此打开面板时会有一次数秒的等待；结果在当次会话中复用，重新探测由用户显式触发。
 - 一次拉取历史上限 400 条；Graph 泳道绘制上限 5 列，超出归并展示。
 - 多仓库工作区只服务当前会话工作区所属仓库。

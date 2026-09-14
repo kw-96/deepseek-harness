@@ -10,10 +10,11 @@ import { readCommit, readLastMessage, readLog } from './host/history.js'
 import { checkout, createBranch, readBranches } from './host/branches.js'
 import { generateCommitMessage } from './host/message.js'
 import { readIdentity, writeIdentity } from './host/identity.js'
+import { buildChannelStatus, switchRemote } from './host/channel/index.js'
 import { readCommitDiff, readDiff, readStatus } from './host/status.js'
 import type {
-  GitActionResponse, GitBranches, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity,
-  GitLogResponse, GitMessageResponse, GitMessageText, GitStatusResponse,
+  GitActionResponse, GitBranches, GitChannelStatus, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity,
+  GitLogResponse, GitMessageResponse, GitMessageText, GitStatusResponse, GitSwitchResult,
 } from './types.js'
 
 export type * from './types.js'
@@ -156,6 +157,25 @@ export class GitPanel extends TypertRemoteService {
   @Remote('message')
   async message(sessionId: string, cwd: string): Promise<GitMessageResponse> {
     return await generateCommitMessage(this.ctx, this.ctx.shell, sessionId, cwd)
+  }
+
+  /**
+   * 探测当前仓库的网络通道（HTTPS / SSH）并给出可执行建议。
+   * @param cwd - session working directory.
+   */
+  @Remote('channelStatus')
+  async channelStatus(cwd: string): Promise<GitChannelStatus> {
+    return await buildChannelStatus(this.ctx.shell, cwd)
+  }
+
+  /**
+   * 把远程地址切换到另一种传输形态（HTTPS ↔ SSH）。
+   * @param cwd - session working directory.
+   * @param target - 目标形态。
+   */
+  @Remote('switchRemote')
+  async switchRemote(cwd: string, target: 'ssh' | 'https'): Promise<GitSwitchResult> {
+    return await switchRemote(this.ctx.shell, cwd, target)
   }
 }
 

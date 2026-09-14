@@ -81,6 +81,11 @@ export function GitBody({ sessionId, useSessions, t, api, files }: GitBodyProps)
         ahead={panel.status?.ahead ?? 0}
         behind={panel.status?.behind ?? 0}
         identity={panel.identity}
+        channel={panel.channel}
+        probing={panel.probing}
+        switching={panel.switching}
+        onReprobe={panel.reprobe}
+        onUseSsh={panel.useSsh}
         workspaceName={panel.workspaceName}
         busy={panel.busy}
         branchNames={panel.branchNames}

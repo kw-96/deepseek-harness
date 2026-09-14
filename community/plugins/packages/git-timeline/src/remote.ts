@@ -3,12 +3,12 @@
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type {
-  GitActionResponse, GitBranches, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity, GitLogResponse,
-  GitMessageResponse, GitMessageText, GitStatusResponse,
+  GitActionResponse, GitBranches, GitChannelStatus, GitCommitDetail, GitCommitResponse, GitDiffResponse, GitIdentity,
+  GitLogResponse, GitMessageResponse, GitMessageText, GitStatusResponse, GitSwitchResult,
 } from './types.js'
 import {
-  gitActionValue, gitBranchesValue, gitCommitDetailValue, gitCommitResultValue, gitDiffValue, gitIdentityValue,
-  gitLogValue, gitMessageTextValue, gitMessageValue, gitStatusValue,
+  gitActionValue, gitBranchesValue, gitChannelStatusValue, gitCommitDetailValue, gitCommitResultValue, gitDiffValue,
+  gitIdentityValue, gitLogValue, gitMessageTextValue, gitMessageValue, gitStatusValue, gitSwitchResultValue,
 } from './types.js'
 
 const strict = (typeSymbol: string, schema: z.ZodType) => ({ mode: 'strict' as const, typeSymbol, schema })
@@ -19,9 +19,13 @@ const parameter = (name: string, schema: z.ZodType) => ({
  * 可省参数必须显式声明 `acceptsUndefined`：网关默认要求每个 JSON 参数都出现在
  * args 里，而 `undefined` 在序列化时会被丢掉——不声明就会报
  * `args fields do not match the descriptor: missing "<name>"`。
+ *
+ * schema 自身也必须接受 `undefined`：客户端在发送前对每个实参做严格解析，
+ * 省略该参数时传进来的正是 `undefined`；只声明 `acceptsUndefined` 而不放宽
+ * schema，会在客户端被拒（`client api: <endpoint> rejected "<name>"`）。
  */
 const optionalParameter = (name: string, schema: z.ZodType) => ({
-  ...parameter(name, schema),
+  ...parameter(name, schema.optional()),
   acceptsUndefined: true as const,
 })
 const descriptor = (method: string, parameters: readonly ReturnType<typeof parameter>[], result: z.ZodType, type: string) => ({
@@ -62,6 +66,10 @@ const descriptors = [
   descriptor('fetch', [parameter('cwd', z.string())], gitActionValue, 'GitActionResponse'),
   descriptor('identity', [parameter('cwd', z.string())], gitIdentityValue, 'GitIdentity'),
   descriptor('message', [parameter('sessionId', z.string()), parameter('cwd', z.string())], gitMessageValue, 'GitMessageResponse'),
+  descriptor('channelStatus', [parameter('cwd', z.string())], gitChannelStatusValue, 'GitChannelStatus'),
+  descriptor('switchRemote', [
+    parameter('cwd', z.string()), parameter('target', z.union([z.literal('ssh'), z.literal('https')])),
+  ], gitSwitchResultValue, 'GitSwitchResult'),
 ] as const
 
 export const TYPERT_REMOTE: TypertRemoteContribution = { package: 'dsh-git-timeline', descriptors }
@@ -98,6 +106,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'gitPanel/fetch': (cwd: string) => Promise<RemoteResult<GitActionResponse>>
     'gitPanel/identity': (cwd: string) => Promise<RemoteResult<GitIdentity>>
     'gitPanel/message': (sessionId: string, cwd: string) => Promise<RemoteResult<GitMessageResponse>>
+    'gitPanel/channelStatus': (cwd: string) => Promise<RemoteResult<GitChannelStatus>>
+    'gitPanel/switchRemote': (cwd: string, target: 'ssh' | 'https') => Promise<RemoteResult<GitSwitchResult>>
   }
 }
 

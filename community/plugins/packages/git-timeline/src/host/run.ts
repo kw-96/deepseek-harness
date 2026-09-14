@@ -39,6 +39,7 @@ export function gitConfigEnv(): Record<string, string> {
  * @param cwd 工作目录
  * @param args 参数（自动加引号）
  * @param timeoutMs 超时
+ * @param env 追加的环境变量（与 git 定位配置所需的变量合并）
  * @returns stdout / stderr 文本
  */
 export async function git(
@@ -46,6 +47,7 @@ export async function git(
   cwd: string,
   args: readonly string[],
   timeoutMs = GIT_TIMEOUT_MS,
+  env: Record<string, string> = {},
 ): Promise<GitOutcome> {
   const quoted = args.map(arg => `'${String(arg).replaceAll("'", "'\\''")}'`).join(' ')
   const spec = shell.resolve({
@@ -53,7 +55,7 @@ export async function git(
     workdir: cwd,
     timeoutMs,
     stdoutMaxBytes: STDOUT_MAX_BYTES,
-    env: gitConfigEnv(),
+    env: { ...gitConfigEnv(), ...env },
   })
   const result = await shell.run(spec)
   if (result.exitCode !== 0) {

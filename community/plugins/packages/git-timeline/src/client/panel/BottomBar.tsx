@@ -1,8 +1,8 @@
-/** Git 面板底部栏（固定）：分支切换、刷新、工作区名与 Git 账号（可配置）。 */
+/** Git 面板底部栏（固定）：分支切换、网络通道状态、刷新、工作区名与 Git 账号（可配置）。 */
 
 import { useState } from 'react'
-import { Check, GitBranch, Plus, RefreshCw, User } from 'lucide-react'
-import type { GitIdentity } from '../../types.js'
+import { Check, GitBranch, Globe, Loader2, Plus, RefreshCw, User } from 'lucide-react'
+import type { GitChannelStatus, GitIdentity } from '../../types.js'
 import type { TFn } from '../lib/faces.js'
 import css from './styles.module.css'
 
@@ -12,6 +12,14 @@ export interface BottomBarProps {
   ahead: number
   behind: number
   identity: GitIdentity | null
+  /** 网络通道状态；未探测完成时为 null。 */
+  channel: GitChannelStatus | null
+  /** 是否正在探测通道或切换远程。 */
+  probing: boolean
+  /** 是否正在切换远程地址。 */
+  switching: boolean
+  onReprobe: () => void
+  onUseSsh: () => void
   workspaceName: string
   busy: boolean
   branchNames: readonly string[]
@@ -25,19 +33,23 @@ export interface BottomBarProps {
 
 /**
  * 面板底部状态条。
- * @param props 分支/身份信息、切换分支与保存身份的入口
+ * @param props 分支/身份/通道状态与各入口回调
  */
 export function BottomBar(props: BottomBarProps): React.ReactNode {
-  const { t, branch, ahead, behind, identity, workspaceName, busy, branchNames, branchMenuOpen } = props
+  const { t, branch, ahead, behind, identity, channel, probing, switching, workspaceName, busy, branchNames, branchMenuOpen } = props
   const [draft, setDraft] = useState('')
   const [accountOpen, setAccountOpen] = useState(false)
   const [name, setName] = useState(identity?.name ?? '')
   const [email, setEmail] = useState(identity?.email ?? '')
   const [scope, setScope] = useState<'global' | 'local'>('global')
   const configured = identity !== null && (identity.name !== null || identity.email !== null)
-  const account = configured
-    ? [identity.name, identity.email].filter(part => part !== null && part !== '').join(' · ')
-    : t('accountUnset')
+  // 只显示用户名：邮箱会把底部栏挤满，需要时在悬停说明与账号弹层里看。
+  const accountName = identity?.name ?? identity?.email ?? null
+  const account = configured && accountName !== null ? accountName : t('accountUnset')
+  // 通道提示按「是否已就绪」两态呈现；被阻断时给出改用 SSH 的动作。
+  const channelOk = channel !== null && channel.advice === 'ok'
+  const channelText = channel === null ? t('net') : channelOk ? t('netReady') : t('netBlocked')
+  const channelTitle = probing ? t('netProbing') : `${t('net')}：${channel?.note ?? t('netProbing')}`
 
   /** 回车即新建并切换分支；名称为空时忽略。 */
   const submitBranch = (): void => {
@@ -75,6 +87,18 @@ export function BottomBar(props: BottomBarProps): React.ReactNode {
         disabled={busy} onClick={props.onRefresh}>
         <RefreshCw size={12} className={busy ? css.spinning : undefined} />
       </button>
+      <button type="button" className={channelOk ? `${css.netButton} ${css.netReady}` : css.netButton}
+        title={channelTitle} aria-label={t('netProbe')} disabled={probing} onClick={props.onReprobe}>
+        <Globe size={12} aria-hidden="true" />
+        <span className={css.netText}>{channelText}</span>
+        {probing && <Loader2 size={11} className={css.spinning} aria-hidden="true" />}
+      </button>
+      {channel?.advice === 'use-ssh' && (
+        <button type="button" className={css.netFixButton} title={t('netUseSshHint')}
+          aria-label={t('netUseSsh')} disabled={probing} onClick={props.onUseSsh}>
+          {switching ? t('netSwitching') : t('netUseSsh')}
+        </button>
+      )}
       {branchMenuOpen && (
         <div className={css.branchMenu} role="menu">
           <div className={css.branchMenuHead}>{t('branchMenu')}</div>
@@ -104,11 +128,12 @@ export function BottomBar(props: BottomBarProps): React.ReactNode {
       )}
       <span className={css.bottomSpacer} />
       <span className={css.bottomItem} title={workspaceName}>
-        <span className={css.bottomLabel}>{t('workspace')}</span>
         <span className={css.bottomText}>{workspaceName}</span>
       </span>
       <button type="button" className={configured ? css.accountButton : `${css.accountButton} ${css.accountUnset}`}
-        title={identity?.origin ?? t('accountHint')}
+        title={configured && identity?.email != null
+          ? `${identity.name ?? identity.email} <${identity.email}>${identity.origin === null ? '' : ` · ${identity.origin}`}`
+          : t('accountHint')}
         aria-label={t('accountMenu')} aria-haspopup="dialog" aria-expanded={accountOpen}
         onClick={toggleAccount}>
         <User size={12} aria-hidden="true" />

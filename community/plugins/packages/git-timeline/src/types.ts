@@ -78,6 +78,8 @@ export const gitMessageValue = z.object({
   provider: z.string(),
   model: z.string(),
 }).readonly()
+/** 通道探测结果的线上形态与类型（独立成文件，供 Remote 与界面共用）。 */
+export * from './channel.js'
 
 /** 一条工作区状态条目。 */
 export interface GitEntry {

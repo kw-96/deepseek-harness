@@ -83,6 +83,13 @@ function api(over: Partial<GitPanelApi> = {}): GitPanelApi {
     identity: vi.fn(async () => ({ name: 'dev', email: 'dev@example.test', origin: 'C:/Users/x/.gitconfig' })),
     setIdentity: vi.fn(async () => ({ detail: 'dev <dev@example.test>' })),
     message: vi.fn(async () => ({ message: '整理 Git 面板', provider: 'deepseek', model: 'chat' })),
+    channelStatus: vi.fn(async () => ({
+      protocol: 'https' as const, remoteName: 'origin', remoteUrl: 'https://github.com/o/r.git',
+      https: { tlsOk: true, httpOk: true, status: 'HTTP/1.1 200 OK', latencyMs: 210, error: null },
+      ssh: { port22: true, port443: true },
+      advice: 'ok' as const, sshUrl: 'git@github.com:o/r.git', note: 'HTTPS 通道正常，网络操作可直接进行',
+    })),
+    switchRemote: vi.fn(async () => ({ url: 'git@github.com:o/r.git', detail: '' })),
     ...over,
   } as GitPanelApi
 }
@@ -179,6 +186,17 @@ describe('git panel body', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '暂存 src/new.ts' }))
     await waitFor(() => expect(stage).toHaveBeenCalledWith('E:/repo', ['src/new.ts']))
+  })
+
+  it('keeps a multi-line drafted message whole in the input', async () => {
+    // 输入框限高，多行草稿必须整段留在 value 里（可见性由自动增高与滚动负责）。
+    const drafted = '整理 Git 面板\n\n- 修正提交信息生成\n- 补齐网络通道状态'
+    const message = vi.fn(async () => ({ message: drafted, provider: 'deepseek', model: 'chat' }))
+    render(<GitBody {...props({ api: api({ message }) })} />)
+    fireEvent.click(await screen.findByRole('button', { name: '用当前会话的模型生成提交信息' }))
+    await waitFor(() => {
+      expect((screen.getByLabelText('提交信息（Ctrl+Enter 提交）') as HTMLTextAreaElement).value).toBe(drafted)
+    })
   })
 
   it('opens the inline diff for a file and closes it again', async () => {
@@ -294,8 +312,10 @@ describe('git panel body', () => {
   it('prefills the configured identity and its source file', async () => {
     render(<GitBody {...props()} />)
     const chip = await screen.findByRole('button', { name: 'Git 账号' })
-    expect(chip.textContent).toContain('dev · dev@example.test')
-    expect(chip.getAttribute('title')).toBe('C:/Users/x/.gitconfig')
+    // 底部栏只显示用户名；署名全文与来源放在悬停说明里。
+    expect(chip.textContent).toBe('dev')
+    expect(chip.getAttribute('title')).toContain('dev <dev@example.test>')
+    expect(chip.getAttribute('title')).toContain('C:/Users/x/.gitconfig')
     fireEvent.click(chip)
     expect(screen.getByText('来源：C:/Users/x/.gitconfig')).toBeTruthy()
     expect((screen.getByLabelText('姓名') as HTMLInputElement).value).toBe('dev')
@@ -303,11 +323,16 @@ describe('git panel body', () => {
   })
 
   it('shows branch, workspace and account in the bottom bar', async () => {
-    render(<GitBody {...props()} />)
+    const log = vi.fn(async () => ({ repo: true, root: 'E:/repo', error: null, entries: [] }))
+    render(<GitBody {...props({ api: api({ log }) })} />)
     const branch = await screen.findByRole('button', { name: '切换分支' })
     expect(branch.textContent).toContain('dev')
     expect(branch.textContent).toContain('↑1')
     expect(screen.getByTitle('repo')).toBeTruthy()
-    expect(screen.getByTitle('C:/Users/x/.gitconfig')).toBeTruthy()
+    const accountChip = screen.getByRole('button', { name: 'Git 账号' })
+    expect(accountChip.getAttribute('title')).toBe('dev <dev@example.test> · C:/Users/x/.gitconfig')
+    // 网关要求实参个数与描述符一致：可省参数必须显式占位，否则调用在客户端即被拒
+    // （client api: gitPanel/log rejected "limit"）。
+    await waitFor(() => expect(log).toHaveBeenCalledWith('E:/repo', undefined))
   })
 })
