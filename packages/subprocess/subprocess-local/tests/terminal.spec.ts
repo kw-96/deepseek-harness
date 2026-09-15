@@ -15,10 +15,10 @@ class FakePty {
   pid = 123
   readonly pause = vi.fn()
   readonly resume = vi.fn()
-  readonly resize = vi.fn()
+  readonly resizes: Array<[number, number]> = []
+  readonly resize = vi.fn((cols: number, rows: number): void => { this.resizes.push([cols, rows]) })
   readonly writes: string[] = []
   readonly kills: string[] = []
-  readonly resizes: Array<[number, number]> = []
   autoExitOnKill = true
   throwKill = false
   onKill?: () => void
@@ -44,8 +44,6 @@ class FakePty {
   }
 
   write(data: string): void { this.writes.push(data) }
-
-  resize(cols: number, rows: number): void { this.resizes.push([cols, rows]) }
 
   kill(signal?: string): void {
     if (this.throwKill) throw new Error('process raced')

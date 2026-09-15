@@ -187,7 +187,7 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     const b = backend()
     ctx.terminals.registerBackend(b.provider)
     const owner = stubAgent(ctx, 'owner')
-    ctx.agents.register(owner)
+    await ctx.agents.register(owner)
     await ctx.terminals.spawn(owner, {
       type: 'stub',
       name: 'ui-pwsh-1',

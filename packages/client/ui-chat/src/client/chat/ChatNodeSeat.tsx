@@ -13,6 +13,7 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
   readonly useChatNode: ChatViewSlotProps['useChatNode']
   readonly useChatNodeProcess: ChatViewSlotProps['useChatNodeProcess']
+  readonly historyIncomplete: boolean
   readonly compactTranscript: boolean
   readonly useStore: ChatViewSlotProps['useStore']
   readonly actions: ChatViewSlotProps['actions']
@@ -36,7 +37,7 @@ function turnOf(node: ChatNode | undefined): number | undefined {
 
 /** Subscribe, apply Turn-process visibility, and dispatch one stable Context key. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, useChatNode, useChatNodeProcess, compactTranscript,
+  nodeKey, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
   selectedCallId, cwd, openFile, openSkill, inspectCall, forkAt,
   loadImage, renderMessageImages, fileMentions, useStore, actions, renderSlot, t,
 }: ChatNodeSeatProps) {
@@ -65,6 +66,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const processWindowReady = processSpec !== undefined
     && processPresentation !== undefined
     && compactTranscript
+    && !historyIncomplete
     && processPresentation.turn === processSpec.turn
     && (processSpec.answerAnchorSeq !== null || processPresentation.streamFoldEnd !== null)
   const foldEndSeq = processWindowReady

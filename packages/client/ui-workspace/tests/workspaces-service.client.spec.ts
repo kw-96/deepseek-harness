@@ -142,13 +142,6 @@ class FakeWorkspaces implements IWorkspaces {
     }))
   }
 
-  onUnarchive: IWorkspaces['unarchiveSession'] = async (sessionId) => {
-    this.list.update(state => ({
-      ...state,
-      archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
-    }))
-  }
-
   declare readonly create: IWorkspaces['create']
   declare readonly rename: IWorkspaces['rename']
   declare readonly delete: IWorkspaces['delete']

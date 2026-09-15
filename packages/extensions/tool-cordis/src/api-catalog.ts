@@ -657,6 +657,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'codexImport',
+    summary: 'Remote business surface for the card: trigger a run and read history.',
+    description: 'Remote business surface for the card: trigger a run and read history. The controller owns the durable `codex_import` domain and never touches the session log beyond what the sweep already wrote.',
+    methods: [
+      {
+        signature: '@Remote(\'run\') async run(): Promise<CodexImportRun>',
+        description: 'Run one import sweep now and record its outcome as the newest history run.',
+        parameters: [],
+        returns: 'the recorded run.',
+      },
+      {
+        signature: '@Remote(\'scan\') async scan(): Promise<CodexImportScanValue>',
+        description: 'Preview the next sweep without writing: per-thread verdicts and counts in the sweep\'s own vocabulary. Nothing is persisted, no workspace or project is created, and no session is published.',
+        parameters: [],
+        returns: 'the preview.',
+      },
+      {
+        signature: '@Remote(\'history\') async history(): Promise<CodexImportHistoryValue>',
+        description: 'Read recorded import runs, newest first.',
+        parameters: [],
+        returns: 'the complete history list.',
+      },
+      {
+        signature: '@Remote(\'undo\') async undo(at: number): Promise<CodexImportUndoValue>',
+        description: 'Undo one recorded run by archiving the sessions it imported, then stamp the run. The sessions stay in DSH storage, so undo is reversible through restore and the evidence never disappears.',
+        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
+        returns: 'the outcome counts for the card.',
+      },
+      {
+        signature: '@Remote(\'restore\') async restore(at: number): Promise<CodexImportUndoValue>',
+        description: 'Restore the sessions of one undone run and clear its stamp.',
+        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
+        returns: 'the outcome counts for the card.',
+      },
+    ],
+  },
+  {
     key: 'commands',
     summary: 'Human-command registry.',
     description: 'Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.',
@@ -1572,6 +1609,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'acknowledgement that cancellation was requested.',
       },
       {
+        signature: '@Remote(\'killJob\') killJob(request: SessionKillJobRequest): SessionKillJobValue',
+        description: 'Cancel one background job owned by this Session without touching the active turn, its inbox, or the job\'s output history.',
+        parameters: [{ name: 'request', description: 'Session, job id, and optional operator reason.' }],
+        returns: 'acknowledgement carrying whether a live job was cancelled.',
+      },
+      {
         signature: '@Remote(\'page\') page(request: SessionPageRequest, signal: AbortSignal): Promise<SessionPage>',
         description: 'Read one cold-safe, message-aligned Session history page.',
         parameters: [{ name: 'request', description: 'durable address, backward cursor, and page budget.' }, { name: 'signal', description: 'cancellation for persistence reads.' }],
@@ -1911,6 +1954,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'id', description: 'the session id; omitted, the store mints `session-<n>`.' }, { name: 'options', description: 'seed events and/or creation metadata for the header.' }],
         returns: 'the live session, already entered and announced.',
         throws: ['if a session with `id` already exists, metadata is not a plain lossless-JSON record with valid scalar fields, or `meta.cwd` is a non-absolute path (storage backends key directories off it).'],
+      },
+      {
+        signature: 'replace(id: SessionId, options: CreateSessionOptions): Session',
+        description: 'Replace one non-appending live session with a new seeded snapshot under the same id. External importers call this only after their durable source replacement succeeds and after excluding Agent-owned sessions.',
+        parameters: [{ name: 'id', description: 'existing or new session id.' }, { name: 'options', description: 'replacement seed and immutable header metadata.' }],
+        returns: 'the newly announced live session.',
+        throws: ['when the existing session is publishing an event.'],
       },
       {
         signature: 'prepare(id?: SessionId, options?: PrepareSessionOptions): Session',
@@ -2637,6 +2687,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'delivered foreground process-group identity.',
       },
       {
+        signature: 'async write(owner: Agent, id: TerminalSessionId, data: string): Promise<void>',
+        description: 'Write raw text to an owned PTY without Enter or line-mode exclusivity.',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'data', description: 'UTF-8 text delivered without implicit newline conversion.' }],
+      },
+      {
+        signature: 'async resize(owner: Agent, id: TerminalSessionId, cols: number, rows: number): Promise<void>',
+        description: 'Resize an owned PTY window.',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'cols', description: 'positive column count.' }, { name: 'rows', description: 'positive row count.' }],
+      },
+      {
+        signature: 'followOutput( owner: Agent, id: TerminalSessionId, signal: AbortSignal, ): AsyncIterable<TerminalFollowFrame>',
+        description: 'Follow decoded PTY output for UI rendering (CSI preserved).',
+        parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'signal', description: 'cancels the subscription.' }],
+        returns: 'frames in delivery order.',
+      },
+      {
         signature: 'async kill(owner: Agent, id: TerminalSessionId, reason: string = \'model request\'): Promise<boolean>',
         description: 'Close one owned session and remove it only after quiescent backend cleanup.',
         parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'reason', description: 'diagnostic cleanup reason.' }],
@@ -3035,6 +3101,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace projection.',
       },
       {
+        signature: '@Remote(\'attachSession\') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>',
+        description: 'Account one Session whose stored cwd matches the Workspace path.',
+        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
+        returns: 'the updated Workspace projection.',
+      },
+      {
+        signature: '@Remote(\'detachSession\') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>',
+        description: 'Remove one Session from a Workspace account (Ungrouped).',
+        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
+        returns: 'the updated Workspace projection.',
+      },
+      {
         signature: '@Remote(\'archiveSession\') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Hide one known Session from Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to archive.' }],
@@ -3137,6 +3215,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Move one workspace within the durable display order, DOM-insertBefore-like. With an anchor it lands before that workspace; without one it appends.',
         parameters: [{ name: 'id', description: 'Workspace to move.' }, { name: 'beforeId', description: 'Workspace anchor; omitted appends.' }],
         returns: 'the complete committed workspace order.',
+      },
+      {
+        signature: 'createProject(name: string, roots: readonly string[] = []): Promise<Project>',
+        description: 'Create a project grouping over ordered directory roots.',
+        parameters: [{ name: 'name', description: 'Display tier name.' }, { name: 'roots', description: 'Ordered directory roots whose prefix matches workspaces.' }],
+        returns: 'the newly durable project.',
+      },
+      {
+        signature: 'getProject(id: ProjectId): Project | undefined',
+        description: 'Look up a project by id.',
+        parameters: [{ name: 'id', description: 'Project id.' }],
+        returns: 'the project, or `undefined` when unknown.',
+      },
+      {
+        signature: 'listProjects(): Project[]',
+        description: 'Synchronous project projection in durable registry order.',
+        parameters: [],
+        returns: 'a fresh ordered array of project entities.',
+      },
+      {
+        signature: 'projectForPath(path: string): Project | undefined',
+        description: 'Resolve the project owning one canonical directory path by longest root prefix; the empty root never matches, and longer roots win ties.',
+        parameters: [{ name: 'path', description: 'Canonical directory path to classify.' }],
+        returns: 'the owning project, or `undefined` when no root prefixes it.',
+      },
+      {
+        signature: 'deleteProject(id: ProjectId): Promise<boolean>',
+        description: 'Delete one project registration; its directory roots and workspaces are retained. The durable order is updated before the table deletion; a failed table write restores the prior order. Unknown ids are an idempotent no-op.',
+        parameters: [{ name: 'id', description: 'Project to remove.' }],
+        returns: '`true` when a record was deleted, `false` when it was unknown.',
+      },
+      {
+        signature: 'insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>',
+        description: 'Move one project within the durable display order, DOM-insertBefore-like.',
+        parameters: [{ name: 'id', description: 'The project to move.' }, { name: 'beforeId', description: 'Project to insert before; omitted appends.' }],
+        returns: 'the complete committed project order.',
       },
       {
         signature: 'archiveSession(sessionId: SessionId): Promise<void>',
@@ -3969,6 +4083,38 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ClientArtifactBaseline',
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly size: number;\n}',
+  },
+  {
+    name: 'CodexImportHistoryValue',
+    declaration: 'export interface CodexImportHistoryValue {\n    readonly runs: readonly CodexImportRun[];\n}',
+  },
+  {
+    name: 'CodexImportRun',
+    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n    readonly sessions: readonly CodexImportSession[];\n    readonly undoneAt: number;\n}',
+  },
+  {
+    name: 'CodexImportScanEntry',
+    declaration: 'export interface CodexImportScanEntry {\n    readonly threadId: string;\n    readonly sessionId: SessionId;\n    readonly title: string;\n    readonly cwd: string;\n    readonly kind: CodexImportScanVerdict;\n    readonly events: number;\n}',
+  },
+  {
+    name: 'CodexImportScanValue',
+    declaration: 'export interface CodexImportScanValue {\n    readonly summary: CodexImportSummary;\n    readonly entries: readonly CodexImportScanEntry[];\n}',
+  },
+  {
+    name: 'CodexImportScanVerdict',
+    declaration: 'export type CodexImportScanVerdict = \'imported\' | \'updated\' | \'unchanged\' | \'deferred-active\';',
+  },
+  {
+    name: 'CodexImportSession',
+    declaration: 'export interface CodexImportSession {\n    readonly id: SessionId;\n    readonly title: string;\n}',
+  },
+  {
+    name: 'CodexImportSummary',
+    declaration: 'export interface CodexImportSummary {\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n}',
+  },
+  {
+    name: 'CodexImportUndoValue',
+    declaration: 'export interface CodexImportUndoValue {\n    readonly at: number;\n    readonly undone: boolean;\n    readonly changed: number;\n    readonly failed: number;\n}',
   },
   {
     name: 'CollectedOutput',
@@ -4939,6 +5085,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n    info?: ToolErrorInfo;\n} | {\n    kind: \'cancel\';\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
   },
   {
+    name: 'Project',
+    declaration: 'export interface Project {\n    readonly id: ProjectId;\n    readonly name: string;\n    readonly roots: readonly string[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    setName(name: string): Promise<void>;\n    setRoots(roots: readonly string[]): Promise<void>;\n}',
+  },
+  {
     name: 'ProjectionChangeListener',
     declaration: 'export type ProjectionChangeListener = (session: Session, key: Extract<keyof SessionProjectionMap, string>, value: unknown, seq: SessionSeq) => void;',
   },
@@ -5413,6 +5563,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionJob',
     declaration: 'export interface SessionJob {\n    readonly id: JobId;\n    readonly kind: string;\n    readonly label: string;\n    readonly status: \'running\' | \'stopping\' | \'completed\' | \'killed\' | \'failed\';\n    readonly detail?: string;\n    readonly startedAt: number;\n    readonly finishedAt?: number;\n}',
+  },
+  {
+    name: 'SessionKillJobRequest',
+    declaration: 'export interface SessionKillJobRequest {\n    readonly sessionId: SessionId;\n    readonly jobId: JobId;\n    readonly reason?: string;\n}',
+  },
+  {
+    name: 'SessionKillJobValue',
+    declaration: 'export interface SessionKillJobValue {\n    readonly accepted: true;\n    readonly outcome: \'requested\' | \'already-finished\';\n}',
   },
   {
     name: 'SessionLineageNode',
@@ -6128,7 +6286,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalBackendSession',
-    declaration: 'export interface TerminalBackendSession {\n    readonly motd: string;\n    readonly pid?: number;\n    startSend(request: TerminalSendRequest): TerminalSendOperation;\n    read(request: TerminalReadRequest): TerminalReadResult;\n    signal(signal: TerminalSignal): Promise<TerminalSignalResult>;\n    status(): TerminalSessionStatus;\n    close(reason: string): Promise<void>;\n}',
+    declaration: 'export interface TerminalBackendSession {\n    readonly motd: string;\n    readonly pid?: number;\n    startSend(request: TerminalSendRequest): TerminalSendOperation;\n    read(request: TerminalReadRequest): TerminalReadResult;\n    signal(signal: TerminalSignal): Promise<TerminalSignalResult>;\n    status(): TerminalSessionStatus;\n    write(data: string): Promise<void>;\n    resize(cols: number, rows: number): Promise<void>;\n    followOutput(signal: AbortSignal): AsyncIterable<TerminalFollowFrame>;\n    close(reason: string): Promise<void>;\n}',
   },
   {
     name: 'TerminalBackendSpawnSpec',
@@ -6145,6 +6303,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalEnvironment',
     declaration: 'export interface TerminalEnvironment {\n    readonly cwd: string;\n    readonly maxInputBytes: number;\n    readonly maxCols: number;\n    readonly maxRows: number;\n    readonly scrollback: number;\n}',
+  },
+  {
+    name: 'TerminalFollowFrame',
+    declaration: 'export interface TerminalFollowFrame {\n    readonly seq: number;\n    readonly chunk: string;\n}',
   },
   {
     name: 'TerminalFrame',
@@ -6208,7 +6370,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalSpawnRequest',
-    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    cwd?: string;\n}',
+    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    cwd?: string;\n    interaction?: \'line\' | \'interactive\';\n    cols?: number;\n    rows?: number;\n    shellDialect?: \'bash\' | \'pwsh\';\n}',
   },
   {
     name: 'TerminalSpawnResult',
@@ -6639,6 +6801,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WorkspaceArchiveValue {\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
   {
+    name: 'WorkspaceAttachSessionRequest',
+    declaration: 'export interface WorkspaceAttachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
     name: 'WorkspaceBaseline',
     declaration: 'export interface WorkspaceBaseline {\n    readonly items: readonly WorkspaceView[];\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
@@ -6661,6 +6827,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceDeleteValue',
     declaration: 'export interface WorkspaceDeleteValue {\n    readonly deleted: true;\n}',
+  },
+  {
+    name: 'WorkspaceDetachSessionRequest',
+    declaration: 'export interface WorkspaceDetachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'WorkspaceDirectoryEntry',
