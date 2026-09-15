@@ -187,28 +187,38 @@ export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [
 }
 
 /**
- * Copy the template's `allowBuilds` entries the profile is missing, so a new
- * plugin whose native module needs its install script allowed does not turn
- * into a failed install on an already-seeded host. Comment lines directly above
+ * Copy the template mapping entries this profile is missing, leaving the
+ * profile's own entries and their order untouched. Comment lines directly above
  * a copied entry travel with it; existing entries are never overwritten.
  * @param profileText - the profile's current pnpm-workspace.yaml text.
  * @param templateText - the template's pnpm-workspace.yaml text.
+ * @param key - the top-level mapping key to converge.
  * @returns the merged text, or undefined when nothing is missing.
  */
-export function mergeAllowBuilds(profileText, templateText) {
-  const templateBlock = allowBuildsBlock(templateText)
+export function mergeMappingEntries(profileText, templateText, key) {
+  const templateBlock = mappingBlock(templateText, key)
   if (templateBlock === undefined) return undefined
-  const present = new Set((allowBuildsBlock(profileText)?.entries ?? []).map(entry => entry.key))
+  const present = new Set((mappingBlock(profileText, key)?.entries ?? []).map(entry => entry.key))
   const missing = templateBlock.entries.filter(entry => !present.has(entry.key))
   if (missing.length === 0) return undefined
   const lines = profileText.split(/\r?\n/)
-  const block = allowBuildsBlock(profileText)
+  const block = mappingBlock(profileText, key)
   if (block === undefined) {
-    const appended = [...lines, 'allowBuilds:', ...missing.flatMap(entry => entry.lines)]
+    const appended = [...lines, `${key}:`, ...missing.flatMap(entry => entry.lines)]
     return `${appended.join('\n').replace(/\n*$/u, '')}\n`
   }
   const merged = [...lines.slice(0, block.end), ...missing.flatMap(entry => entry.lines), ...lines.slice(block.end)]
   return merged.join('\n')
+}
+
+/**
+ * Copy the template's build allowlist entries this profile is missing.
+ * @param profileText - the profile's pnpm-workspace.yaml text.
+ * @param templateText - the template's pnpm-workspace.yaml text.
+ * @returns the merged text, or undefined when nothing is missing.
+ */
+export function mergeAllowBuilds(profileText, templateText) {
+  return mergeMappingEntries(profileText, templateText, 'allowBuilds')
 }
 
 /**
@@ -422,13 +432,14 @@ function isFlowRowFor(line, packageName) {
 }
 
 /**
- * Locate a top-level `allowBuilds:` block and read its entries.
+ * Locate a top-level mapping block and read its entries.
  * @param text - pnpm-workspace.yaml text.
+ * @param key - the top-level key to locate (`allowBuilds`, `patchedDependencies`).
  * @returns the block's end index and entries, or undefined without the block.
  */
-function allowBuildsBlock(text) {
+function mappingBlock(text, key) {
   const lines = text.split(/\r?\n/)
-  const start = lines.findIndex(line => line.trim() === 'allowBuilds:')
+  const start = lines.findIndex(line => line.trim() === `${key}:`)
   if (start === -1) return undefined
   let end = start + 1
   while (end < lines.length && (lines[end].trim() === '' || /^\s/u.test(lines[end]))) end += 1

@@ -21,3 +21,10 @@ overrides:
   '@xberg-io/xberg': 1.0.0-rc.15
   '@deepseek-ai/dsh-pwsh-local': 0.1.2-rc.1
   '@deepseek-ai/schemastery': 3.18.2
+
+# 依赖补丁：本 fork 把 Codex 导入会话持久化为 `codex-<thread-id>`，而
+# dsh-session-archive 把「不以 session- 开头」的 id 一律补前缀，于是归档管理整列
+# 缺标题、每轮自动归档也全部失败。补丁只对裸 uuid 段补前缀，并放宽预览路由校验。
+# 补丁文件随模板播种，重装或重新播种 profile 都会自动重放。
+patchedDependencies:
+  '@linxin666/dsh-session-archive@0.3.22': patches/@linxin666__dsh-session-archive@0.3.22.patch

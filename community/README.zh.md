@@ -9,7 +9,7 @@
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           workspace-rail · codex-shell · manager · marketplace
+    packages/           manager · marketplace · workorder-agent
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot
@@ -53,6 +53,7 @@ pnpm dsh web
 - **组合漂移。** `verify-profile.mjs` 在不启动服务的前提下读取每个 bundle 的 patch：插入行 id 重复会直接判失败，行名在 profile、仓库、以及 bundle 自身依赖树三处都解析不到时给出报告。这正是「手工装的插件/半装状态的插件」在**下次启动之前**而非之后被拦下的那道检查。
 - **pnpm 大版本漂移。** profile 的 `node_modules` 由 pnpm v10 安装、而当前 pnpm 是 v11 时，一旦添加插件就会报 `ERR_PNPM_UNEXPECTED_STORE`。检查会同时列出两个版本与修法：用 profile 对应的 pnpm 大版本安装，或在备份后有意地在 profile 内执行 `pnpm install` 整体重链。
 - **git 托管的组合包。** 依赖里出现 `github:` 引用时，pnpm 会拦下构建脚本，需要在 profile 的 `pnpm-workspace.yaml` 里按精确 key 补 `allowBuilds`；检查会在安装失败之前报告缺失。
+- **依赖补丁。** 要给某个 npm 插件打补丁时，把补丁文件放进 `community/profiles/web/patches/`，并在模板的 `pnpm-workspace.yaml` 里登记 `patchedDependencies`：首次播种会连同补丁文件一起写进 profile，修复已有 profile 时也会把缺的那一样补上，所以重新安装、升级插件或重新播种都不会丢掉补丁。
 - **重启纪律。** 新增或修改插件的 Remote 方法后必须重启 `dsh web`：typert manifest 按包名缓存，HMR 不会刷新它。
 - **升级前先存快照。** 装了 `dsh-undo-savepoint` 时，检查会打印升级或改插件前应执行的快照命令。
 

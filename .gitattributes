@@ -8,6 +8,12 @@
 
 *.pdf binary
 
+# Patch files are generated unified diffs: every context line starts with the
+# diff's single leading space followed by the target file's own indentation, so
+# the staged whitespace check would read a valid patch as "space before tab in
+# indent". Their whitespace is dictated by the file they patch, never by us.
+*.patch -whitespace
+
 # Pairing records are generated from the three confirmed owner-blob pairs.
 # The worktree-local installer registers the fail-closed driver command.
 *.i18n.yaml merge=dsh-translation-pairing

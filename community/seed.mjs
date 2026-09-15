@@ -34,8 +34,8 @@ import { homedir, arch, platform } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { probe } from './preflight.mjs'
 import {
-  absorbManagedBlock, bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, renderProfile, repairProfile,
-  retireHoistPatterns, retirePatchRows, unavailablePinned, unresolvableBundles,
+  absorbManagedBlock, bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, mergeMappingEntries,
+  renderProfile, repairProfile, retireHoistPatterns, retirePatchRows, unavailablePinned, unresolvableBundles,
 } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -105,6 +105,28 @@ async function readProfileManifest() {
 }
 
 /**
+ * Copy the template's pnpm patch files into the profile. A patch file this
+ * profile already carries an identical copy of is left alone, and a patch file
+ * only the host has (a `pnpm patch` the user made) is never deleted.
+ * @returns one Chinese sentence when a file was written.
+ */
+async function convergePatchFiles() {
+  const src = join(profileSrc, 'patches')
+  if (!existsSync(src)) return undefined
+  const dst = join(profileDst, 'patches')
+  await mkdir(dst, { recursive: true })
+  let copied = 0
+  for (const name of await readdir(src)) {
+    const from = join(src, name)
+    const to = join(dst, name)
+    if (existsSync(to) && await readFile(to, 'utf8') === await readFile(from, 'utf8')) continue
+    await cp(from, to, { force: true })
+    copied += 1
+  }
+  return copied > 0 ? `更新 profile 依赖补丁 ${copied} 个` : undefined
+}
+
+/**
  * Converge the profile's hand-editable configuration on the template: copy the
  * `allowBuilds` entries the profile is missing, fold a plugin's trailing
  * block-style patch rows back into the array, and drop patch rows a retired
@@ -117,19 +139,28 @@ async function convergeProfileFiles(retired) {
   const changes = []
   const workspacePath = join(profileDst, 'pnpm-workspace.yaml')
   if (existsSync(workspacePath)) {
-    const merged = mergeAllowBuilds(
-      await readFile(workspacePath, 'utf8'),
-      await readFile(join(profileSrc, 'pnpm-workspace.yaml'), 'utf8'),
-    )
+    const templateWorkspace = await readFile(join(profileSrc, 'pnpm-workspace.yaml'), 'utf8')
+    const merged = mergeAllowBuilds(await readFile(workspacePath, 'utf8'), templateWorkspace)
     if (merged !== undefined) {
       await writeFile(workspacePath, merged, 'utf8')
       changes.push('合并模板新增的构建白名单 allowBuilds')
+    }
+    const patched = mergeMappingEntries(
+      await readFile(workspacePath, 'utf8'),
+      templateWorkspace,
+      'patchedDependencies',
+    )
+    if (patched !== undefined) {
+      await writeFile(workspacePath, patched, 'utf8')
+      changes.push('合并模板新增的依赖补丁 patchedDependencies')
     }
     const hoist = retireHoistPatterns(await readFile(workspacePath, 'utf8'), retired)
     if (hoist.removed.length > 0) {
       await writeFile(workspacePath, hoist.text, 'utf8')
       changes.push(`移除已下线包的 hoist 规则：${[...new Set(hoist.removed)].join('、')}`)
     }
+    const patchFiles = await convergePatchFiles()
+    if (patchFiles !== undefined) changes.push(patchFiles)
   }
   const patchPath = join(profileDst, 'cordis.patch.yml')
   if (existsSync(patchPath)) {
@@ -189,6 +220,7 @@ if (existing === undefined || force) {
   for (const file of ['cordis.yml', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
     await cp(join(profileSrc, file), join(profileDst, file), { force: true })
   }
+  await convergePatchFiles()
   await writeFile(profileManifest, renderProfile(materializeProfile(template, { tarballsUrl, dropped })), 'utf8')
   await writeFile(join(profileDst, '.npmrc'), `registry=${registry}\n`, 'utf8')
   console.log(`[community] profile → ${profileDst}（registry ${registry}）`)

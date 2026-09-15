@@ -1,0 +1,33 @@
+diff --git a/lib/index.js b/lib/index.js
+index ead372504f7fbf59943162434c2186f4adcc2abe..75418b8b3c858caee6fddb4976ba5d80de578d14 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -237,7 +237,16 @@ function resolveAutoConfig(config) {
+ * inventory never produces phantom duplicate rows.
+ */
+ function canonicalSessionId(segment) {
+-	return segment.startsWith("session-") ? segment : `session-${segment}`;
++	// 本地补丁（deepseek-harness fork）：宿主报出的 id 才是权威。本部署把 Codex 导入
++	// 会话持久化为 `codex-<thread-id>`，其磁盘目录同名；原规则「不以 session- 开头就
++	// 加前缀」会把它改写成 `session-codex-…`——这个名字在任何地方都不存在：projection
++	// cache 文件查不到（归档管理里整列缺标题），归档/取消归档又带着未知 id 打到宿主
++	// （每轮 auto sweep 全部失败）。只对遗留的裸 uuid 段补前缀，那正是该规则当初要
++	// 处理的目录形态。
++	if (segment.startsWith("session-")) return segment;
++	return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(segment)
++		? `session-${segment}`
++		: segment;
+ }
+ function dirSize(path) {
+ 	let total = 0;
+@@ -1631,7 +1640,9 @@ function makePreviewRoute(service) {
+ 		handler: async (req, res) => {
+ 			if (!fenced(req, res)) return;
+ 			const id = new URL(req.url ?? "/", "http://localhost").searchParams.get("id") ?? "";
+-			if (!id.startsWith("session-")) {
++			// 本地补丁：导入会话的 id 形如 `codex-<thread-id>`，不再要求 session- 前缀；
++			// 这里只做空值、路径分隔符与上跳的清洗，口径与 idList 一致。
++			if (id === "" || id.includes("/") || id.includes("\\") || id.includes("..")) {
+ 				writeJson(res, 400, {
+ 					ok: false,
+ 					error: "invalid session id"

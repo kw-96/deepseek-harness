@@ -9,7 +9,7 @@ This directory makes the DeepSeek Harness checkout self-contained for deployment
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           workspace-rail · codex-shell · manager · marketplace
+    packages/           manager · marketplace · workorder-agent
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot
@@ -53,6 +53,7 @@ It adds no second implementation of any step; the value is ordering plus the tra
 - **Composition drift.** `verify-profile.mjs` reads every bundle's patch without starting the server: it fails on a duplicated insert-row id and reports any row whose package cannot be resolved from the profile, the repository, or the bundle's own dependency tree. This is the check that catches a plugin installed by hand — or half-installed — before the next boot, instead of after it.
 - **pnpm major drift.** A profile whose `node_modules` came from pnpm v10 and a host running pnpm v11 fails with `ERR_PNPM_UNEXPECTED_STORE` the moment any plugin is added. The check names both versions and the fix: install with the profile's pnpm major, or relink the profile deliberately (`pnpm install` inside it) after a backup.
 - **Git-hosted bundles.** A `github:` dependency whose build script pnpm blocks needs its exact key under `allowBuilds` in the profile's `pnpm-workspace.yaml`; the check reports a missing entry before the install fails.
+- **Dependency patches.** To patch an npm plugin, put the patch file under `community/profiles/web/patches/` and register it under `patchedDependencies` in the template's `pnpm-workspace.yaml`. A fresh seed copies both into the profile, and repairing an existing profile adds whichever of the two is missing, so a reinstall, a plugin upgrade, or a re-seed never drops the patch.
 - **Restart discipline.** Adding or changing a plugin's Remote methods requires restarting `dsh web`; the typert manifest is cached per package name and HMR does not refresh it.
 - **Snapshot before upgrades.** When `dsh-undo-savepoint` is installed, the check prints the snapshot command to run before upgrading or editing plugins.
 
