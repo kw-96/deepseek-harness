@@ -162,10 +162,10 @@
 ### GitHub 操作
 
 - 严禁自动安装 GitHub CLI。
-- Git 提交、推送仍使用 Git；PR、Issue、Release 等 GitHub 平台操作使用 API 方式。
-- GitHub API 认证：优先使用本机已配置的 `gh api` 调用 GitHub REST API；它复用本地 GitHub OAuth，不要求当前 Codex 会话存在 `GITHUB_TOKEN` 或 `GH_TOKEN`。严禁自动安装 `gh`，也不得读取、输出、记录或提交原始令牌。
-- 创建 PR：先确认分支已推送，再通过 `gh api` 创建或查询目标 PR；必须回查 PR 的正式 `html_url` 后再向用户交付，不能只提供新建页或比较页链接。
-- `gh` 不可用时：必须尝试本机 Git 凭据管理器的 GitHub 凭据作为 REST API 回退路径。仅允许在单个进程内通过 `git credential fill` 获取 `https://github.com` 凭据并立即用于 `curl`/PowerShell REST 请求；令牌只能留在进程内存，严禁输出、写入文件、写入日志、提交或在回复中展示。不能因为缺少 `gh`、Netrc 或环境变量就直接放弃创建 PR。
-- REST API 创建 PR 流程：先用同一凭据查询 `head + base` 是否已有开放 PR；没有则 `POST /repos/{owner}/{repo}/pulls` 创建；随后 `GET /repos/{owner}/{repo}/pulls/{number}` 回查 `html_url`、`head.ref`、`base.ref` 和状态。只有这些字段确认正确后才能向用户交付正式链接。
+- Git 提交、推送仍使用 Git；PR、Issue、Release 等 GitHub 平台操作：**本机已安装 `gh` CLI 就用 `gh`**（含 `gh api`、`gh pr create` 等），**未安装才改走 GitHub REST API**（用 `curl`/PowerShell 直接请求）。
+- 认证：`gh` 可用时优先 `gh api`，它复用本机 GitHub OAuth，不要求当前会话存在 `GITHUB_TOKEN` 或 `GH_TOKEN`；`gh` 不可用时，仅允许在单个进程内通过 `git credential fill` 获取 `https://github.com` 凭据并立即用于 REST 请求。
+- 不得读取、输出、记录或提交原始 GitHub 令牌：令牌只能留在进程内存，严禁输出、写入文件、写入日志、提交或在回复中展示。
+- 创建 PR：先确认分支已推送，并先用同一凭据查询 `head + base` 是否已有开放 PR；`gh` 可用时用 `gh pr create`，否则 `POST /repos/{owner}/{repo}/pulls`。随后必须回查 `html_url`、`head.ref`、`base.ref` 和状态，只有这些字段确认正确后才能向用户交付正式链接，不能只提供新建页或比较页链接。
+- 不得因为缺少 `gh`、Netrc 或环境变量就直接放弃创建 PR。
 - 填写 PR 描述时使用 UTF-8 编码。
 - PR 完成后提供正式 PR 链接。

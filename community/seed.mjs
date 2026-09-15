@@ -9,6 +9,8 @@
  *
  * - skills:  copies any missing skill into $DSH_HOME/skills (never overwrites)
  * - home:    copies any missing global home file into $DSH_HOME (never overwrites)
+ * - presets: copies any missing agent preset file into $DSH_HOME/.agent-presets
+ *            (never overwrites; a preset the user edited stays untouched)
  * - profile: writes $DSH_HOME/profiles/web when it is absent; otherwise converges
  *            it on the template — tarball paths left by another checkout, bundles
  *            this host cannot install, bundles the template retired
@@ -194,6 +196,22 @@ if (existsSync(homeSrc)) {
     if (existsSync(join(dshHome, name))) continue
     await cp(join(homeSrc, name), join(dshHome, name))
     console.log(`[community] 安装全局文件 → ${name}`)
+  }
+}
+
+// Agent presets: fill in any missing preset file from community/presets;
+// never overwrite a preset the user already has at $DSH_HOME/.agent-presets.
+const presetsSrc = join(here, 'presets')
+const presetsDst = join(dshHome, '.agent-presets')
+if (existsSync(presetsSrc)) {
+  for (const id of await readdir(presetsSrc)) {
+    for (const name of await readdir(join(presetsSrc, id))) {
+      const dest = join(presetsDst, id, name)
+      if (existsSync(dest)) continue
+      await mkdir(dirname(dest), { recursive: true })
+      await cp(join(presetsSrc, id, name), dest)
+      console.log(`[community] 安装预设 → ${id}/${name}`)
+    }
   }
 }
 
