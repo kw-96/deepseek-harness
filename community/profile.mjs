@@ -167,7 +167,7 @@ export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [
     if (!bundles.includes(name) && dependencies[name] === undefined) continue
     dropBundle(name)
     delete dependencies[name]
-    changes.push(`下线 ${name}（新版模板已由其它插件取代）`)
+    changes.push(`下线 ${name}（不再随模板提供）`)
   }
   for (const [name, spec] of Object.entries(template.dependencies ?? {})) {
     if (dropped.has(name) || retired.includes(name) || dependencies[name] !== undefined) continue

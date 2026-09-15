@@ -1,5 +1,6 @@
 [
   "dsh-codex-left",
   "dsh-codex-shell",
-  "dsh-git-timeline"
+  "dsh-git-timeline",
+  "@linxin666/dsh-pet"
 ]
