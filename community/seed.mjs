@@ -215,11 +215,16 @@ if (existing === undefined || force) {
   const manifestChanges = repairProfile(existing, { tarballsUrl, dropped, template, retired })
   const changes = [...manifestChanges, ...await convergeProfileFiles(retired)]
   for (const change of changes) console.log(`[community] ${change}`)
-  // 只有清单真的变了才写回并安装。补丁层自愈是每次启动都会发生的机械修复——
-  // 社区插件每次启动都重写自己的托管块——让它在启动时触发一次 pnpm install
-  // 既慢又没有任何依赖变化可装。
+  // 清单变了，或这个 profile 从未装过依赖（新主机只带清单、node_modules 被删、
+  // 上次安装中断），才安装。补丁层自愈是每次启动都会发生的机械修复——社区插件
+  // 每次启动都重写自己的托管块——让它在启动时触发一次 pnpm install 既慢又没有
+  // 任何依赖变化可装。
+  const installedModules = join(profileDst, 'node_modules', '.modules.yaml')
   if (manifestChanges.length > 0) {
     await writeFile(profileManifest, renderProfile(existing), 'utf8')
+    installProfile()
+  } else if (!existsSync(installedModules)) {
+    console.log('[community] profile 尚未安装依赖，执行安装')
     installProfile()
   }
 }
