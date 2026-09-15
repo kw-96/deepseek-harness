@@ -13,7 +13,6 @@
         "dsh-mnemon",
         "dsh-plugin-manager",
         "@ruihuahe/dsh-plugin-marketplace",
-        "@linxin666/dsh-client-ui-skin-center",
         "@linxin666/dsh-session-archive",
         "@linxin666/dsh-doctor",
         "@linxin666/dsh-remote-web-ui",
@@ -25,7 +24,6 @@
   "dependencies": {
     "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
     "@huiliyi37/dsh-office": "0.2.1",
-    "@linxin666/dsh-client-ui-skin-center": "0.3.22",
     "@linxin666/dsh-doctor": "0.3.22",
     "@linxin666/dsh-remote-web-ui": "0.3.22",
     "@linxin666/dsh-session-archive": "0.3.22",
