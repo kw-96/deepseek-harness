@@ -106,6 +106,36 @@ function ensureBundle(name) {
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
+/**
+ * 把「只由 agent 预设挂载」的插件（没有 bundle 补丁的那些）连接进 harness
+ * 安装目录的 node_modules。
+ *
+ * 预设组成里的包名按安装位置解析——用户目录下的预设不是这些包的解析根，
+ * 而这类插件又不属于 profile 的组合包，因此只有这里替它建链接才解析得到。
+ * 幂等：目标已指向同一目录时跳过。
+ */
+function mountPresetPlugins() {
+  const retired = readRetired()
+  for (const dirName of readdirSync(packagesDir).sort()) {
+    const dir = join(packagesDir, dirName)
+    const manifestPath = join(dir, 'package.json')
+    if (!existsSync(manifestPath)) continue
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (typeof manifest.name !== 'string' || manifest.dsh?.bundle?.patch !== undefined) continue
+    if (retired.includes(manifest.name)) continue
+    const target = join(repoRoot, 'node_modules', manifest.name)
+    try {
+      if (lstatSync(target).isSymbolicLink()) unlinkSync(target)
+      else rmSync(target, { recursive: true, force: true })
+    } catch {
+      // 目标不存在则忽略。
+    }
+    mkdirSync(dirname(target), { recursive: true })
+    symlinkSync(dir, target, 'junction')
+    console.log(`[dev] 预设插件 junction 挂载 ${manifest.name} → ${dir}`)
+  }
+}
+
 if (!watchOnly) {
   enableHmr(packagesDir)
   console.log(`[dev] 已启用 Cordis HMR，root=${packagesDir}`)
@@ -130,6 +160,7 @@ if (!watchOnly) {
     symlinkSync(plugin.dir, target, 'junction')
     ensureBundle(plugin.name)
   }
+  mountPresetPlugins()
 }
 
 // 启动 watch 构建：双面插件跑 host/client 两套 tsc + tsdown，单面插件只跑 tsc。

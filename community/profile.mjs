@@ -9,10 +9,17 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import yaml from 'js-yaml'
 import { GITHUB_BUNDLES, INTERNAL_BUNDLES, NATIVE_BUNDLE_LIMITS, tarballAvailable } from './preflight.mjs'
 
 /** Placeholder seed substitutes with this checkout's tarballs directory. */
 export const TARBALLS_TOKEN = '__COMMUNITY_TARBALLS__'
+
+/** remote-web-ui 的 lan-bind 托管块标记：插件把它写在顶层数组之后。 */
+const MANAGED_BLOCK_BEGIN = '# --- remote-web-ui lan-bind block (managed - do not edit) ---'
+
+/** 同一托管块的结束标记。 */
+const MANAGED_BLOCK_END = '# --- end remote-web-ui lan-bind block ---'
 
 /** Path fragment identifying a dependency pinned to a community tarball. */
 const TARBALLS_MARKER = '/community/plugins/tarballs/'
@@ -233,12 +240,48 @@ export function retirePatchRows(text, retired) {
 }
 
 /**
+ * Fold a plugin's trailing block-style patch rows back into the profile patch
+ * array. `remote-web-ui`'s LAN-bind toggle appends a managed block sequence
+ * after the file's flow array, which leaves the document invalid YAML and costs
+ * the profile its entire user patch layer at the next boot. The rows are
+ * re-emitted as single-line flow rows inside the array, so the same cleanup
+ * rules (`retirePatchRows`) keep recognising them.
+ * @param text - the profile's cordis.patch.yml text.
+ * @returns the repaired text and the number of absorbed rows.
+ */
+export function absorbManagedBlock(text) {
+  const begin = text.indexOf(MANAGED_BLOCK_BEGIN)
+  if (begin === -1) return { text, absorbed: 0 }
+  const endMarkerAt = text.indexOf(MANAGED_BLOCK_END, begin)
+  const blockEnd = endMarkerAt === -1 ? text.length : endMarkerAt + MANAGED_BLOCK_END.length
+  const blockBody = text.slice(text.indexOf('\n', begin) + 1, endMarkerAt === -1 ? text.length : endMarkerAt)
+  const head = text.slice(0, begin).replace(/\s+$/u, '')
+  const close = head.lastIndexOf(']')
+  if (close === -1) return { text, absorbed: 0 }
+  let parsed
+  try {
+    parsed = yaml.load(blockBody) ?? []
+  } catch {
+    // 块本身不可解析时不猜内容，原样保留交给用户处理。
+    return { text, absorbed: 0 }
+  }
+  const rows = (Array.isArray(parsed) ? parsed : [])
+    .filter(row => row !== null && typeof row === 'object' && !Array.isArray(row))
+    .map(row => JSON.stringify(row))
+  if (rows.length === 0) return { text, absorbed: 0 }
+  const body = head.slice(0, close).replace(/\s+$/u, '')
+  const separator = body.endsWith('[') ? '' : ','
+  const tail = text.slice(blockEnd).replace(/^\s+/u, '')
+  const merged = `${body}${separator}\n${rows.map(row => `  ${row}`).join(',\n')}\n${head.slice(close)}`
+  return { text: tail === '' ? `${merged}\n` : `${merged}\n${tail}`, absorbed: rows.length }
+}
+
+/**
  * Whether one line is a complete single-line patch row naming a package.
  * @param line - one line of a patch file.
  * @param packageName - the package name to match.
  * @returns true when the line is that package's flow-style row.
- */
-function isFlowRowFor(line, packageName) {
+ */function isFlowRowFor(line, packageName) {
   const trimmed = line.trim()
   if (!trimmed.startsWith('{') || !trimmed.includes('}')) return false
   const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')

@@ -35,7 +35,7 @@ import { homedir, arch, platform } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { probe } from './preflight.mjs'
 import {
-  bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, renderProfile, repairProfile,
+  absorbManagedBlock, bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, renderProfile, repairProfile,
   retirePatchRows, unavailablePinned, unresolvableBundles,
 } from './profile.mjs'
 
@@ -104,7 +104,8 @@ async function readProfileManifest() {
 
 /**
  * Converge the profile's hand-editable configuration on the template: copy the
- * `allowBuilds` entries the profile is missing, and drop patch rows a retired
+ * `allowBuilds` entries the profile is missing, fold a plugin's trailing
+ * block-style patch rows back into the array, and drop patch rows a retired
  * bundle left behind. Both files carry user edits, so they are merged in place
  * instead of being rewritten from the template.
  * @param retired - retired package names.
@@ -125,11 +126,12 @@ async function convergeProfileFiles(retired) {
   }
   const patchPath = join(profileDst, 'cordis.patch.yml')
   if (existsSync(patchPath)) {
-    const result = retirePatchRows(await readFile(patchPath, 'utf8'), retired)
-    if (result.removed.length > 0) {
-      await writeFile(patchPath, result.text, 'utf8')
-      changes.push(`移除已下线插件的补丁行：${[...new Set(result.removed)].join('、')}`)
-    }
+    const original = await readFile(patchPath, 'utf8')
+    const absorbed = absorbManagedBlock(original)
+    if (absorbed.absorbed > 0) changes.push(`把插件写在数组之后的托管行并回补丁数组：${absorbed.absorbed} 行`)
+    const result = retirePatchRows(absorbed.text, retired)
+    if (result.removed.length > 0) changes.push(`移除已下线插件的补丁行：${[...new Set(result.removed)].join('、')}`)
+    if (result.text !== original) await writeFile(patchPath, result.text, 'utf8')
     for (const name of retired) {
       if (result.text.includes(name)) {
         console.warn(`[community] 请手动移除 ${patchPath} 中 ${name} 的补丁行（不是单行格式，无法自动识别）`)

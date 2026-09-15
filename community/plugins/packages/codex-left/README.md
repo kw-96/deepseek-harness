@@ -15,9 +15,9 @@ The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session br
 - **Project picker on the new-session page** (shadows `conversation.hero.workspace`): the workspace chip of the empty-session hero now selects a **project**; it lists projects (pinned > recent) + ungrouped workspaces + "New project..."; a project with several workspaces expands its worktrees first, a single-workspace project starts the session directly, and a project with no owning workspace is disabled with the reason shown.
 - **Visuals**: maps the host's `--dsw-*` theme tokens completely and follows light and dark themes automatically; the sidebar uses a minimal Codex-style arrangement (quiet grouping, single-line sessions, actions revealed on hover). [DESIGN.md](DESIGN.md) owns the visual decisions.
 
-## Composing with dsh-codex-shell
+## Composing with a terminal plugin
 
-The session menu's "Open with > Open in terminal" entry calls `codexShell.terminalOpen` on the bottom-terminal plugin. That plugin is **optional**: when `dsh-codex-shell` is not mounted the entry is disabled and shows "Requires the bottom terminal plugin (dsh-codex-shell)". Nothing else in this plugin depends on it.
+The session menu's "Open with > Open in terminal" entry opens a terminal through whichever terminal plugin is installed: `dsh-better-sidebar`'s workbench terminal tab when that plugin is present (the terminal this deployment uses), otherwise the self-made bottom-terminal plugin `dsh-codex-shell`, retired from this repository on 2026-09-15. With neither installed the entry reports the missing plugin; nothing else in this plugin depends on them.
 
 ## Install
 
@@ -63,5 +63,5 @@ Sessions, session search, forks, and workspace attach/move/archive come from the
 
 - Moving a project across directories requires changing the session cwd (deferred); attaching a session to a matching workspace in the same directory (`attachSession`) and "move to ungrouped" (`detachSession`) are complete.
 - Permanent worktrees / a Cursor opener still await the host: the menu entries stay disabled with their reason.
-- The "Open in terminal" entry needs `dsh-codex-shell`; without it the entry is disabled.
+- The "Open in terminal" entry needs a terminal plugin (`dsh-better-sidebar` or `dsh-codex-shell`); without one the entry reports the missing plugin.
 - The add-workspace picker ships with the plugin (directory browsing + path input) and does not reuse the native directoryFlow flow.

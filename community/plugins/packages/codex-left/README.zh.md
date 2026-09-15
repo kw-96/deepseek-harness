@@ -15,9 +15,9 @@ DeepSeek Harness（DSH）的 Codex 式左侧导航栏：会话浏览器（带持
 - **新建会话页的项目选择器**（遮蔽 `conversation.hero.workspace`）：空会话 hero 的工作区 chip 改为选择**项目**；列出项目（置顶 > 最近）+ 未分组工作区 + 「新建项目…」；多工作区项目先展开工作树，单工作区项目直接开会话，没有归属工作区的项目禁用并说明原因。
 - **视觉**：完整映射宿主 `--dsw-*` 主题令牌，自动跟随亮/暗主题；侧栏采用 Codex 式极简排布（安静分组、单行会话、悬停才显露操作）。视觉决策见 [DESIGN.md](DESIGN.md)。
 
-## 与 dsh-codex-shell 的组合
+## 与终端插件的组合
 
-会话菜单「打开方式 → 在终端中打开」调用底栏终端插件的 `codexShell.terminalOpen`。该插件是**可选的**：未挂载 `dsh-codex-shell` 时该项禁用并提示「未安装底栏终端插件（dsh-codex-shell）」。本插件其余功能不依赖它。
+会话菜单「打开方式 → 在终端中打开」按已安装的终端插件打开终端：装了侧边栏工作台插件（`dsh-better-sidebar`）时用它工作台的终端 tab（本部署当前用的就是这个终端），否则回落到自研底栏终端插件 `dsh-codex-shell`（本仓库 2026-09-15 已下线）。两者都没装时该项报错提示；本插件其余功能不依赖它们。
 
 ## 安装
 
@@ -63,5 +63,5 @@ node community/plugins/dev.mjs codex-left
 
 - 项目跨目录迁移需要改会话 cwd（本期未接入）；同目录下把会话挂到匹配工作区（`attachSession`）与「移到未分组」（`detachSession`）已完成。
 - 永久工作树 / Cursor 打开器仍待 Host：菜单项保持禁用并给出原因。
-- 「在终端中打开」需要 `dsh-codex-shell`；未安装时该项禁用。
+- 「在终端中打开」需要终端插件（`dsh-better-sidebar` 或 `dsh-codex-shell`）；都没有时该项报错提示缺失插件。
 - 添加工作区选择器随插件自带（目录浏览 + 路径输入），不复用原生 directoryFlow 流程。

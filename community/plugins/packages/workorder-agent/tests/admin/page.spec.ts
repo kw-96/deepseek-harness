@@ -47,13 +47,16 @@ describe('Ticket Hub 控制面', () => {
     expect(() => new Function(script ?? '')).not.toThrow()
   })
 
-  it('通过官方索引扩展挂入侧边栏设置区域', () => {
+  it('通过官方索引扩展挂入侧边栏页脚动作区', () => {
     const script = controlPanelNavigationScript()
     expect(script).not.toContain('</script')
+    expect(script).toContain("querySelector('[class*=footerActions]')")
     expect(script).toContain("querySelector('[class*=settingsArea]')")
     expect(script).toContain("const path='/workorder-agent'")
-    expect(script).toContain("link.textContent='Ticket Hub'")
+    expect(script).toContain("const label='Ticket Hub'")
+    expect(script).toContain('data-workorder-entry-label')
     expect(script).not.toContain('工单控制面')
+    expect(() => new Function(script)).not.toThrow()
     const html = injectControlPanelNavigation('<html><body><main></main></body></html>')
     expect(html).toContain('data-workorder-navigation')
   })

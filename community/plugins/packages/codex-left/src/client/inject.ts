@@ -2,8 +2,8 @@
  * 注入面工厂：把 apply 闭包里的服务组装成各槽位组件需要的业务回调。
  *
  * 槽位框架按注册项缓存 inject 结果，所以这里返回的闭包必须自己读取可能
- * 后挂载的服务（例如底栏终端插件 dsh-codex-shell 的 remote），不能在
- * 工厂里一次性求值成布尔值。
+ * 后挂载的服务（例如侧边栏工作台插件 dsh-better-sidebar 的服务、底栏终端
+ * 插件 dsh-codex-shell 的 remote），不能在工厂里一次性求值成布尔值。
  */
 
 import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
@@ -14,7 +14,8 @@ import type { ProjectPickerInjected } from './overlays/hero-picker.js'
 import type { CodexBrowserInjected } from './browser/WorkspaceBrowser.js'
 import { exportSessionMarkdown } from './state/export-markdown.js'
 import type {
-  CodexLeftRemoteFace, LayoutFace, RemoteResult, SessionId, SessionsFace, TerminalOpenFace, WorkspacesFace,
+  BetterSidebarFace, CodexLeftRemoteFace, LayoutFace, RemoteResult, SessionId, SessionsFace, TerminalOpenFace,
+  WorkspacesFace,
 } from './faces.js'
 
 /** 会话面板的工作区打开动作（宿主 session remote 的可选方法）。 */
@@ -30,6 +31,8 @@ export interface CodexLeftDeps {
   sessionRemote: OpenWorkspacePathFace | undefined
   connection: unknown
   layout: LayoutFace | undefined
+  /** 侧边栏工作台插件的服务；未安装 dsh-better-sidebar 时返回 undefined。 */
+  better: () => BetterSidebarFace | undefined
   /** 底栏终端插件的 remote；未安装 dsh-codex-shell 时返回 undefined。 */
   terminal: () => TerminalOpenFace | undefined
   meta: SessionMetaStore
@@ -46,10 +49,24 @@ export function unwrap<T>(result: RemoteResult<T>): T {
   throw new Error(`${result.error.code}: ${result.error.message}`)
 }
 
-/** 在底栏终端里打开会话目录；未安装终端插件时抛出可读错误。 */
+/**
+ * 在会话的终端里打开目录。
+ *
+ * 优先用侧边栏工作台插件的终端 tab（当前部署的终端就在这里，一个会话一个
+ * 终端实例）；它缺席时回落到自研底栏终端插件的 remote；两者都没有才报错。
+ * @param deps - 注入面依赖包
+ * @param sessionId - 目标会话
+ * @param cwd - 会话工作目录（可缺省）
+ */
 async function openTerminalForSession(deps: CodexLeftDeps, sessionId: SessionId, cwd?: string): Promise<void> {
+  const scope = cwd === undefined || cwd === '' ? { sessionId } : { sessionId, cwd }
+  const better = deps.better()
+  if (better !== undefined) {
+    better.openTab({ type: 'terminal' }, scope)
+    return
+  }
   const shell = deps.terminal()
-  if (shell === undefined) throw new Error('未安装底栏终端插件 dsh-codex-shell')
+  if (shell === undefined) throw new Error('未安装终端插件（dsh-better-sidebar 或 dsh-codex-shell）')
   if (deps.layout !== undefined) deps.layout.openBottom()
   await unwrap(await shell.terminalOpen(sessionId, cwd === undefined || cwd === '' ? {} : { cwd }))
 }

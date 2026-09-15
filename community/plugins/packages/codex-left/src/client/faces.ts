@@ -84,6 +84,24 @@ export interface TerminalOpenFace {
   }): Promise<RemoteResult<{ terminalId: string; output: string; status: { kind: string }; name?: string; origin: 'ui' | 'agent' }>>
 }
 
+/**
+ * 侧边栏工作台插件（dsh-better-sidebar）的 openTab 面。
+ *
+ * 它只在客户端半边注册服务，所以这里按结构面调用、运行时缺席即回落：装了
+ * 该插件的部署里，会话菜单的「在终端中打开」用的是用户当前在用的那个终端。
+ */
+export interface BetterSidebarFace {
+  /**
+   * 打开一个 tab；`terminal` 类型即该插件的工作台终端。
+   * @param seed - tab 种子（类型、可选标题与停靠位）
+   * @param scope - 目标会话与工作目录；缺省为当前会话
+   */
+  openTab(
+    seed: { type: string; title?: string; target?: 'right' | 'bottom' },
+    scope?: { sessionId: SessionId; cwd?: string },
+  ): void
+}
+
 /** Typert client remote face the gateway provides. */
 export interface RemoteFace {
   $mount(contribution: unknown): Promise<() => Promise<void>>
