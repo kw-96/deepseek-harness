@@ -22,11 +22,11 @@ overrides:
   '@deepseek-ai/dsh-pwsh-local': 0.1.2-rc.1
   '@deepseek-ai/schemastery': 3.18.2
 
-# 依赖补丁：本 fork 把 Codex 导入会话持久化为 `codex-<thread-id>`，而
-# dsh-session-archive 把「不以 session- 开头」的 id 一律补前缀，于是归档管理整列
-# 缺标题、每轮自动归档也全部失败。补丁只对裸 uuid 段补前缀，并放宽预览路由校验；
-# 旧布局的投影缓存按裸 uuid 命名，补丁同时补上文件名回退。另外：草稿（零消息的空白
-# 会话，即「新建会话」留下的空壳）不进归档桶，超过一天没人用过就直接回收。
+# 依赖补丁（dsh-session-archive）：本 fork 的历史会话 id 就是裸 uuid（Codex 导入会话
+# 则是 `codex-<thread-id>`），而插件把「不以 session- 开头」的 id 一律补前缀，造出宿主
+# 与磁盘都不认识的名字——归档管理整列缺标题、每轮自动归档全部失败。补丁改为原样使用
+# 宿主报出的 id，并放宽预览路由校验、补上旧布局投影缓存的文件名回退；另外：草稿
+# （零消息的空白会话，即「新建会话」留下的空壳）不进归档桶，超过一天没人用过就回收。
 # 补丁文件随模板播种，重装或重新播种 profile 都会自动重放。
 patchedDependencies:
   '@linxin666/dsh-session-archive@0.3.22': patches/@linxin666__dsh-session-archive@0.3.22.patch

@@ -1,5 +1,5 @@
 diff --git a/lib/index.js b/lib/index.js
-index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805e1b8c55c 100644
+index ead372504f7fbf59943162434c2186f4adcc2abe..4c4d8c51de891cc1d6bd3b240ad23f86375ae958 100644
 --- a/lib/index.js
 +++ b/lib/index.js
 @@ -59,6 +59,9 @@ function autoArchiveCandidates(rows, options) {
@@ -45,25 +45,22 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  /**
  * Sessions eligible for auto-delete BEFORE family-cascade planning: archived
  * with a KNOWN archive time, older than the retention threshold, and archived
-@@ -237,7 +266,16 @@ function resolveAutoConfig(config) {
+@@ -237,7 +266,13 @@ function resolveAutoConfig(config) {
  * inventory never produces phantom duplicate rows.
  */
  function canonicalSessionId(segment) {
 -	return segment.startsWith("session-") ? segment : `session-${segment}`;
-+	// 本地补丁（deepseek-harness fork）：宿主报出的 id 才是权威。本部署把 Codex 导入
-+	// 会话持久化为 `codex-<thread-id>`，其磁盘目录同名；原规则「不以 session- 开头就
-+	// 加前缀」会把它改写成 `session-codex-…`——这个名字在任何地方都不存在：projection
-+	// cache 文件查不到（归档管理里整列缺标题），归档/取消归档又带着未知 id 打到宿主
-+	// （每轮 auto sweep 全部失败）。只对遗留的裸 uuid 段补前缀，那正是该规则当初要
-+	// 处理的目录形态。
-+	if (segment.startsWith("session-")) return segment;
-+	return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(segment)
-+		? `session-${segment}`
-+		: segment;
++	// 本地补丁（deepseek-harness fork）：宿主报出的 id 才是权威，插件原样使用即可。
++	// 原规则「不以 session- 开头就补前缀」假设旧布局的目录丢了前缀、而规范 id 带前缀；
++	// 本部署的历史会话 id 本身就是裸 uuid（Codex 导入会话则是 `codex-<thread-id>`），
++	// 补前缀会造出宿主与磁盘都不认识的名字：归档/取消归档/删除全部失败（每轮 auto sweep
++	// 33 项失败），projection cache 也就查不到（归档管理整列缺标题）。本部署的目录段与
++	// feed id 逐字一致，原样返回让目录、feed、ledger 三处来源自然归一。
++	return segment;
  }
  function dirSize(path) {
  	let total = 0;
-@@ -421,21 +459,28 @@ function titleFromProjcache(entry) {
+@@ -421,21 +456,28 @@ function titleFromProjcache(entry) {
  */
  async function readProjcacheFile(dshHome, id, cache) {
  	if (cache !== void 0 && cache.has(id)) return cache.get(id) ?? void 0;
@@ -106,7 +103,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  	}
  	if (cache !== void 0) cache.set(id, entry ?? null);
  	return entry;
-@@ -1234,7 +1279,13 @@ var ArchiveService = class {
+@@ -1234,7 +1276,13 @@ var ArchiveService = class {
  			runStartedAt: now,
  			protectedIds: protectedSet
  		}) : [];
@@ -121,7 +118,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  		let deleteBytes = 0;
  		for (const id of plan.targets) {
  			const size = built.rows.find((row) => row.id === id)?.sizeBytes;
-@@ -1266,14 +1317,16 @@ var ArchiveService = class {
+@@ -1266,14 +1314,16 @@ var ArchiveService = class {
  			try {
  				if (kind === "archive") {
  					const built = await buildInventory(this.sources(), AbortSignal.timeout(3e4));
@@ -140,7 +137,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  					this.autoState.lastArchiveRun = stats;
  					await this.flushState();
  					return stats;
-@@ -1287,22 +1340,16 @@ var ArchiveService = class {
+@@ -1287,22 +1337,16 @@ var ArchiveService = class {
  					runStartedAt: startedAt,
  					protectedIds: protectedSet
  				});
@@ -166,7 +163,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  				this.autoState.lastDeleteRun = stats;
  				await this.flushState();
  				return stats;
-@@ -1311,6 +1358,24 @@ var ArchiveService = class {
+@@ -1311,6 +1355,24 @@ var ArchiveService = class {
  			}
  		});
  	}
@@ -191,7 +188,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805
  	/** Archive without re-acquiring the lock (used inside cycles). */
  	async archiveInternal(ids, source, currentSessionId) {
  		const results = [];
-@@ -1631,7 +1696,9 @@ function makePreviewRoute(service) {
+@@ -1631,7 +1693,9 @@ function makePreviewRoute(service) {
  		handler: async (req, res) => {
  			if (!fenced(req, res)) return;
  			const id = new URL(req.url ?? "/", "http://localhost").searchParams.get("id") ?? "";
