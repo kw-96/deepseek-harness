@@ -3,11 +3,9 @@
 
 mod alert;
 mod backend;
-mod bootstrap;
 mod child;
 mod external_links;
 mod resolve;
-mod snapshot;
 
 use child::ChildSlot;
 use std::env;

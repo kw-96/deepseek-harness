@@ -1,25 +1,20 @@
 //! `dsh web` 子进程的启动、持有、结束与退出查询。
 
-use crate::{resolve, snapshot};
-use std::path::PathBuf;
+use crate::resolve;
 use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-
-/// 指向本会话前端 dist 快照的环境变量。
-const DIST_INDEX_ENV: &str = "DSH_WEB_DIST_INDEX";
 
 /// 保存当前 `dsh web` 子进程的槽位；窗口关闭与后端看护共用。
 pub(crate) type ChildSlot = Arc<Mutex<Option<HarnessChild>>>;
 
 pub(crate) struct HarnessChild {
   child: Child,
-  dist_snapshot: Option<PathBuf>,
 }
 
 impl HarnessChild {
-  /// 结束子进程树并删除本会话的 dist 快照。
+  /// 结束子进程树。
   fn kill_tree(&mut self) {
     // 已退出的子进程不再按 pid 结束进程树：pid 可能已被系统复用，taskkill 会
     // 误杀无关进程。
@@ -44,14 +39,6 @@ impl HarnessChild {
         let _ = self.child.kill();
         let _ = self.child.wait();
       }
-    }
-    self.remove_snapshot();
-  }
-
-  /// 删除本会话的 dist 快照目录。
-  fn remove_snapshot(&mut self) {
-    if let Some(index) = self.dist_snapshot.take() {
-      snapshot::remove_snapshot(&index);
     }
   }
 
@@ -116,20 +103,14 @@ fn apply_no_window(command: &mut Command) {
 
 /// 启动 `dsh web --no-open` 并返回子进程与其输出管道。
 ///
-/// 找到 checkout CLI 时先按需安装依赖、刷新前端并快照 dist，再把快照路径通过
-/// `DIST_INDEX_ENV` 交给子进程，使本次会话不受后续重建影响。
+/// 壳只做窗口与进程看护：不安装依赖、不构建前端，直接使用检出目录里已经构建好的
+/// `apps/web/dist` 等产物。
 /// @param extra_args - 追加在 `--no-open` 之后的 CLI 参数。
-/// @param on_line - 接收安装与构建进度的行回调。
 /// @returns 子进程、标准输出与标准错误管道。
 pub(crate) fn spawn(
   extra_args: &[String],
-  on_line: &mut dyn FnMut(&str),
 ) -> Result<(HarnessChild, ChildStdout, ChildStderr), String> {
   let (cli, cwd) = resolve::resolve_dsh_cli()?;
-  let dist_snapshot = match cwd.as_ref() {
-    Some(root) => Some(snapshot::snapshot_web_dist(root, on_line)?),
-    None => None,
-  };
 
   let mut command =
     if cfg!(windows) && cli.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("cmd")) {
@@ -156,10 +137,6 @@ pub(crate) fn spawn(
   if let Some(dir) = cwd.as_ref() {
     command.current_dir(dir);
   }
-  if let Some(index) = dist_snapshot.as_ref() {
-    command.env(DIST_INDEX_ENV, index);
-  }
-
   let mut child = command
     .spawn()
     .map_err(|error| format!("failed to spawn {}: {error}", cli.display()))?;
@@ -171,12 +148,5 @@ pub(crate) fn spawn(
     .stderr
     .take()
     .ok_or_else(|| "dsh web stderr was not piped".to_string())?;
-  Ok((
-    HarnessChild {
-      child,
-      dist_snapshot,
-    },
-    stdout,
-    stderr,
-  ))
+  Ok((HarnessChild { child }, stdout, stderr))
 }

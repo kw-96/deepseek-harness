@@ -39,7 +39,7 @@ pub(crate) fn run_backend(
   let mut navigated = false;
   let mut failures = 0usize;
   loop {
-    let (harness, stdout, stderr) = child::spawn(args, on_line)?;
+    let (harness, stdout, stderr) = child::spawn(args)?;
     {
       let mut guard = slot.lock().map_err(|_| "child lock poisoned".to_string())?;
       *guard = Some(harness);
