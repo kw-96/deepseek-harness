@@ -71,23 +71,9 @@ export interface CodexLeftRemoteFace {
 }
 
 /**
- * 底栏终端插件（dsh-codex-shell）的 remote 面：左侧只读其中的「打开终端」。
- * 该服务仅在安装了 dsh-codex-shell 时存在，缺失时侧栏菜单对应项禁用。
- */
-export interface TerminalOpenFace {
-  terminalOpen(sessionId: SessionId, options?: {
-    cwd?: string
-    name?: string
-    shellDialect?: 'bash' | 'pwsh'
-    cols?: number
-    rows?: number
-  }): Promise<RemoteResult<{ terminalId: string; output: string; status: { kind: string }; name?: string; origin: 'ui' | 'agent' }>>
-}
-
-/**
  * 侧边栏工作台插件（dsh-better-sidebar）的 openTab 面。
  *
- * 它只在客户端半边注册服务，所以这里按结构面调用、运行时缺席即回落：装了
+ * 它只在客户端半边注册服务，所以这里按结构面调用、运行时缺席即报错：装了
  * 该插件的部署里，会话菜单的「在终端中打开」用的是用户当前在用的那个终端。
  */
 export interface BetterSidebarFace {
@@ -167,12 +153,6 @@ export type RenderSlotFn = (
   owner: unknown,
   options?: { fallback?: ReactNode },
 ) => ReactNode
-
-/** 宿主 ui-layout 的 ctx.layout 面板动作面：驱动底部行开合。 */
-export interface LayoutFace {
-  openBottom(): void
-  closeBottom(): void
-}
 
 export type TFn = (key: string, params?: Record<string, unknown>) => string
 

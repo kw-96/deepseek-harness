@@ -4,10 +4,8 @@
  * 遮蔽 sidebar.workspaces 的 Codex 式工作区浏览器、隐藏侧栏顶部品牌文字、
  * 挂在侧栏页脚槽位的添加工作区弹窗，以及新建会话页的项目选择器。
  *
- * 终端：会话菜单的「在终端中打开」优先走侧边栏工作台插件（dsh-better-sidebar）
- * 的终端 tab——那是当前部署里用户在用的终端；该插件缺席时回落到自研底栏终端
- * 插件（dsh-codex-shell）的 `remote.codexShell.terminalOpen`，两者都没有时该
- * 菜单项报错提示，不构成硬依赖。
+ * 终端：会话菜单的「在终端中打开」走侧边栏工作台插件（dsh-better-sidebar）的
+ * 终端 tab——那是当前部署里用户在用的终端；该插件缺席时菜单项报错提示。
  * 插件/MCP/Skills 统一走宿主「设置 → 插件」。
  *
  * 对宿主编译采用本地结构面（faces.ts）而非宿主编排类型线；运行时的
@@ -28,14 +26,13 @@ import {
 import { en, zh } from './locales.js'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {
-  BetterSidebarFace, CodexLeftRemoteFace, LayoutFace, LocaleFace, RemoteFace, SessionsFace, SlotsFace,
-  TerminalOpenFace, WorkspacesFace,
+  BetterSidebarFace, CodexLeftRemoteFace, LocaleFace, RemoteFace, SessionsFace, SlotsFace, WorkspacesFace,
 } from './faces.js'
 
 export const inject = ['slots', 'locale', 'remote', 'sessions', 'workspaces', 'connection']
 
 /**
- * 组装注入面依赖包：终端相关服务用取值函数延迟读取，插件后挂载也能生效。
+ * 组装注入面依赖包：终端服务用取值函数延迟读取，插件后挂载也能生效。
  * @param ctx - 客户端根上下文。
  * @returns 各槽位注入面工厂共享的依赖。
  */
@@ -46,9 +43,7 @@ function dependencies(ctx: Context): CodexLeftDeps {
     codexLeft: ctx.get('remote.codexLeft') as CodexLeftRemoteFace,
     sessionRemote: ctx.get('remote.session') as OpenWorkspacePathFace | undefined,
     connection: ctx.get('connection'),
-    layout: ctx.get('layout') as LayoutFace | undefined,
     better: () => ctx.get('betterSidebar') as BetterSidebarFace | undefined,
-    terminal: () => ctx.get('remote.codexShell') as TerminalOpenFace | undefined,
     meta: new SessionMetaStore(),
     prefs: new BrowserPrefsStore(),
   }

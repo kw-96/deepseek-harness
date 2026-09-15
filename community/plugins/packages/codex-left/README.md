@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session browser with a durable project tier, the add-workspace dialog, and the new-session project picker, in **one bundle plugin**. The multi-tab bottom terminal ships separately as `dsh-codex-shell`, which this repository retired on 2026-09-15 (its source stays in git history); with that plugin installed the two compose, and each also works alone.
+The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session browser with a durable project tier, the add-workspace dialog, and the new-session project picker, in **one bundle plugin**. The session menu's "Open in terminal" opens the workbench terminal of `dsh-better-sidebar`; the self-made bottom-terminal plugin `dsh-codex-shell` was retired from this repository on 2026-09-15 (its source stays in git history).
 
 ## Features
 
@@ -17,7 +17,7 @@ The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session br
 
 ## Composing with a terminal plugin
 
-The session menu's "Open with > Open in terminal" entry opens a terminal through whichever terminal plugin is installed: `dsh-better-sidebar`'s workbench terminal tab when that plugin is present (the terminal this deployment uses), otherwise the self-made bottom-terminal plugin `dsh-codex-shell`, retired from this repository on 2026-09-15. With neither installed the entry reports the missing plugin; nothing else in this plugin depends on them.
+The session menu's "Open with > Open in terminal" entry opens `dsh-better-sidebar`'s workbench terminal tab for that session: it is the terminal this deployment uses, one instance per conversation. That plugin is the only supported terminal host; without it the entry reports the missing plugin, and nothing else in this plugin depends on it.
 
 ## Install
 
@@ -63,5 +63,5 @@ Sessions, session search, forks, and workspace attach/move/archive come from the
 
 - Moving a project across directories requires changing the session cwd (deferred); attaching a session to a matching workspace in the same directory (`attachSession`) and "move to ungrouped" (`detachSession`) are complete.
 - Permanent worktrees / a Cursor opener still await the host: the menu entries stay disabled with their reason.
-- The "Open in terminal" entry needs a terminal plugin (`dsh-better-sidebar` or `dsh-codex-shell`); without one the entry reports the missing plugin.
+- The "Open in terminal" entry needs `dsh-better-sidebar`; without it the entry reports the missing plugin.
 - The add-workspace picker ships with the plugin (directory browsing + path input) and does not reuse the native directoryFlow flow.
