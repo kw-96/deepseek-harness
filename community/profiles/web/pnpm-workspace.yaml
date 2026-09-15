@@ -10,8 +10,8 @@ allowBuilds:
   # better-sqlite3 自带预编译二进制（prebuilds/win32-x64.node），无需源码编译；
   # 显式拒绝 node-gyp 构建，避免无 Visual Studio 的机器安装失败。
   better-sqlite3: false
-  # cloudflared 仅用于 remote-web-ui 的公网隧道；局域网直连不需要它，
-  # 显式拒绝以免下载二进制。要开公网隧道时改为 true 并重跑安装。
+  # cloudflared 仅用于 remote-web-ui 的公网隧道；本部署用局域网直连 + 扫码配对，
+  # 不需要它，显式拒绝以免每台主机都下载二进制。要开公网隧道时改为 true 并重跑安装。
   cloudflared: false
   # better-sidebar 的真实终端依赖 node-pty 的原生二进制；pnpm 11 默认拦截
   # 构建脚本会导致「node-pty 加载失败」，这里显式放行。

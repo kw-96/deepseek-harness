@@ -244,8 +244,10 @@ export function retirePatchRows(text, retired) {
  * array. `remote-web-ui`'s LAN-bind toggle appends a managed block sequence
  * after the file's flow array, which leaves the document invalid YAML and costs
  * the profile its entire user patch layer at the next boot. The rows are
- * re-emitted as single-line flow rows inside the array, so the same cleanup
- * rules (`retirePatchRows`) keep recognising them.
+ * re-emitted as single-line flow rows inside the array — replacing an existing
+ * row with the same id, so re-absorbing a rewritten block never leaves two rows
+ * competing — and the same cleanup rules (`retirePatchRows`) still recognise
+ * them.
  * @param text - the profile's cordis.patch.yml text.
  * @returns the repaired text and the number of absorbed rows.
  */
@@ -255,9 +257,6 @@ export function absorbManagedBlock(text) {
   const endMarkerAt = text.indexOf(MANAGED_BLOCK_END, begin)
   const blockEnd = endMarkerAt === -1 ? text.length : endMarkerAt + MANAGED_BLOCK_END.length
   const blockBody = text.slice(text.indexOf('\n', begin) + 1, endMarkerAt === -1 ? text.length : endMarkerAt)
-  const head = text.slice(0, begin).replace(/\s+$/u, '')
-  const close = head.lastIndexOf(']')
-  if (close === -1) return { text, absorbed: 0 }
   let parsed
   try {
     parsed = yaml.load(blockBody) ?? []
@@ -265,10 +264,20 @@ export function absorbManagedBlock(text) {
     // 块本身不可解析时不猜内容，原样保留交给用户处理。
     return { text, absorbed: 0 }
   }
-  const rows = (Array.isArray(parsed) ? parsed : [])
+  const entries = (Array.isArray(parsed) ? parsed : [])
     .filter(row => row !== null && typeof row === 'object' && !Array.isArray(row))
-    .map(row => JSON.stringify(row))
-  if (rows.length === 0) return { text, absorbed: 0 }
+  if (entries.length === 0) return { text, absorbed: 0 }
+  const taken = entries.map(row => row.id).filter(id => typeof id === 'string')
+  // 同名行在被吸收的那次里可能出现两份（插件每次启动都会重写托管块），
+  // 先按 id 去掉数组里已有的行，避免留下互相竞争的两行。
+  const head = text.slice(0, begin).replace(/\s+$/u, '')
+    .split(/\r?\n/)
+    .filter(line => !taken.some(id => isFlowRowForId(line, id)))
+    .join('\n')
+    .replace(/\s+$/u, '')
+  const close = head.lastIndexOf(']')
+  if (close === -1) return { text, absorbed: 0 }
+  const rows = entries.map(row => JSON.stringify(row))
   const body = head.slice(0, close).replace(/\s+$/u, '')
   const separator = body.endsWith('[') ? '' : ','
   const tail = text.slice(blockEnd).replace(/^\s+/u, '')
@@ -277,15 +286,29 @@ export function absorbManagedBlock(text) {
 }
 
 /**
+ * Whether one line is a complete single-line patch row carrying the given id.
+ * @param line - one line of a patch file.
+ * @param id - the row id to match.
+ * @returns true when the line is that id's flow-style row.
+ */
+function isFlowRowForId(line, id) {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('{') || !trimmed.includes('}')) return false
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+  return new RegExp(`['"]?id['"]?\\s*:\\s*['"]?${escaped}['"]?\\s*[,}]`, 'u').test(trimmed)
+}
+
+/**
  * Whether one line is a complete single-line patch row naming a package.
  * @param line - one line of a patch file.
  * @param packageName - the package name to match.
  * @returns true when the line is that package's flow-style row.
- */function isFlowRowFor(line, packageName) {
+ */
+function isFlowRowFor(line, packageName) {
   const trimmed = line.trim()
   if (!trimmed.startsWith('{') || !trimmed.includes('}')) return false
   const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-  return new RegExp(`name:\\s*['"]?${escaped}['"]?\\s*[,}]`, 'u').test(trimmed)
+  return new RegExp(`['"]?name['"]?\\s*:\\s*['"]?${escaped}['"]?\\s*[,}]`, 'u').test(trimmed)
 }
 
 /**
