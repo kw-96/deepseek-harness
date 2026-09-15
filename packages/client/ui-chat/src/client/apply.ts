@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { BoundActions, ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 // Type-only service and declaration merges used by the apply world.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -127,6 +128,11 @@ export function apply(ctx: Context): void {
               path: resolveWorkspacePath(cwd, path),
             })
             if (!result.ok) throw new Error(`path open failed: ${result.error.message}`)
+          },
+          openSkill: (name) => {
+            const scope = ctx.sessions.scope(sessionId)
+            if (scope === undefined) return
+            ctx.get('inputTriggers')?.sessionOf(scope).openReference('skill', { ref: `/${name}` })
           },
           loadOlder: () => { void session.loadOlder() },
           loadThrough: seq => session.loadThrough(seq),

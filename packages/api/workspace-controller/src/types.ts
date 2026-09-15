@@ -121,7 +121,7 @@ export interface WorkspaceArchiveSessionRequest {
   readonly sessionId: SessionId
 }
 
-/** Session requested back from the registry-global archive set. */
+/** Session requested for restoration from the archived Session list. */
 export interface WorkspaceUnarchiveSessionRequest {
   readonly sessionId: SessionId
 }

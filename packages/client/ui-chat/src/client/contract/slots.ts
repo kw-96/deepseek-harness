@@ -80,6 +80,8 @@ export interface ChatNodeTurnDataInjected {
 export interface ChatNodeOwnerProps {
   selectedCallId?: ToolCallId | undefined
   cwd?: string | undefined
+  /** Open the current source file of a skill referenced by a sent message. */
+  openSkill: (name: string) => void
   openFile: (path: string, options?: OpenFileOptions) => void
   inspectCall: (callId: ToolCallId) => void
   forkAt: (seq: number) => void
@@ -144,6 +146,8 @@ export interface ChatViewInjected {
     /** Resolve the stable Turn-process source for one Chat Node key. */
     chatNodeProcess: (key: string) => ChatNodeProcessSource
   }
+  /** Open the current source file of a skill referenced by a sent message. */
+  openSkill: (name: string) => void
   openFile: (path: string, options?: OpenFileOptions) => Promise<void>
   /** Select one Tool call and open the Chat details panel on it. */
   openDetails: (target: SelectionTarget) => void

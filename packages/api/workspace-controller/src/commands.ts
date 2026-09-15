@@ -195,8 +195,10 @@ export class WorkspaceCommands {
   }
 
   /**
-   * Return one archived Session to every grouping surface.
-   * @param request - Session identity to restore.
+   * Drop one Session from the registry-global archive set. An id that is not
+   * archived is not an error: the call is idempotent, so a lost race with
+   * another surface resolves as a no-op.
+   * @param request - Session identity to unarchive.
    * @returns the complete resulting archive set.
    */
   async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue> {

@@ -25,10 +25,9 @@ type WorkspaceId = Branded<'WorkspaceId'>
 ```ts type-equiv
 /**
  * One workspace: a stable id over an existing directory, a display title, and
- * an ordered account of sessions. The directory is the default location for
- * new sessions and the Explorer target; membership is an explicit, durable
- * account and does not require a session's cwd to equal {@link path}.
- * Consumers only see this interface; the implementation stays private.
+ * an ordered candidate account of sessions. Membership requires both an id in
+ * that account and a session header whose canonical cwd equals the workspace
+ * path. Consumers only see this interface; the implementation stays private.
  */
 interface Workspace {
   /** Stable record id (generated uuid). */
@@ -51,10 +50,12 @@ interface Workspace {
   readonly updatedAt: string
 
   /**
-   * Explicitly accounted sessions in manually owned order: a new session is
+   * Header-validated sessions in manually owned order: a new session is
    * prepended at attach, explicit reordering goes through
-   * `insertSessionBefore`, and activity never reorders. The account is not
-   * filtered by cwd; a session may be moved across workspaces freely.
+   * `insertSessionBefore`, and activity never reorders. The durable candidate
+   * account is filtered synchronously: missing headers, invalid cwd values,
+   * and canonical cwd mismatches are never returned. A subsequent workspace
+   * mutation prunes those filtered candidates durably.
    */
   readonly sessionIds: readonly SessionId[]
 
@@ -66,9 +67,13 @@ interface Workspace {
   setTitle(title: string): Promise<void>
 
   /**
-   * Prepend a session to this workspace's account. An already accounted id
-   * resolves without writing. A new id must exist in the session store or
-   * persistence; unknown ids reject without writing.
+   * Prepend a session to this workspace's candidate account. An already
+   * accounted id resolves without writing, aside from the durable
+   * filtered-candidate prune every accepted mutation performs. A new id's
+   * live or persisted
+   * header cwd must resolve to an existing directory equal to {@link path};
+   * unknown ids, missing or invalid cwd values, and mismatches reject without
+   * writing.
    * @param sessionId - The session to record.
    * @returns resolution after durability.
    */
@@ -79,7 +84,9 @@ interface Workspace {
    * with an anchor the session lands before it, without one it appends to the
    * end. Only the moved id changes position. A session or anchor absent from
    * the account rejects without writing; a move to the current position
-   * resolves without writing; decided on the domain write chain.
+   * resolves without writing, aside from the durable filtered-candidate
+   * prune every accepted mutation performs; decided on the domain write
+   * chain.
    * @param sessionId - The accounted session to move.
    * @param beforeSessionId - Accounted anchor to insert before; omitted appends.
    * @returns resolution after durability.
@@ -88,8 +95,9 @@ interface Workspace {
 
   /**
    * Remove a session from this workspace's account. Idempotent: an id not on
-   * the account resolves without writing; decided on the domain write chain
-   * like attach. Never touches the session's own stored log.
+   * the account resolves without writing, aside from the durable
+   * filtered-candidate prune every accepted mutation performs; decided on
+   * the domain write chain like attach. Never touches the session's own stored log.
    * @param sessionId - The session to remove.
    * @returns resolution after durability.
    */
@@ -115,7 +123,7 @@ interface Workspace {
 
 ## 消费方
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD 与会话归属（`attachSession` / `detachSession` / `insertSessionBefore`），[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD，[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -175,6 +183,97 @@ Host service backing the generated `ctx.remote.directoryPicker` namespace. The s
 
 Source: [`packages/api/workspace-controller/src/directory-picker.ts`](../../packages/api/workspace-controller/src/directory-picker.ts)
 
+<a id="ctxterminalcontroller--terminalcontroller"></a>
+
+### `ctx.terminalController` — `TerminalController`
+
+Typed Remote control of transient Session-owned terminal processes.
+
+```ts cordis-catalog
+/**
+ * Read the Session working directory and terminal limits without resolving a shell.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param signal - request cancellation.
+ * @returns the Session workspace directory and terminal limits.
+ */
+@Remote environment(agent: Agent, signal: AbortSignal): TerminalEnvironment
+
+/**
+ * Discover installed shells in the Session's execution environment.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param signal - request cancellation.
+ * @returns verified profiles, with the configured or system default first.
+ */
+@Remote shells(agent: Agent, signal: AbortSignal): Promise<TerminalShell[]>
+
+/**
+ * List retained terminals without resolving or activating an Agent.
+ * @param sessionId - displayed Session identity, including offline history.
+ * @returns terminals retained for this Host lifetime.
+ */
+@Remote list(sessionId: SessionId): WebTerminalInfo[]
+
+/**
+ * Allocate an interactive shell once for a caller-generated identity.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param request - initial dimensions and idempotency identity.
+ * @param signal - allocation cancellation; committed terminals survive disconnection.
+ * @returns the existing or newly committed terminal.
+ */
+@Remote async create(agent: Agent, request: TerminalCreateRequest, signal: AbortSignal): Promise<WebTerminalInfo>
+
+/**
+ * Attach to a terminal without binding its process lifetime to the transport.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - new exclusive input attachment.
+ * @param signal - physical stream cancellation.
+ * @returns screen recovery followed by output and metadata changes.
+ */
+@Remote({ mode: 'stream' }) follow(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, signal: AbortSignal): AsyncIterable<TerminalFrame>
+
+/**
+ * Deliver raw input, including Tab completion and control characters.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - current writable attachment.
+ * @param data - input bytes represented as UTF-8 text.
+ * @returns after provider input acceptance.
+ */
+@Remote async write(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, data: string): Promise<void>
+
+/**
+ * Update the dimensions of the PTY and recovery screen.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param attachmentId - current writable attachment.
+ * @param cols - column count.
+ * @param rows - row count.
+ * @returns after the resize completes.
+ */
+@Remote async resize(agent: Agent, id: WebTerminalId, attachmentId: TerminalAttachmentId, cols: number, rows: number): Promise<void>
+
+/**
+ * Rename a terminal without changing its shell.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @param title - nonempty display title, at most 120 characters.
+ */
+@Remote rename(agent: Agent, id: WebTerminalId, title: string): void
+
+/**
+ * Close an identity to future creation and kill its process range; repeated closes succeed.
+ * @param agent - Session owner supplied by the Gateway.
+ * @param id - terminal identity.
+ * @returns after provider cleanup succeeds. A failure retains the terminal for retry.
+ */
+@Remote async close(agent: Agent, id: WebTerminalId): Promise<void>
+```
+
+Types: [Agent](core.zh.md) · [SessionId](core.zh.md)
+
+Source: [`packages/api/terminal-controller/src/index.ts`](../../packages/api/terminal-controller/src/index.ts)
+
 <a id="ctxworkspacecontroller--workspacecontroller"></a>
 
 ### `ctx.workspaceController` — `WorkspaceController`
@@ -218,20 +317,6 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('insertSessionBefore') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>
 
 /**
- * Account one Session whose stored cwd matches the Workspace path.
- * @param request - Workspace and Session identities.
- * @returns the updated Workspace projection.
- */
-@Remote('attachSession') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>
-
-/**
- * Remove one Session from a Workspace account (Ungrouped).
- * @param request - Workspace and Session identities.
- * @returns the updated Workspace projection.
- */
-@Remote('detachSession') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>
-
-/**
  * Hide one known Session from Workspace grouping surfaces.
  * @param request - Session identity to archive.
  * @returns the complete resulting archive set.
@@ -239,8 +324,8 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('archiveSession') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
- * Return one archived Session to Workspace grouping surfaces.
- * @param request - Session identity to restore.
+ * Restore one archived Session to Workspace grouping surfaces.
+ * @param request - Session identity to unarchive.
  * @returns the complete resulting archive set.
  */
 @Remote('unarchiveSession') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>
@@ -389,53 +474,6 @@ delete(id: WorkspaceId): Promise<boolean>
 insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly WorkspaceId[]>
 
 /**
- * Create a project grouping over ordered directory roots.
- * @param name - Display tier name.
- * @param roots - Ordered directory roots whose prefix matches workspaces.
- * @returns the newly durable project.
- */
-createProject(name: string, roots: readonly string[] = []): Promise<Project>
-
-/**
- * Look up a project by id.
- * @param id - Project id.
- * @returns the project, or `undefined` when unknown.
- */
-getProject(id: ProjectId): Project | undefined
-
-/**
- * Synchronous project projection in durable registry order.
- * @returns a fresh ordered array of project entities.
- */
-listProjects(): Project[]
-
-/**
- * Resolve the project owning one canonical directory path by longest root
- * prefix; the empty root never matches, and longer roots win ties.
- * @param path - Canonical directory path to classify.
- * @returns the owning project, or `undefined` when no root prefixes it.
- */
-projectForPath(path: string): Project | undefined
-
-/**
- * Delete one project registration; its directory roots and workspaces are
- * retained. The durable order is updated before the table deletion; a
- * failed table write restores the prior order. Unknown ids are an idempotent
- * no-op.
- * @param id - Project to remove.
- * @returns `true` when a record was deleted, `false` when it was unknown.
- */
-deleteProject(id: ProjectId): Promise<boolean>
-
-/**
- * Move one project within the durable display order, DOM-insertBefore-like.
- * @param id - The project to move.
- * @param beforeId - Project to insert before; omitted appends.
- * @returns the complete committed project order.
- */
-insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>
-
-/**
  * Archive one session durably. The session must exist (live or in session
  * persistence); its workspace accounting — or lack of one — is irrelevant.
  * An already archived id resolves without writing.
@@ -445,11 +483,13 @@ insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly Proje
 archiveSession(sessionId: SessionId): Promise<void>
 
 /**
- * Restore one archived session to every grouping surface. Workspace
- * accounting was never touched by archiving, so the session returns to its
- * original position; a session that is not archived resolves without writing
- * and needs no existence check.
- * @param sessionId - The session to restore.
+ * Unarchive one session durably by dropping it from the registry-global
+ * archive set; the accounting slot was never touched, so the session
+ * returns to its recorded position. Unarchiving runs no session-existence
+ * check because removing an id cannot introduce an unknown one, so an
+ * entry whose session is gone still resolves. An id that is not archived
+ * resolves without writing.
+ * @param sessionId - The session to unarchive.
  * @returns resolution after durability.
  */
 unarchiveSession(sessionId: SessionId): Promise<void>

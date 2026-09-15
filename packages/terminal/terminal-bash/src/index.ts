@@ -111,7 +111,7 @@ function childEnvironment(
 export const PWSH_PROMPT_SETUP =
   "function prompt { [Console]::Write([char]27 + ']133;D;' + [int]$LASTEXITCODE + [char]7); '" + CONTROLLED_PROMPT + "' }"
 
-function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxExecutionPolicy): string[] {
+async function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxExecutionPolicy, signal?: AbortSignal): Promise<string[]> {
   const argv = [config.shellPath, ...config.shellArgs]
   if (policy.mode === 'danger-full-access') return argv
   const sandbox = ctx.get('sandbox')
@@ -119,7 +119,7 @@ function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxExecutio
     throw new Error(`terminal-bash: sandbox mode "${policy.mode}" requires a ctx.sandbox provider in the execution world`)
   }
   // Re-state the discriminant because object spread does not preserve its narrowed type.
-  return sandbox.confine(argv, { ...policy, mode: policy.mode }).argv
+  return (await sandbox.confine(argv, { ...policy, mode: policy.mode }, signal)).argv
 }
 
 /**
@@ -233,7 +233,8 @@ export class BashTerminalBackend implements TerminalBackend {
     ensureSandboxModeFence(this.ctx, spec.owner)
     const policy = this.ctx.sandboxPolicy.resolve({ session: spec.owner.session })
     const effective = configForSpawn(this.config, spec.shellDialect)
-    const argv = spawnArgv(this.ctx, effective, policy)
+    const argv = await spawnArgv(this.ctx, effective, policy, spec.signal)
+    spec.signal?.throwIfAborted()
     if (argv[0] === undefined) throw new Error('terminal-bash: sandbox returned empty argv')
     const interactive = spec.interaction === 'interactive'
     const cols = spec.cols ?? effective.cols
@@ -242,7 +243,7 @@ export class BashTerminalBackend implements TerminalBackend {
       argv,
       cwd: spec.cwd ?? policy.workspaceRoot,
       env: childEnvironment(spec, effective.shellDialect, interactive),
-      ...interactive ? { name: 'xterm-256color' } : {},
+      terminalType: interactive ? 'xterm-256color' : 'dumb',
       rows,
       cols,
       graceMs: effective.disposeGraceMs,

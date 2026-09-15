@@ -142,6 +142,13 @@ class FakeWorkspaces implements IWorkspaces {
     }))
   }
 
+  onUnarchive: IWorkspaces['unarchiveSession'] = async (sessionId) => {
+    this.list.update(state => ({
+      ...state,
+      archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+    }))
+  }
+
   declare readonly create: IWorkspaces['create']
   declare readonly rename: IWorkspaces['rename']
   declare readonly delete: IWorkspaces['delete']
@@ -618,6 +625,18 @@ describe('UiWorkspaceService', () => {
     b.workspaces.onArchive = () => Promise.reject(new Error('archive rejected'))
     await expect(b.uiWorkspace.archiveSession(idle)).rejects.toThrow('archive rejected')
     expect(b.workspaces.archiveCalls).toEqual([idle, idle])
+  })
+
+  it('forwards unarchive commands and preserves failures', async () => {
+    const idle = sid('idle')
+    const b = bench()
+
+    await b.uiWorkspace.unarchiveSession(idle)
+    expect(b.workspaces.unarchiveCalls).toEqual([idle])
+
+    b.workspaces.onUnarchive = () => Promise.reject(new Error('unarchive rejected'))
+    await expect(b.uiWorkspace.unarchiveSession(idle)).rejects.toThrow('unarchive rejected')
+    expect(b.workspaces.unarchiveCalls).toEqual([idle, idle])
   })
 
   it('passes directory operations to the Host and preserves structured browse failures', async () => {
