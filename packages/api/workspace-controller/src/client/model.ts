@@ -225,19 +225,6 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
-   * Restore one archived Session and install the returned complete archive set.
-   * @param sessionId - Session to restore.
-   * @returns generated Remote result.
-   */
-  async unarchiveSession(
-    sessionId: WorkspaceUnarchiveSessionRequest['sessionId'],
-  ): Promise<RemoteResult<WorkspaceArchiveValue>> {
-    const result = await this.remote.unarchiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds)
-    return result
-  }
-
-  /**
    * Replace the projection from one complete stream-generation baseline.
    * @param baseline - complete Workspace and archive projection.
    */
