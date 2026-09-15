@@ -121,11 +121,12 @@ export function materializeProfile(template, { tarballsUrl, dropped }) {
 
 /**
  * Repair a manifest an earlier checkout wrote so this host converges on the
- * current template: re-point `file:` dependencies at this checkout's tarballs
- * directory, drop bundles this host cannot install, drop bundles the template
- * retired, and adopt the template's bundles and dependencies that are missing.
- * Bundles and dependencies a user added beyond the template are left untouched,
- * so running seed without `--force` never discards them.
+ * current template: resolve the template's tarballs placeholder and re-point
+ * `file:` dependencies at this checkout's tarballs directory, drop bundles this
+ * host cannot install, drop bundles the template retired, and adopt the
+ * template's bundles and dependencies that are missing. Bundles and
+ * dependencies a user added beyond the template are left untouched, so running
+ * seed without `--force` never discards them.
  * @param pkg - the parsed profile manifest, mutated in place.
  * @param options - tarballs directory, dropped bundles, template and retired names.
  * @returns one Chinese sentence per applied change; empty when nothing changed.
@@ -142,9 +143,17 @@ export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [
     const at = bundles.indexOf(name)
     if (at !== -1) bundles.splice(at, 1)
   }
+  // Only a fresh seed runs the template through materializeProfile, so an
+  // adopted dependency reaches a repair still holding the placeholder; an
+  // unresolved `file:__COMMUNITY_TARBALLS__/x.tgz` points at a directory no
+  // host has, and the failing install leaves the new bundles uninstalled.
+  const resolveSpec = (spec) => {
+    const materialized = spec.replaceAll(TARBALLS_TOKEN, tarballsUrl)
+    return relocateTarball(materialized, tarballsUrl) ?? materialized
+  }
   for (const [name, spec] of Object.entries(dependencies)) {
-    const expected = relocateTarball(spec, tarballsUrl)
-    if (expected === undefined || expected === spec) continue
+    const expected = resolveSpec(spec)
+    if (expected === spec) continue
     dependencies[name] = expected
     changes.push(`修正依赖路径 ${name} → ${expected.slice('file:'.length)}`)
   }
@@ -162,7 +171,7 @@ export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [
   }
   for (const [name, spec] of Object.entries(template.dependencies ?? {})) {
     if (dropped.has(name) || retired.includes(name) || dependencies[name] !== undefined) continue
-    dependencies[name] = relocateTarball(spec, tarballsUrl) ?? spec
+    dependencies[name] = resolveSpec(spec)
     changes.push(`新增依赖 ${name}`)
   }
   for (const name of template.dsh?.profile?.bundles ?? []) {
