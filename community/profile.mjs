@@ -278,6 +278,16 @@ export function retireHoistPatterns(text, retired) {
 export function absorbManagedBlock(text) {
   const begin = text.indexOf(MANAGED_BLOCK_BEGIN)
   if (begin === -1) return { text, absorbed: 0 }
+  // 文件本身已合法时不做并回：块尾仅在根是 flow 数组时才非法，根为 block
+  // 序列（把根改成 block 风格后）的块尾是合法 YAML。缺这层判断，下面的
+  // lastIndexOf(']') 会在 block 根的文件上命中嵌套数组的右括号，把托管行
+  // 拼进别人的 config 里。
+  try {
+    yaml.load(text)
+    return { text, absorbed: 0 }
+  } catch {
+    // 这里吞掉的是 js-yaml 对「flow 数组 + 块尾」的解析错误；该形态正是下面要修的目标。
+  }
   const endMarkerAt = text.indexOf(MANAGED_BLOCK_END, begin)
   const blockEnd = endMarkerAt === -1 ? text.length : endMarkerAt + MANAGED_BLOCK_END.length
   const blockBody = text.slice(text.indexOf('\n', begin) + 1, endMarkerAt === -1 ? text.length : endMarkerAt)
