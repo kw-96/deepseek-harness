@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session browser with a durable project tier, the add-workspace dialog, and the new-session project picker, in **one bundle plugin**. The multi-tab bottom terminal ships separately as [`dsh-codex-shell`](../codex-shell/README.md); the two plugins compose and can also be installed alone.
+The Codex-styled left navigation rail for DeepSeek Harness (DSH): the session browser with a durable project tier, the add-workspace dialog, and the new-session project picker, in **one bundle plugin**. The multi-tab bottom terminal ships separately as `dsh-codex-shell`, which this repository retired on 2026-09-15 (its source stays in git history); with that plugin installed the two compose, and each also works alone.
 
 ## Features
 

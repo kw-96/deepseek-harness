@@ -16,7 +16,7 @@ export const REQUIRED_NODE_RANGE = '^22.19.0 || >=24.0.0'
 export const REQUIRED_PNPM_VERSION = '11.7.0'
 
 /** Profile bundles that exist only on the NetEase-internal registry. */
-export const INTERNAL_BUNDLES = ['ntes-dsh-market', '@dap-dsh-plugins/netease-auth']
+export const INTERNAL_BUNDLES = ['@dap-dsh-plugins/netease-auth']
 
 /**
  * Profile bundles installed straight from GitHub through a `github:`

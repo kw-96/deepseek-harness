@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness（DSH）的 Codex 式左侧导航栏：会话浏览器（带持久项目层）、添加工作区弹窗与新建会话页的项目选择器，**单插件组合**。多 tab 底栏终端由单独的 [`dsh-codex-shell`](../codex-shell/README.zh.md) 提供；两者可组合使用，也可各自单独安装。
+DeepSeek Harness（DSH）的 Codex 式左侧导航栏：会话浏览器（带持久项目层）、添加工作区弹窗与新建会话页的项目选择器，**单插件组合**。多 tab 底栏终端由单独的 `dsh-codex-shell` 提供——本仓库已于 2026-09-15 下线该插件（源码保留在 git 历史里）；装回它时两者可组合使用，也可各自单独安装。
 
 ## 功能
 

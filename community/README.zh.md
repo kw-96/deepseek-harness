@@ -93,10 +93,10 @@ pnpm pack:check       # regenerates tarballs under each package's dist/
 
 ## 网易内部包（自动检测）
 
-`ntes-dsh-market` 和 `@dap-dsh-plugins/netease-auth` 只存在于 `https://npm.nie.netease.com/`（一个同时代理公共 npm 的公司内部注册表）。`seed.mjs` 会事先探测该注册表：
+`@dap-dsh-plugins/netease-auth` 只存在于 `https://npm.nie.netease.com/`（一个同时代理公共 npm 的公司内部注册表）。`seed.mjs` 会事先探测该注册表：
 
 - **可达** → 完整 profile，使用内部 `.npmrc`。
-- **不可达** → 跳过这两个组合包及其依赖，写出公共的 `registry.npmjs.org` `.npmrc`。
+- **不可达** → 跳过该组合包及其依赖，写出公共的 `registry.npmjs.org` `.npmrc`。
 
 也可以跳过自动检测，强制做出选择：
 
