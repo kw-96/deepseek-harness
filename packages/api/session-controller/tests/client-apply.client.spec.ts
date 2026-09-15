@@ -165,10 +165,41 @@ describe('Session Controller Client apply', () => {
     bench.api.pushControl({ type: 'baseline', value: bench.api.controlBaseline } as never)
     await vi.waitFor(() => {
       expect(logged).toHaveBeenCalledWith(
-        '[session-controller] control stream failed:',
+        '[session-controller] control stream failed; reopening:',
         expect.objectContaining({ message: 'session control stream emitted more than one opening snapshot' }),
       )
     })
+  })
+
+  it('replaces a terminally failed control stream so the mirror keeps converging', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const accept = vi.spyOn(ClientSessions.prototype, 'handleControlFrame')
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const bench = await mount(GENERATION)
+      await flush()
+      const baselines = (): number =>
+        accept.mock.calls.filter(([frame]) => frame.type === 'baseline').length
+      expect(baselines()).toBe(1)
+
+      // A second opening snapshot is terminal for that generation: the Host
+      // violated the snapshot protocol, so the stream cannot continue.
+      bench.api.pushControl({ type: 'baseline', value: bench.api.controlBaseline } as never)
+      for (let index = 0; index < 4; index++) await flush()
+      expect(baselines()).toBe(1)
+
+      await vi.advanceTimersByTimeAsync(1_000)
+      await flush()
+      expect(baselines()).toBe(2)
+
+      // The replacement is disposed with its own plugin fiber, and a disposed
+      // runtime schedules no further generation.
+      await bench.fiber.dispose()
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(baselines()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('materializes Host-addressed Agent scopes before the Session list arrives', async () => {
