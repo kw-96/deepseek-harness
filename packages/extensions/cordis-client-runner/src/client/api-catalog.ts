@@ -83,20 +83,19 @@ export interface TypeApiEntry {
 export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'layout',
-    summary: 'Panel navigation and geometry actions exposed through ctx.layout.',
-    description: 'Panel navigation and geometry actions exposed through ctx.layout.',
+    summary: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply.',
+    description: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply. The attachPanels wiring hook stays on the concrete class (root-entry assembly only).',
     methods: [
       {
         signature: 'selectPanel(panelId: MainPanelId | null): void',
-        description: 'Select a global central panel without changing the current Session.',
-        parameters: [{ name: 'panelId', description: 'registered main key, or null to show the Conversation.' }],
-        throws: ['if the selected main key is not registered; preserves the current selection.'],
+        description: '选择全局中央面板而不改变当前会话（官方兼容面）。',
+        parameters: [{ name: 'panelId', description: '已注册的 \'main\' 槽 key，或 null 回到会话视图。' }],
       },
       {
         signature: 'beginNavigation(): AbortSignal',
-        description: 'Start an asynchronous navigation, superseding any earlier pending navigation.',
+        description: '开始一次异步导航，作废此前未完成的导航（官方兼容面）。',
         parameters: [],
-        returns: 'a signal aborted by the next navigation or layout disposal; check it before committing UI state.',
+        returns: '下一次导航或布局卸载时中止的信号；提交 UI 状态前先检查它。',
       },
       {
         signature: 'toggleSidebar(): void',
@@ -105,12 +104,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'openRightbar(track: boolean, fullscreen: boolean): void',
-        description: 'Report the right panel\'s presentation without changing its expanded state.',
-        parameters: [{ name: 'track', description: 'whether the normal panel width reserves a grid track, including beneath a fullscreen overlay.' }, { name: 'fullscreen', description: 'whether the panel covers the frame and hides its outer resize handle; independent of the underlying grid track.' }],
+        description: '官方兼容面：右栏 occupant 上报"已展开 + 轨道/全屏形态"。 本地面板架构把右栏等价于 details 列，且只有"打开/关闭"两种形态 （无轨道悬浮与全屏覆盖），故 track/fullscreen 仅保留签名兼容， 调用一律映射为打开 details 列。',
+        parameters: [{ name: 'track', description: '是否让中心列让出轨道（本地忽略）。' }, { name: 'fullscreen', description: '是否覆盖整帧（本地忽略）。' }],
       },
       {
         signature: 'closeRightbar(): void',
-        description: 'Report the right panel as hidden: no track, no handle.',
+        description: '官方兼容面：右栏 occupant 上报隐藏，映射为关闭 details 列。',
         parameters: [],
       },
     ],
@@ -410,18 +409,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'insertSessionBefore( workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId, ): Promise<WorkspaceView>',
         description: 'Move a Session within one Workspace account.',
         parameters: [{ name: 'workspaceId', description: 'owning Workspace.' }, { name: 'sessionId', description: 'Session to move.' }, { name: 'beforeSessionId', description: 'anchor Session; omitted appends.' }],
-        returns: 'the changed Workspace.',
-      },
-      {
-        signature: 'attachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>',
-        description: 'Account a Session whose stored cwd matches the Workspace path.',
-        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'sessionId', description: 'Session to attach.' }],
-        returns: 'the changed Workspace.',
-      },
-      {
-        signature: 'detachSession(workspaceId: WorkspaceId, sessionId: SessionId): Promise<WorkspaceView>',
-        description: 'Remove a Session from a Workspace account (Ungrouped).',
-        parameters: [{ name: 'workspaceId', description: 'owning Workspace.' }, { name: 'sessionId', description: 'Session to detach.' }],
         returns: 'the changed Workspace.',
       },
     ],

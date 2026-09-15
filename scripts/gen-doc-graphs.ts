@@ -237,6 +237,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Associates generated Remote descriptors with live Cordis services, resolves registered identities, and exposes unary calls through the shared Connection RPC carrier.',
   },
   {
+    key: 'codexImport',
+    pkg: 'session-import-codex',
+    title: 'Codex session-import Remote controller',
+    mode: 'core',
+    consumers: ['ui-codex-import'],
+    note: 'Scans a Codex store, imports the chosen sessions into the local Session store, and undoes or restores one import; the client half drives it over the shared Connection RPC carrier.',
+  },
+  {
     key: 'sessionPersistence',
     pkg: 'session-persistence',
     title: 'Durable session persistence seam',

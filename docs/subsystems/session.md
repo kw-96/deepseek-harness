@@ -813,6 +813,14 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote('cancel') cancel(request: SessionCancelRequest): SessionCancelValue
 
 /**
+ * Cancel one background job owned by this Session without touching the
+ * active turn, its inbox, or the job's output history.
+ * @param request - Session, job id, and optional operator reason.
+ * @returns acknowledgement carrying whether a live job was cancelled.
+ */
+@Remote('killJob') killJob(request: SessionKillJobRequest): SessionKillJobValue
+
+/**
  * Read one cold-safe, message-aligned Session history page.
  * @param request - durable address, backward cursor, and page budget.
  * @param signal - cancellation for persistence reads.

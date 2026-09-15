@@ -677,10 +677,28 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the recorded run.',
       },
       {
+        signature: '@Remote(\'scan\') async scan(): Promise<CodexImportScanValue>',
+        description: 'Preview the next sweep without writing: per-thread verdicts and counts in the sweep\'s own vocabulary. Nothing is persisted, no workspace or project is created, and no session is published.',
+        parameters: [],
+        returns: 'the preview.',
+      },
+      {
         signature: '@Remote(\'history\') async history(): Promise<CodexImportHistoryValue>',
         description: 'Read recorded import runs, newest first.',
         parameters: [],
         returns: 'the complete history list.',
+      },
+      {
+        signature: '@Remote(\'undo\') async undo(at: number): Promise<CodexImportUndoValue>',
+        description: 'Undo one recorded run by archiving the sessions it imported, then stamp the run. The sessions stay in DSH storage, so undo is reversible through restore and the evidence never disappears.',
+        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
+        returns: 'the outcome counts for the card.',
+      },
+      {
+        signature: '@Remote(\'restore\') async restore(at: number): Promise<CodexImportUndoValue>',
+        description: 'Restore the sessions of one undone run and clear its stamp.',
+        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
+        returns: 'the outcome counts for the card.',
       },
     ],
   },
@@ -1560,6 +1578,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Cancel one active Agent turn without dropping its pending inbox.',
         parameters: [{ name: 'request', description: 'Session whose active Agent turn is cancelled.' }],
         returns: 'acknowledgement that cancellation was requested.',
+      },
+      {
+        signature: '@Remote(\'killJob\') killJob(request: SessionKillJobRequest): SessionKillJobValue',
+        description: 'Cancel one background job owned by this Session without touching the active turn, its inbox, or the job\'s output history.',
+        parameters: [{ name: 'request', description: 'Session, job id, and optional operator reason.' }],
+        returns: 'acknowledgement carrying whether a live job was cancelled.',
       },
       {
         signature: '@Remote(\'page\') page(request: SessionPageRequest, signal: AbortSignal): Promise<SessionPage>',
@@ -3950,11 +3974,31 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CodexImportRun',
-    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n    readonly sessions: readonly CodexImportSession[];\n}',
+    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n    readonly sessions: readonly CodexImportSession[];\n    readonly undoneAt: number;\n}',
+  },
+  {
+    name: 'CodexImportScanEntry',
+    declaration: 'export interface CodexImportScanEntry {\n    readonly threadId: string;\n    readonly sessionId: SessionId;\n    readonly title: string;\n    readonly cwd: string;\n    readonly kind: CodexImportScanVerdict;\n    readonly events: number;\n}',
+  },
+  {
+    name: 'CodexImportScanValue',
+    declaration: 'export interface CodexImportScanValue {\n    readonly summary: CodexImportSummary;\n    readonly entries: readonly CodexImportScanEntry[];\n}',
+  },
+  {
+    name: 'CodexImportScanVerdict',
+    declaration: 'export type CodexImportScanVerdict = \'imported\' | \'updated\' | \'unchanged\' | \'deferred-active\';',
   },
   {
     name: 'CodexImportSession',
     declaration: 'export interface CodexImportSession {\n    readonly id: SessionId;\n    readonly title: string;\n}',
+  },
+  {
+    name: 'CodexImportSummary',
+    declaration: 'export interface CodexImportSummary {\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n}',
+  },
+  {
+    name: 'CodexImportUndoValue',
+    declaration: 'export interface CodexImportUndoValue {\n    readonly at: number;\n    readonly undone: boolean;\n    readonly changed: number;\n    readonly failed: number;\n}',
   },
   {
     name: 'CollectedOutput',
@@ -5355,6 +5399,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionJob',
     declaration: 'export interface SessionJob {\n    readonly id: JobId;\n    readonly kind: string;\n    readonly label: string;\n    readonly status: \'running\' | \'stopping\' | \'completed\' | \'killed\' | \'failed\';\n    readonly detail?: string;\n    readonly startedAt: number;\n    readonly finishedAt?: number;\n}',
+  },
+  {
+    name: 'SessionKillJobRequest',
+    declaration: 'export interface SessionKillJobRequest {\n    readonly sessionId: SessionId;\n    readonly jobId: JobId;\n    readonly reason?: string;\n}',
+  },
+  {
+    name: 'SessionKillJobValue',
+    declaration: 'export interface SessionKillJobValue {\n    readonly accepted: true;\n    readonly outcome: \'requested\' | \'already-finished\';\n}',
   },
   {
     name: 'SessionLineageNode',

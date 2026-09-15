@@ -77,10 +77,34 @@ Remote business surface for the card: trigger a run and read history. The contro
 @Remote('run') async run(): Promise<CodexImportRun>
 
 /**
+ * Preview the next sweep without writing: per-thread verdicts and counts in
+ * the sweep's own vocabulary. Nothing is persisted, no workspace or project
+ * is created, and no session is published.
+ * @returns the preview.
+ */
+@Remote('scan') async scan(): Promise<CodexImportScanValue>
+
+/**
  * Read recorded import runs, newest first.
  * @returns the complete history list.
  */
 @Remote('history') async history(): Promise<CodexImportHistoryValue>
+
+/**
+ * Undo one recorded run by archiving the sessions it imported, then stamp
+ * the run. The sessions stay in DSH storage, so undo is reversible through
+ * {@link restore} and the evidence never disappears.
+ * @param at - run time identifying the run.
+ * @returns the outcome counts for the card.
+ */
+@Remote('undo') async undo(at: number): Promise<CodexImportUndoValue>
+
+/**
+ * Restore the sessions of one undone run and clear its stamp.
+ * @param at - run time identifying the run.
+ * @returns the outcome counts for the card.
+ */
+@Remote('restore') async restore(at: number): Promise<CodexImportUndoValue>
 ```
 
 Source: [`packages/session/session-import-codex/src/remote.ts`](../../packages/session/session-import-codex/src/remote.ts)
