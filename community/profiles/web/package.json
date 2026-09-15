@@ -15,7 +15,8 @@
         "@linxin666/dsh-session-archive",
         "@linxin666/dsh-doctor",
         "dsh-better-sidebar",
-        "dsh-git-panel"
+        "dsh-git-panel",
+        "@linxin666/dsh-ssh"
       ],
       "patchReload": "live"
     }
