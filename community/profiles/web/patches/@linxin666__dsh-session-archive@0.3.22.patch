@@ -1,8 +1,51 @@
 diff --git a/lib/index.js b/lib/index.js
-index ead372504f7fbf59943162434c2186f4adcc2abe..8331ed273319325844135e733c2b3746868f60c2 100644
+index ead372504f7fbf59943162434c2186f4adcc2abe..ae38c614b7340cd127a2172bced53805e1b8c55c 100644
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -237,7 +237,16 @@ function resolveAutoConfig(config) {
+@@ -59,6 +59,9 @@ function autoArchiveCandidates(rows, options) {
+ 	const candidates = [];
+ 	for (const row of rows) {
+ 		if (row.archived) continue;
++		// 本地补丁：草稿（零消息的空白会话）不是历史，不进归档桶——归档它只会让
++		// 「新建会话」留下的空壳长期占着列表，过期草稿由 expiredDraftCandidates 回收。
++		if (row.blank) continue;
+ 		if (!row.lastActivityReliable || row.lastActivityAt === void 0) continue;
+ 		if (options.protectedIds.has(row.id)) continue;
+ 		if (options.now - row.lastActivityAt <= threshold) continue;
+@@ -70,6 +73,32 @@ function autoArchiveCandidates(rows, options) {
+ 	candidates.sort((a, b) => a.lastActivityAt - b.lastActivityAt);
+ 	return candidates;
+ }
++/** 本地补丁：草稿的回收年龄——超过一天没人动过、且零消息的空白会话直接删掉。 */
++const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1e3;
++/**
++ * 本地补丁：可回收的草稿。草稿是「新建会话 / 打开工作区」为输入框铸造的空白会话
++ * （只有会话头与权限、沙箱、审批等种子事件，没有任何消息），既不属于历史，也不该
++ * 长期留在磁盘上；侧栏本就把它隐藏，归档管理却会把它们全部列成「缺少标题」。
++ * 已归档的草稿同样回收：它们是被旧规则误归档进去的同一批空壳。
++ * @param rows 清单行。
++ * @param options now、protectedIds。
++ * @returns 按最近活动升序排列的待回收草稿。
++ */
++function expiredDraftCandidates(rows, options) {
++	const candidates = [];
++	for (const row of rows) {
++		if (!row.blank) continue;
++		if (!row.lastActivityReliable || row.lastActivityAt === void 0) continue;
++		if (options.protectedIds.has(row.id)) continue;
++		if (options.now - row.lastActivityAt <= DRAFT_MAX_AGE_MS) continue;
++		candidates.push({
++			id: row.id,
++			lastActivityAt: row.lastActivityAt
++		});
++	}
++	candidates.sort((a, b) => a.lastActivityAt - b.lastActivityAt);
++	return candidates;
++}
+ /**
+ * Sessions eligible for auto-delete BEFORE family-cascade planning: archived
+ * with a KNOWN archive time, older than the retention threshold, and archived
+@@ -237,7 +266,16 @@ function resolveAutoConfig(config) {
  * inventory never produces phantom duplicate rows.
  */
  function canonicalSessionId(segment) {
@@ -20,7 +63,7 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..8331ed273319325844135e733c2b3746
  }
  function dirSize(path) {
  	let total = 0;
-@@ -421,21 +430,28 @@ function titleFromProjcache(entry) {
+@@ -421,21 +459,28 @@ function titleFromProjcache(entry) {
  */
  async function readProjcacheFile(dshHome, id, cache) {
  	if (cache !== void 0 && cache.has(id)) return cache.get(id) ?? void 0;
@@ -63,7 +106,92 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..8331ed273319325844135e733c2b3746
  	}
  	if (cache !== void 0) cache.set(id, entry ?? null);
  	return entry;
-@@ -1631,7 +1647,9 @@ function makePreviewRoute(service) {
+@@ -1234,7 +1279,13 @@ var ArchiveService = class {
+ 			runStartedAt: now,
+ 			protectedIds: protectedSet
+ 		}) : [];
+-		const plan = planDelete(built.rows, deleteSeeds.map((seed) => seed.id), this.protectedReason(void 0, built.rows));
++		// 本地补丁：过期草稿也计入删除计划，让预览与执行看到同一批目标。
++		const draftSeeds = expiredDraftCandidates(built.rows, { now, protectedIds: protectedSet });
++		const plan = planDelete(
++			built.rows,
++			[...deleteSeeds.map((seed) => seed.id), ...draftSeeds.map((seed) => seed.id)],
++			this.protectedReason(void 0, built.rows),
++		);
+ 		let deleteBytes = 0;
+ 		for (const id of plan.targets) {
+ 			const size = built.rows.find((row) => row.id === id)?.sizeBytes;
+@@ -1266,14 +1317,16 @@ var ArchiveService = class {
+ 			try {
+ 				if (kind === "archive") {
+ 					const built = await buildInventory(this.sources(), AbortSignal.timeout(3e4));
+-					const protectedSet = new Set(this.protectedReason(currentSessionId, built.rows).keys());
++					const protectedMap = this.protectedReason(currentSessionId, built.rows);
++					const protectedSet = new Set(protectedMap.keys());
+ 					const candidates = autoArchiveCandidates(built.rows, {
+ 						days: this.config.autoArchiveDays,
+ 						now: startedAt,
+ 						protectedIds: protectedSet
+ 					});
+ 					const response = await this.archiveInternal(candidates.map((entry) => entry.id), "auto", currentSessionId);
+-					const stats = this.statsFrom(response.results, startedAt);
++					const reaped = await this.reapExpiredDrafts(built, protectedMap, startedAt);
++					const stats = this.statsFrom([...response.results, ...reaped.results], startedAt);
+ 					this.autoState.lastArchiveRun = stats;
+ 					await this.flushState();
+ 					return stats;
+@@ -1287,22 +1340,16 @@ var ArchiveService = class {
+ 					runStartedAt: startedAt,
+ 					protectedIds: protectedSet
+ 				});
++				const reaped = await this.reapExpiredDrafts(built, protectedMap, startedAt);
+ 				if (seeds.length === 0) {
+-					const stats = {
+-						at: startedAt,
+-						total: 0,
+-						ok: 0,
+-						skipped: 0,
+-						failed: 0,
+-						entries: []
+-					};
++					const stats = this.statsFrom(reaped.results, startedAt);
+ 					this.autoState.lastDeleteRun = stats;
+ 					await this.flushState();
+ 					return stats;
+ 				}
+ 				const plan = planDelete(built.rows, seeds.map((seed) => seed.id), protectedMap);
+ 				const response = await this.executeDelete(plan, built, "auto");
+-				const stats = this.statsFrom(response.results, startedAt);
++				const stats = this.statsFrom([...response.results, ...reaped.results], startedAt);
+ 				this.autoState.lastDeleteRun = stats;
+ 				await this.flushState();
+ 				return stats;
+@@ -1311,6 +1358,24 @@ var ArchiveService = class {
+ 			}
+ 		});
+ 	}
++	/**
++	* 本地补丁：回收过期草稿（零消息的空白会话）。草稿不是历史，既不进归档桶，也不
++	* 跟着归档保留期走；超过 DRAFT_MAX_AGE_MS 没人用过就直接删。受保护集合（在世会话、
++	* 运行中、当前、正在处理的）照旧生效，因此正开着的草稿不会被删。
++	* @param built 本轮清单。
++	* @param protectedMap 受保护 id 及其原因。
++	* @param startedAt 本轮开始时间。
++	* @returns 与别的批次同样的 results（可能为空）。
++	*/
++	async reapExpiredDrafts(built, protectedMap, startedAt) {
++		const drafts = expiredDraftCandidates(built.rows, {
++			now: startedAt,
++			protectedIds: new Set(protectedMap.keys())
++		});
++		if (drafts.length === 0) return { results: [] };
++		const plan = planDelete(built.rows, drafts.map((entry) => entry.id), protectedMap);
++		return await this.executeDelete(plan, built, "auto");
++	}
+ 	/** Archive without re-acquiring the lock (used inside cycles). */
+ 	async archiveInternal(ids, source, currentSessionId) {
+ 		const results = [];
+@@ -1631,7 +1696,9 @@ function makePreviewRoute(service) {
  		handler: async (req, res) => {
  			if (!fenced(req, res)) return;
  			const id = new URL(req.url ?? "/", "http://localhost").searchParams.get("id") ?? "";
