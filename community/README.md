@@ -34,7 +34,7 @@ pnpm run build
 pnpm dsh web
 ```
 
-The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it writes `$DSH_HOME/profiles/web` from `community/profiles/web/` (resolving the three `file:` deps to this checkout's `community/plugins/tarballs/`), copies the skills into `$DSH_HOME/skills/`, copies the global home files (the user-global `AGENTS.md`) into `$DSH_HOME/`, then `pnpm install`s the profile. Later boots repair only what drifted: tarball paths left by a different checkout, and bundles this host cannot install. Bundles added beyond the template are never removed. Override the home with `DSH_HOME=/path`, rewrite the whole manifest with `node community/seed.mjs --force`, or skip the profile install with `DSH_SEED_SKIP_INSTALL=1`.
+The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it writes `$DSH_HOME/profiles/web` from `community/profiles/web/` (resolving the three `file:` deps to this checkout's `community/plugins/tarballs/`), copies the skills into `$DSH_HOME/skills/`, copies the global home files (the user-global `AGENTS.md`) into `$DSH_HOME/`, then `pnpm install`s the profile. Later boots converge an existing profile on the template: tarball paths left by a different checkout, bundles this host cannot install, bundles listed in `profiles/web/retired.json`, and the template's bundles, dependencies and `allowBuilds` entries the profile is missing. Bundles added beyond the template are never removed. Override the home with `DSH_HOME=/path`, rewrite the whole manifest with `node community/seed.mjs --force`, or skip the profile install with `DSH_SEED_SKIP_INSTALL=1`.
 
 ## Check the host before deploying
 

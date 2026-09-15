@@ -120,17 +120,28 @@ export function materializeProfile(template, { tarballsUrl, dropped }) {
 }
 
 /**
- * Repair a manifest an earlier checkout wrote: re-point `file:` dependencies
- * at this checkout's tarballs directory and drop bundles this host cannot
- * install. Bundles and dependencies a user added beyond the template are left
- * untouched, so running seed without `--force` never discards them.
+ * Repair a manifest an earlier checkout wrote so this host converges on the
+ * current template: re-point `file:` dependencies at this checkout's tarballs
+ * directory, drop bundles this host cannot install, drop bundles the template
+ * retired, and adopt the template's bundles and dependencies that are missing.
+ * Bundles and dependencies a user added beyond the template are left untouched,
+ * so running seed without `--force` never discards them.
  * @param pkg - the parsed profile manifest, mutated in place.
- * @param options - the tarballs directory and the bundles to drop.
+ * @param options - tarballs directory, dropped bundles, template and retired names.
  * @returns one Chinese sentence per applied change; empty when nothing changed.
  */
-export function repairProfile(pkg, { tarballsUrl, dropped }) {
+export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [] }) {
   const changes = []
   const dependencies = pkg.dependencies ?? {}
+  pkg.dependencies = dependencies
+  // One array, mutated in place: reassigning the list would leave later steps
+  // filtering a stale copy and resurrecting what an earlier step removed.
+  pkg.dsh.profile.bundles = pkg.dsh.profile.bundles ?? []
+  const bundles = pkg.dsh.profile.bundles
+  const dropBundle = (name) => {
+    const at = bundles.indexOf(name)
+    if (at !== -1) bundles.splice(at, 1)
+  }
   for (const [name, spec] of Object.entries(dependencies)) {
     const expected = relocateTarball(spec, tarballsUrl)
     if (expected === undefined || expected === spec) continue
@@ -138,13 +149,115 @@ export function repairProfile(pkg, { tarballsUrl, dropped }) {
     changes.push(`修正依赖路径 ${name} → ${expected.slice('file:'.length)}`)
   }
   for (const [name, reason] of dropped) {
-    const bundles = pkg.dsh.profile.bundles ?? []
     if (!bundles.includes(name) && dependencies[name] === undefined) continue
-    pkg.dsh.profile.bundles = bundles.filter(entry => entry !== name)
+    dropBundle(name)
     delete dependencies[name]
     changes.push(`移除 ${name}（${reason}）`)
   }
+  for (const name of retired) {
+    if (!bundles.includes(name) && dependencies[name] === undefined) continue
+    dropBundle(name)
+    delete dependencies[name]
+    changes.push(`下线 ${name}（新版模板已由其它插件取代）`)
+  }
+  for (const [name, spec] of Object.entries(template.dependencies ?? {})) {
+    if (dropped.has(name) || retired.includes(name) || dependencies[name] !== undefined) continue
+    dependencies[name] = relocateTarball(spec, tarballsUrl) ?? spec
+    changes.push(`新增依赖 ${name}`)
+  }
+  for (const name of template.dsh?.profile?.bundles ?? []) {
+    if (dropped.has(name) || retired.includes(name) || bundles.includes(name)) continue
+    bundles.push(name)
+    changes.push(`新增插件 ${name}`)
+  }
   return changes
+}
+
+/**
+ * Copy the template's `allowBuilds` entries the profile is missing, so a new
+ * plugin whose native module needs its install script allowed does not turn
+ * into a failed install on an already-seeded host. Comment lines directly above
+ * a copied entry travel with it; existing entries are never overwritten.
+ * @param profileText - the profile's current pnpm-workspace.yaml text.
+ * @param templateText - the template's pnpm-workspace.yaml text.
+ * @returns the merged text, or undefined when nothing is missing.
+ */
+export function mergeAllowBuilds(profileText, templateText) {
+  const templateBlock = allowBuildsBlock(templateText)
+  if (templateBlock === undefined) return undefined
+  const present = new Set((allowBuildsBlock(profileText)?.entries ?? []).map(entry => entry.key))
+  const missing = templateBlock.entries.filter(entry => !present.has(entry.key))
+  if (missing.length === 0) return undefined
+  const lines = profileText.split(/\r?\n/)
+  const block = allowBuildsBlock(profileText)
+  if (block === undefined) {
+    const appended = [...lines, 'allowBuilds:', ...missing.flatMap(entry => entry.lines)]
+    return `${appended.join('\n').replace(/\n*$/u, '')}\n`
+  }
+  const merged = [...lines.slice(0, block.end), ...missing.flatMap(entry => entry.lines), ...lines.slice(block.end)]
+  return merged.join('\n')
+}
+
+/**
+ * Remove the profile patch rows a retired bundle left behind. Only single-line
+ * `{ … }` rows are matched; a retired name still present afterwards is reported
+ * by the caller so the user can remove a hand-written block row.
+ * @param text - the profile's cordis.patch.yml text.
+ * @param retired - retired package names.
+ * @returns the filtered text and the names actually removed.
+ */
+export function retirePatchRows(text, retired) {
+  if (retired.length === 0) return { text, removed: [] }
+  const kept = []
+  const removed = []
+  for (const line of text.split(/\r?\n/)) {
+    const name = retired.find(pkg => isFlowRowFor(line, pkg))
+    if (name === undefined) {
+      kept.push(line)
+      continue
+    }
+    const previous = kept[kept.length - 1]
+    if (previous !== undefined && /^#\s*Managed by /u.test(previous.trim())) kept.pop()
+    removed.push(name)
+  }
+  return { text: kept.join('\n'), removed }
+}
+
+/**
+ * Whether one line is a complete single-line patch row naming a package.
+ * @param line - one line of a patch file.
+ * @param packageName - the package name to match.
+ * @returns true when the line is that package's flow-style row.
+ */
+function isFlowRowFor(line, packageName) {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('{') || !trimmed.includes('}')) return false
+  const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+  return new RegExp(`name:\\s*['"]?${escaped}['"]?\\s*[,}]`, 'u').test(trimmed)
+}
+
+/**
+ * Locate a top-level `allowBuilds:` block and read its entries.
+ * @param text - pnpm-workspace.yaml text.
+ * @returns the block's end index and entries, or undefined without the block.
+ */
+function allowBuildsBlock(text) {
+  const lines = text.split(/\r?\n/)
+  const start = lines.findIndex(line => line.trim() === 'allowBuilds:')
+  if (start === -1) return undefined
+  let end = start + 1
+  while (end < lines.length && (lines[end].trim() === '' || /^\s/u.test(lines[end]))) end += 1
+  const entries = []
+  for (let index = start + 1; index < end; index += 1) {
+    const match = /^\s+['"]?([^'":]+)['"]?:\s*\S/u.exec(lines[index])
+    if (match === null) continue
+    const previous = lines[index - 1]
+    const lines0 = previous !== undefined && /^\s*#/u.test(previous) && index - 1 > start
+      ? [previous, lines[index]]
+      : [lines[index]]
+    entries.push({ key: match[1], lines: lines0 })
+  }
+  return { start, end, entries }
 }
 
 /**

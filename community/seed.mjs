@@ -9,11 +9,13 @@
  *
  * - skills:  copies any missing skill into $DSH_HOME/skills (never overwrites)
  * - home:    copies any missing global home file into $DSH_HOME (never overwrites)
- * - profile: writes $DSH_HOME/profiles/web when it is absent; otherwise repairs
- *            only what drifted — tarball paths left by another checkout, and
- *            bundles this host cannot install — leaving bundles the user added
- *            beyond the template untouched. Pass --force to rewrite the whole
- *            profile from the template instead.
+ * - profile: writes $DSH_HOME/profiles/web when it is absent; otherwise converges
+ *            it on the template — tarball paths left by another checkout, bundles
+ *            this host cannot install, bundles the template retired
+ *            (profiles/web/retired.json), and template bundles, dependencies and
+ *            `allowBuilds` entries this profile is missing — while leaving
+ *            bundles the user added beyond the template untouched. Pass --force
+ *            to rewrite the whole profile from the template instead.
  *
  * A bundle the chosen registry, the local network, or the CPU architecture
  * cannot support is dropped with a printed reason, so a seeded profile always
@@ -33,8 +35,8 @@ import { homedir, arch, platform } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { probe } from './preflight.mjs'
 import {
-  bundleAnchors, droppedBundles, materializeProfile, renderProfile, repairProfile,
-  unavailablePinned, unresolvableBundles,
+  bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, renderProfile, repairProfile,
+  retirePatchRows, unavailablePinned, unresolvableBundles,
 } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -76,12 +78,17 @@ function reportDropped(dropped) {
 /**
  * Extend a drop set with the bundles nothing on this host can supply — rows
  * `dsh-plugin-manager` wrote from its catalog without a dependency to install.
+ * A name the template does declare a dependency for is left alone: the
+ * convergence step installs it from that dependency instead.
  * @param dropped - the drop set to extend in place.
  * @param pkg - the manifest about to be written or repaired.
+ * @param template - the parsed checked-in profile template.
  */
-function dropUnresolvable(dropped, pkg) {
+function dropUnresolvable(dropped, pkg, template) {
   const anchors = bundleAnchors({ repoRoot, profileDir: profileDst, dshHome })
+  const provided = new Set(Object.keys(template?.dependencies ?? {}))
   for (const [name, reason] of unresolvableBundles(pkg, anchors)) {
+    if (provided.has(name)) continue
     if (!dropped.has(name)) dropped.set(name, reason)
   }
 }
@@ -93,6 +100,43 @@ function dropUnresolvable(dropped, pkg) {
 async function readProfileManifest() {
   if (!existsSync(profileManifest)) return undefined
   return JSON.parse(await readFile(profileManifest, 'utf8'))
+}
+
+/**
+ * Converge the profile's hand-editable configuration on the template: copy the
+ * `allowBuilds` entries the profile is missing, and drop patch rows a retired
+ * bundle left behind. Both files carry user edits, so they are merged in place
+ * instead of being rewritten from the template.
+ * @param retired - retired package names.
+ * @returns one Chinese sentence per applied change.
+ */
+async function convergeProfileFiles(retired) {
+  const changes = []
+  const workspacePath = join(profileDst, 'pnpm-workspace.yaml')
+  if (existsSync(workspacePath)) {
+    const merged = mergeAllowBuilds(
+      await readFile(workspacePath, 'utf8'),
+      await readFile(join(profileSrc, 'pnpm-workspace.yaml'), 'utf8'),
+    )
+    if (merged !== undefined) {
+      await writeFile(workspacePath, merged, 'utf8')
+      changes.push('合并模板新增的构建白名单 allowBuilds')
+    }
+  }
+  const patchPath = join(profileDst, 'cordis.patch.yml')
+  if (existsSync(patchPath)) {
+    const result = retirePatchRows(await readFile(patchPath, 'utf8'), retired)
+    if (result.removed.length > 0) {
+      await writeFile(patchPath, result.text, 'utf8')
+      changes.push(`移除已下线插件的补丁行：${[...new Set(result.removed)].join('、')}`)
+    }
+    for (const name of retired) {
+      if (result.text.includes(name)) {
+        console.warn(`[community] 请手动移除 ${patchPath} 中 ${name} 的补丁行（不是单行格式，无法自动识别）`)
+      }
+    }
+  }
+  return changes
 }
 
 // Skills: fill in any that are missing; never overwrite an existing skill.
@@ -135,7 +179,7 @@ if (existing === undefined || force) {
   // A pinned package the registry no longer serves would fail the install, so
   // it is dropped here with the reason instead.
   for (const [name, reason] of await unavailablePinned(template, registry, dropped)) dropped.set(name, reason)
-  dropUnresolvable(dropped, template)
+  dropUnresolvable(dropped, template, template)
   reportDropped(dropped)
 
   await mkdir(profileDst, { recursive: true })
@@ -163,8 +207,11 @@ if (existing === undefined || force) {
     platform: platform(),
     arch: arch(),
   })
-  dropUnresolvable(dropped, existing)
-  const changes = repairProfile(existing, { tarballsUrl, dropped })
+  const template = JSON.parse(await readFile(join(profileSrc, 'package.json'), 'utf8'))
+  const retired = JSON.parse(await readFile(join(profileSrc, 'retired.json'), 'utf8'))
+  dropUnresolvable(dropped, existing, template)
+  const changes = repairProfile(existing, { tarballsUrl, dropped, template, retired })
+  changes.push(...await convergeProfileFiles(retired))
   if (changes.length > 0) {
     for (const change of changes) console.log(`[community] ${change}`)
     await writeFile(profileManifest, renderProfile(existing), 'utf8')
