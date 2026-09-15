@@ -1,5 +1,5 @@
 diff --git a/lib/index.js b/lib/index.js
-index ead372504f7fbf59943162434c2186f4adcc2abe..75418b8b3c858caee6fddb4976ba5d80de578d14 100644
+index ead372504f7fbf59943162434c2186f4adcc2abe..8331ed273319325844135e733c2b3746868f60c2 100644
 --- a/lib/index.js
 +++ b/lib/index.js
 @@ -237,7 +237,16 @@ function resolveAutoConfig(config) {
@@ -20,7 +20,50 @@ index ead372504f7fbf59943162434c2186f4adcc2abe..75418b8b3c858caee6fddb4976ba5d80
  }
  function dirSize(path) {
  	let total = 0;
-@@ -1631,7 +1640,9 @@ function makePreviewRoute(service) {
+@@ -421,21 +430,28 @@ function titleFromProjcache(entry) {
+ */
+ async function readProjcacheFile(dshHome, id, cache) {
+ 	if (cache !== void 0 && cache.has(id)) return cache.get(id) ?? void 0;
+-	const path = join(dshHome, "storages", "session_projcache", "sessions", `${id}.json`);
++	// 本地补丁：缓存文件按「宿主持久化键」命名，旧布局的键是去掉 `session-` 前缀的裸
++	// uuid（目录名即如此），于是按规范化 id 直接去找必然落空——本部署 246 行无标题里
++	// 有 232 行属于这种拼写差异。先按 id 找，找不到再退回裸 uuid 名字。
++	const bare = id.startsWith("session-") ? id.slice("session-".length) : id;
+ 	let entry;
+-	try {
+-		const parsed = JSON.parse(await readFile(path, "utf8"));
+-		const record = parsed.record ?? parsed;
+-		const title = typeof record.rows?.title?.val === "string" && record.rows.title.val !== "" ? record.rows.title.val : void 0;
+-		const createdAt = typeof record.identity?.createdAt === "number" ? record.identity.createdAt : void 0;
+-		const cwd = typeof record.identity?.cwd === "string" && record.identity.cwd !== "" ? record.identity.cwd : void 0;
+-		if (title !== void 0 || createdAt !== void 0 || cwd !== void 0) entry = {
+-			...title !== void 0 ? { title } : {},
+-			...createdAt !== void 0 ? { createdAt } : {},
+-			...cwd !== void 0 ? { cwd } : {}
+-		};
+-	} catch {
+-		entry = void 0;
++	for (const candidate of bare === id ? [id] : [id, bare]) {
++		const path = join(dshHome, "storages", "session_projcache", "sessions", `${candidate}.json`);
++		try {
++			const parsed = JSON.parse(await readFile(path, "utf8"));
++			const record = parsed.record ?? parsed;
++			const title = typeof record.rows?.title?.val === "string" && record.rows.title.val !== "" ? record.rows.title.val : void 0;
++			const createdAt = typeof record.identity?.createdAt === "number" ? record.identity.createdAt : void 0;
++			const cwd = typeof record.identity?.cwd === "string" && record.identity.cwd !== "" ? record.identity.cwd : void 0;
++			if (title !== void 0 || createdAt !== void 0 || cwd !== void 0) entry = {
++				...title !== void 0 ? { title } : {},
++				...createdAt !== void 0 ? { createdAt } : {},
++				...cwd !== void 0 ? { cwd } : {}
++			};
++		} catch {
++			entry = void 0;
++		}
++		if (entry !== void 0) break;
+ 	}
+ 	if (cache !== void 0) cache.set(id, entry ?? null);
+ 	return entry;
+@@ -1631,7 +1647,9 @@ function makePreviewRoute(service) {
  		handler: async (req, res) => {
  			if (!fenced(req, res)) return;
  			const id = new URL(req.url ?? "/", "http://localhost").searchParams.get("id") ?? "";
