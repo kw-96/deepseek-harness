@@ -19,13 +19,14 @@ import {
   GITHUB_BUNDLES, NATIVE_BUNDLE_LIMITS, REQUIRED_NODE_RANGE, REQUIRED_PNPM_VERSION,
   nodeVersionSupported, probe,
 } from './preflight.mjs'
-import { bundleAnchors, droppedBundles, repairProfile, unresolvableBundles } from './profile.mjs'
+import { bundleAnchors, droppedBundles, mergeAllowBuilds, repairProfile, retirePatchRows, unresolvableBundles } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
 const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 const tarballsUrl = join(repoRoot, 'community', 'plugins', 'tarballs').replaceAll('\\', '/')
 const profileDir = join(dshHome, 'profiles', 'web')
+const templateDir = join(here, 'profiles', 'web')
 const host = { platform: process.platform, arch: process.arch }
 
 const findings = []
@@ -126,11 +127,38 @@ if (!existsSync(join(profileDir, 'package.json'))) {
   const pkg = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
   // The drift check mirrors seed's repair path, which never weighs the network:
   // a bundle already installed keeps working offline.
-  const expected = droppedBundles({ internal: true, githubReachable: true, ...host })
+  const template = JSON.parse(readFileSync(join(templateDir, 'package.json'), 'utf8'))
+  const retired = JSON.parse(readFileSync(join(templateDir, 'retired.json'), 'utf8'))
+  // Which registry this profile installs from decides whether the internal
+  // bundles are reachable; seed reads the same .npmrc, so this mirrors it.
+  const npmrcPath = join(profileDir, '.npmrc')
+  const npmrc = existsSync(npmrcPath) ? readFileSync(npmrcPath, 'utf8') : ''
+  const expected = droppedBundles({
+    internal: npmrc.includes('nie.netease.com'),
+    githubReachable: true,
+    ...host,
+  })
+  const provided = new Set(Object.keys(template.dependencies ?? {}))
   for (const [name, reason] of unresolvableBundles(pkg, bundleAnchors({ repoRoot, profileDir, dshHome }))) {
+    if (provided.has(name)) continue
     expected.set(name, reason)
   }
-  const changes = repairProfile(structuredClone(pkg), { tarballsUrl, dropped: expected })
+  const changes = repairProfile(structuredClone(pkg), { tarballsUrl, dropped: expected, template, retired })
+  const workspacePath = join(profileDir, 'pnpm-workspace.yaml')
+  if (existsSync(workspacePath)) {
+    const merged = mergeAllowBuilds(
+      readFileSync(workspacePath, 'utf8'),
+      readFileSync(join(templateDir, 'pnpm-workspace.yaml'), 'utf8'),
+    )
+    if (merged !== undefined) changes.push('构建白名单缺少模板新增的 allowBuilds 条目')
+  }
+  const patchPath = join(profileDir, 'cordis.patch.yml')
+  if (existsSync(patchPath)) {
+    const result = retirePatchRows(readFileSync(patchPath, 'utf8'), retired)
+    if (result.removed.length > 0) {
+      changes.push(`补丁文件仍含已下线插件的行：${[...new Set(result.removed)].join('、')}`)
+    }
+  }
   if (changes.length === 0) {
     record('通过', 'profile 配置与当前仓库一致')
   } else {
