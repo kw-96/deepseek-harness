@@ -12,7 +12,7 @@ const packageNames = {
   manager: 'dsh-plugin-manager',
   marketplace: '@ruihuahe/dsh-plugin-marketplace',
   'codex-shell': 'dsh-codex-shell',
-  'codex-left': 'dsh-codex-left',
+  'codex-left': 'dsh-workspace-rail',
   'workorder-agent': 'workorder-agent',
 }
 const entryFiles = {

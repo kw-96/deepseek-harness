@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Folder, FolderSearch } from 'lucide-react'
-import type { FsListEntry, FsListResponse } from 'dsh-codex-left/types'
+import type { FsListEntry, FsListResponse } from 'dsh-workspace-rail/types'
 import type { TFn } from '../../faces.js'
 import css from '../../styles.module.css'
 

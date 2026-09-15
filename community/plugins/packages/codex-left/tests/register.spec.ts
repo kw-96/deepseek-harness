@@ -1,6 +1,6 @@
 /**
  * 针对真实 SlotCore 的加载期回归覆盖：先播种宿主外壳的槽位树
- * （侧栏与新建会话页），再让 dsh-codex-left 客户端 apply 注册进宿主洞口。
+ * （侧栏与新建会话页），再让 dsh-workspace-rail 客户端 apply 注册进宿主洞口。
  * 重复子槽声明（例如重复声明 sidebar.workspaces.directoryFlow）会在这里
  * 直接抛出，而不是在浏览器里静默失败。
  *

@@ -1,4 +1,4 @@
-/** Host service for the dsh-codex-left Codex-style project/session navigation rail. */
+/** Host service for the dsh-workspace-rail Codex-style project/session navigation rail. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'

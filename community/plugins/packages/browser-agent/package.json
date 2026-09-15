@@ -1,6 +1,6 @@
 {
   "name": "dsh-browser-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser automation for DeepSeek Harness: model tools plus a Web panel that drive the user's real Chromium browser through the bsk CLI, with Agent Window isolation, owned session lifecycle, and observation-first interaction",
   "keywords": [
     "deepseek-harness",

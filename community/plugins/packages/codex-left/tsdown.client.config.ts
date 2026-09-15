@@ -4,7 +4,7 @@ import { transform } from 'lightningcss'
 import { defineConfig } from 'tsdown'
 import { cssModuleClassName } from '../../../../scripts/css-module-class-name.ts'
 
-const id = 'dsh-codex-left'
+const id = 'dsh-workspace-rail'
 const externals = [
   '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-api-gateway/client',
@@ -24,7 +24,7 @@ const externals = [
   // 否则会把整份 react-dom 打进插件产物（双 reconciler 与体积翻倍）。
   'react-dom',
 ]
-const cssPrefix = '\0dsh-codex-left-css:'
+const cssPrefix = '\0dsh-workspace-rail-css:'
 const cssSuffix = '.mjs'
 
 export default defineConfig({
@@ -42,7 +42,7 @@ export default defineConfig({
   },
   define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production') },
   plugins: [{
-    name: 'dsh-codex-left-css',
+    name: 'dsh-workspace-rail-css',
     resolveId(source: string, importer?: string) {
       if (importer === undefined) return null
       if (source.endsWith('.module.css')) {

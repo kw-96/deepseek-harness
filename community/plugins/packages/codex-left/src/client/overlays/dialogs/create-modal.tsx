@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { Folder, FolderSearch, X } from 'lucide-react'
-import type { FsListResponse, ProjectView } from 'dsh-codex-left/types'
+import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
 import type { TFn, WorkspaceViewLike } from '../../faces.js'
 import { DirectoryBrowse } from './directory-browse.js'
 import css from '../../styles.module.css'

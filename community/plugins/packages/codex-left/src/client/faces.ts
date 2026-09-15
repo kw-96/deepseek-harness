@@ -7,12 +7,12 @@
  */
 
 import type { ReactNode } from 'react'
-import type { FsListResponse, ProjectView } from 'dsh-codex-left/types'
+import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
 
 export type SessionId = string
 export type WorkspaceId = string
 
-export type { ProjectView } from 'dsh-codex-left/types'
+export type { ProjectView } from 'dsh-workspace-rail/types'
 
 /** Minimal durable session row the sidebar renders. */
 export interface SessionSummaryLike {

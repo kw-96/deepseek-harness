@@ -1,6 +1,6 @@
 /** 侧栏浏览器对外契约：槽位注入面与组件属性。 */
 
-import type { FsListResponse } from 'dsh-codex-left/types'
+import type { FsListResponse } from 'dsh-workspace-rail/types'
 import type { SessionMetaStore } from '../state/session-meta.js'
 import type { BrowserPrefsStore } from '../state/prefs.js'
 import type {

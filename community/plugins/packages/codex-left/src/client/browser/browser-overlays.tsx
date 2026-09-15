@@ -1,6 +1,6 @@
 /** 侧栏浏览器的浮层：嵌套菜单宿主与两个项目弹窗。 */
 
-import type { FsListResponse } from 'dsh-codex-left/types'
+import type { FsListResponse } from 'dsh-workspace-rail/types'
 import type { ProjectView, SessionId, TFn, WorkspaceViewLike } from '../faces.js'
 import { BrowserMenu, type BrowserMenuState } from '../overlays/browser-menu.js'
 import type { ProjectMenuActions } from '../overlays/project-menu.js'

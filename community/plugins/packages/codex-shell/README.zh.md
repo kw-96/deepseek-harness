@@ -2,19 +2,19 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness（DSH）的多 tab 交互式底栏终端，**单插件组合**：宿主 bottom 行里自带 `pwsh`/`bash` 终端，并可跟随 Agent 的 `terminal_*` 会话。Codex 式左侧导航栏（会话浏览器、项目层、添加工作区弹窗、新建会话页项目选择器）由单独的 [`dsh-codex-left`](../codex-left/README.zh.md) 提供；两者可组合使用，也可各自单独安装。
+DeepSeek Harness（DSH）的多 tab 交互式底栏终端，**单插件组合**：宿主 bottom 行里自带 `pwsh`/`bash` 终端，并可跟随 Agent 的 `terminal_*` 会话。Codex 式左侧导航栏（会话浏览器、项目层、添加工作区弹窗、新建会话页项目选择器）由单独的 [`dsh-workspace-rail`](../codex-left/README.zh.md) 提供；两者可组合使用，也可各自单独安装。
 
 ## 功能
 
 - **底栏交互终端**（以 priority -1 占用宿主 `bottom` 行）：自带多 tab 终端，与模型侧行模式工具并行工作 —— 新标签创建 `pwsh`/`bash`，可跟随 Agent 的 `terminal_*` 会话，渲染用 `@xterm/xterm`。非活跃标签保持 follow，仅隐藏 DOM。行高、拖拽与动画由宿主布局接管；关闭按钮写回 `ctx.layout.closeBottom`。
 - **会话头工具按钮**（`conversation.session.header.utilities`）：Web 渲染底部终端按钮；桌面独立窗口不渲染（该按钮由顶部栏放在窗口控制按钮左侧）。
-- **视觉**：通过 `dsh-codex-left` 同款的 `--cx-*` 别名映射宿主 `--dsw-*` 主题令牌，自动跟随亮/暗主题。
+- **视觉**：通过 `dsh-workspace-rail` 同款的 `--cx-*` 别名映射宿主 `--dsw-*` 主题令牌，自动跟随亮/暗主题。
 
 右侧面板不属于本插件：它由宿主官方右栏（`ui-sidebar-right`）提供，Web 用右栏自带的会话头角落按钮开合，桌面独立窗口用顶部栏的右侧面板按钮。
 
-## 与 dsh-codex-left 的组合
+## 与 dsh-workspace-rail 的组合
 
-`dsh-codex-left` 的会话菜单通过本插件 `codexShell` Remote 的 `terminalOpen` 提供「在终端中打开」。服务名与 `terminalOpen(sessionId, options)` 签名是跨插件接口：改名必须与消费方同步。本插件不依赖 `dsh-codex-left` 的任何内容。
+`dsh-workspace-rail` 的会话菜单通过本插件 `codexShell` Remote 的 `terminalOpen` 提供「在终端中打开」。服务名与 `terminalOpen(sessionId, options)` 签名是跨插件接口：改名必须与消费方同步。本插件不依赖 `dsh-workspace-rail` 的任何内容。
 
 ## 安装
 

@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { FolderPlus, Trash2, X } from 'lucide-react'
-import type { FsListResponse, ProjectView } from 'dsh-codex-left/types'
+import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
 import type { TFn, WorkspaceViewLike } from '../../faces.js'
 import { DirectoryBrowse } from './directory-browse.js'
 import { pathKey } from '../../state/groups.js'

@@ -1,14 +1,14 @@
 # dsh-codex-shell PRODUCT.md
 
 Product truth only. Visual decisions for the shared `--cx-*` token world live in
-[`dsh-codex-left`'s DESIGN.md](../codex-left/DESIGN.md); the bottom terminal
+[`dsh-workspace-rail`'s DESIGN.md](../codex-left/DESIGN.md); the bottom terminal
 itself adds no visual language beyond those tokens.
 
 ## What it is
 
 A DeepSeek Harness web-profile bundle plugin: the host's bottom row driven by a
 multi-tab interactive terminal. The Codex-styled left navigation rail is a
-separate plugin (`dsh-codex-left`) since 0.7.0; this plugin registers no sidebar
+separate plugin (`dsh-workspace-rail`) since 0.7.0; this plugin registers no sidebar
 slot at all. The right-hand `details` column is intentionally left to the host's
 native panel; the plugin registers no occupant there.
 
@@ -32,9 +32,9 @@ native panel; the plugin registers no occupant there.
 
 The `codexShell` Typert Remote service name and its
 `terminalOpen(sessionId, options)` method are the interface
-`dsh-codex-left`'s "Open in terminal" entry consumes. Renaming the service, the
+`dsh-workspace-rail`'s "Open in terminal" entry consumes. Renaming the service, the
 method, or the option fields requires updating that consumer in the same change.
-Nothing in this plugin depends on `dsh-codex-left`.
+Nothing in this plugin depends on `dsh-workspace-rail`.
 
 ## Constraints
 
@@ -45,5 +45,5 @@ Nothing in this plugin depends on `dsh-codex-left`.
   its tool seat stay with the host, so tool cards keep rendering there.
 - Host data only through the `codexShell` Typert Remote (the PTY sessions of the
   live Agent). File access, the project registry, and the session browser moved
-  to `dsh-codex-left`; the Git timeline ships separately as `dsh-git-timeline`.
+  to `dsh-workspace-rail`; the Git timeline ships separately as `dsh-git-timeline`.
 - Platform: web desktop, light and dark themes.

@@ -1,4 +1,4 @@
-# dsh-codex-left
+# dsh-workspace-rail
 
 English | [中文](README.zh.md)
 
@@ -22,8 +22,8 @@ The session menu's "Open with > Open in terminal" entry calls `codexShell.termin
 ## Install
 
 ```sh
-dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-left-0.1.0.tgz
-dsh plugin --profile web remove dsh-codex-left
+dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-workspace-rail-0.1.0.tgz
+dsh plugin --profile web remove dsh-workspace-rail
 ```
 
 ## Develop (source link + hot reload)
@@ -44,8 +44,8 @@ Or insert it manually in the profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
-    - id: codex-left
-      name: dsh-codex-left
+    - id: workspace-rail
+      name: dsh-workspace-rail
 ```
 
 Restart the profile after installing (`dsh web`). Use the host's "Settings > Plugins" page to view and configure plugins, MCP servers, and skills (it requires host-side capabilities such as `dsh-plugin-manager`).

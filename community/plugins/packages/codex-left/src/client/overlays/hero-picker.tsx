@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import type { FsListResponse, ProjectView } from 'dsh-codex-left/types'
+import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
 import type { SelectorHook, SessionListStateLike, TFn, WorkspaceSnapshotLike, WorkspaceViewLike } from '../faces.js'
 import type { BrowserPrefsStore } from '../state/prefs.js'
 import { orderProjects, projectForPath } from '../state/groups.js'

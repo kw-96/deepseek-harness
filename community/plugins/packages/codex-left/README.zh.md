@@ -1,4 +1,4 @@
-# dsh-codex-left
+# dsh-workspace-rail
 
 [English](README.md) | 中文
 
@@ -22,8 +22,8 @@ DeepSeek Harness（DSH）的 Codex 式左侧导航栏：会话浏览器（带持
 ## 安装
 
 ```sh
-dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-codex-left-0.1.0.tgz
-dsh plugin --profile web remove dsh-codex-left
+dsh plugin --profile web add file:/path/to/community/plugins/tarballs/dsh-workspace-rail-0.1.0.tgz
+dsh plugin --profile web remove dsh-workspace-rail
 ```
 
 ## 开发（源码 link + 热替换）
@@ -44,8 +44,8 @@ node community/plugins/dev.mjs codex-left
 
 ```yaml
 - insert:
-    - id: codex-left
-      name: dsh-codex-left
+    - id: workspace-rail
+      name: dsh-workspace-rail
 ```
 
 安装后重启 profile（`dsh web`）。插件/MCP/Skills 的查看与配置走宿主「设置 → 插件」页（需要 `dsh-plugin-manager` 等宿主能力）。

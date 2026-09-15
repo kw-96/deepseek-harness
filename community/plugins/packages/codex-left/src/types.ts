@@ -1,4 +1,4 @@
-/** Shared wire types for the dsh-codex-left Host Remote. */
+/** Shared wire types for the dsh-workspace-rail Host Remote. */
 
 import { z } from 'zod'
 

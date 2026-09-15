@@ -1,4 +1,4 @@
-# dsh-codex-left DESIGN.md
+# dsh-workspace-rail DESIGN.md
 
 左侧导航栏的视觉世界，v6：**Codex 式极简侧栏 + 宿主令牌**。侧栏工作区面板参考
 Codex 左侧栏的界面排布与 UI 设计 —— 常驻圆角搜索框、细字工作区/项目标题、单行

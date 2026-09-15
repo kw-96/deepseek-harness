@@ -6,7 +6,7 @@
  * 工厂里一次性求值成布尔值。
  */
 
-import type { FsListResponse, ProjectView } from 'dsh-codex-left/types'
+import type { FsListResponse, ProjectView } from 'dsh-workspace-rail/types'
 import type { SessionMetaStore } from './state/session-meta.js'
 import type { BrowserPrefsStore } from './state/prefs.js'
 import type { AddWorkspaceInjected } from './overlays/workspace-picker.js'

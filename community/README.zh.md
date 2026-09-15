@@ -9,7 +9,7 @@
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           codex-left · codex-shell · manager · marketplace
+    packages/           workspace-rail · codex-shell · manager · marketplace
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot

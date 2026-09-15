@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ProjectCreateModal } from '../src/client/overlays/dialogs/create-modal.js'
 import { ProjectMenuBody } from '../src/client/overlays/project-menu.js'
 import { zh } from '../src/client/locales.js'
-import type { FsListResponse } from 'dsh-codex-left/types'
+import type { FsListResponse } from 'dsh-workspace-rail/types'
 import type { WorkspaceViewLike } from '../src/client/faces.js'
 
 const t = (key: string, params?: Record<string, unknown>): string => {
