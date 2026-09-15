@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * 新主机装配入口：把仓库已有的装配件（preflight / doctor / seed / portable）
+ * 新主机装配入口：把仓库已有的装配件（preflight / doctor / seed）
  * 串成一条幂等命令，并在装配失败之前把已知陷阱直接点出来。
  *
  *   node community/setup-host.mjs            # 默认等同 check
  *   node community/setup-host.mjs check      # 只体检：不改动任何东西
  *   node community/setup-host.mjs install    # 装配：安装依赖 → 构建 → 写 profile → 自检
- *   node community/setup-host.mjs pack       # 打便携包（同一架构主机免构建部署）
  *
  * 本脚本不重复实现装配逻辑：它按顺序调用仓库自己的脚本，并在中间插入
  * 「本会话踩过的坑」检查——这些坑的共同特征是失败信息离根因很远。
@@ -104,14 +103,12 @@ function printHints() {
   console.log('[提示] 新增/修改插件的 Remote 方法后必须重启 dsh web：typert manifest 按包名缓存，HMR 不生效')
 }
 
-/** check：依次跑仓库自己的三个只读体检件，再跑陷阱检查。 */
+/** check：依次跑仓库自己的只读体检件，再跑陷阱检查。 */
 function check() {
   section('运行时与可达性（preflight）')
   const preflight = run('node', ['community/preflight.mjs'])
   section('部署自检（doctor）')
   const doctor = run('node', ['community/doctor.mjs'])
-  section('便携打包就绪度（portable check）')
-  const portable = run('node', ['community/portable.mjs', 'check'])
   section('组合自检（verify-profile）')
   const composition = run('node', ['community/verify-profile.mjs'])
   section('已知陷阱')
@@ -120,7 +117,7 @@ function check() {
   printHints()
   section('结论')
   for (const problem of problems) console.log(`[警告] ${problem}`)
-  const failed = preflight !== 0 || doctor !== 0 || portable !== 0 || composition !== 0
+  const failed = preflight !== 0 || doctor !== 0 || composition !== 0
   if (failed) {
     console.log('体检未通过：按上面第一条失败项给出的修复命令处理后重跑本命令。')
     return 1
@@ -149,17 +146,10 @@ function install() {
   return status
 }
 
-/** pack：调用仓库的便携打包。 */
-function pack() {
-  section('便携打包')
-  console.log('提示：产物在同一架构主机上解压后只需 pnpm install 一次即可 start.cmd 启动。')
-  return run('node', ['community/portable.mjs', 'pack'])
-}
-
-const handlers = { check, install, pack }
+const handlers = { check, install }
 const handler = handlers[mode]
 if (handler === undefined) {
-  console.error(`未知模式：${mode}（可用：check / install / pack）`)
+  console.error(`未知模式：${mode}（可用：check / install）`)
   process.exit(2)
 }
 process.exit(handler())

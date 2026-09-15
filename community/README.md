@@ -19,7 +19,6 @@ community/
   doctor.mjs          read-only host report; names the command that fixes each problem
   preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
   profile.mjs         profile manifest build and repair
-  portable.mjs        packs a built, configured deployment into one archive
   README.md           this file
 ```
 
@@ -46,9 +45,8 @@ The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it wr
 
 | Mode | Effect |
 | --- | --- |
-| `check` (default) | Runs `preflight.mjs`, `doctor.mjs`, and `portable.mjs check`, then the known-trap checks below. Changes nothing. |
+| `check` (default) | Runs `preflight.mjs`, `doctor.mjs`, and `verify-profile.mjs`, then the known-trap checks below. Changes nothing. |
 | `install` | `pnpm install` → `pnpm run build` → `node community/seed.mjs` → the same self-check, then names the start command. |
-| `pack` | Delegates to `portable.mjs pack` for same-architecture hosts that should not build at all. |
 
 It adds no second implementation of any step; the value is ordering plus the trap checks we hit while operating this fleet, each of which otherwise fails far from its cause:
 
@@ -57,16 +55,6 @@ It adds no second implementation of any step; the value is ordering plus the tra
 - **Git-hosted bundles.** A `github:` dependency whose build script pnpm blocks needs its exact key under `allowBuilds` in the profile's `pnpm-workspace.yaml`; the check reports a missing entry before the install fails.
 - **Restart discipline.** Adding or changing a plugin's Remote methods requires restarting `dsh web`; the typert manifest is cached per package name and HMR does not refresh it.
 - **Snapshot before upgrades.** When `dsh-undo-savepoint` is installed, the check prints the snapshot command to run before upgrading or editing plugins.
-
-## Pack a portable archive
-
-`node community/portable.mjs pack` writes one `tar.gz` carrying the checkout with its build output, a bundled Node.js and pnpm, the offline pnpm store both installs read from, a ready-made profile holding every plugin, the skills, the global configuration, and a launcher that pins `DSH_HOME` inside the extracted folder. A clean Windows host of the same architecture extracts it and double-clicks `DeepSeek Harness.exe` (or `start.cmd`): no runtime to install, no network, and the first launch installs offline from the store that traveled with the archive.
-
-- Artifacts are named per architecture (`dsh-portable-x64-<date>.tar.gz`, `dsh-portable-arm64-<date>.tar.gz`) and run only on that architecture, so pack on the host you intend to deploy to.
-- Neither the checkout's nor the profile's `node_modules` travels: pnpm records them as absolute junctions on Windows, which do not survive relocation. The archive carries the store and the manifests instead, and the target rebuilds both trees offline on first launch.
-- A plugin the host only reached through a development junction, with no dependency entry of its own, is unpacked from `community/plugins/tarballs/` into the shared `$DSH_HOME/profiles/node_modules` fallback, so the target never reinstalls it.
-- A pinned version the registry no longer publishes is repacked from the host's installed copy as a `file:` tarball instead of silently moving to another version, and the run reports it.
-- `node community/portable.mjs check` verifies this host is packable.
 
 ## Bundles this host cannot install
 

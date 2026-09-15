@@ -19,7 +19,6 @@ community/
   doctor.mjs          read-only host report; names the command that fixes each problem
   preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
   profile.mjs         profile manifest build and repair
-  portable.mjs        packs a built, configured deployment into one archive
   README.md           this file
 ```
 
@@ -46,9 +45,8 @@ pnpm dsh web
 
 | 模式 | 作用 |
 | --- | --- |
-| `check`（默认） | 依次运行 `preflight.mjs`、`doctor.mjs`、`portable.mjs check`、`verify-profile.mjs`，再做下面的已知陷阱检查。不改动任何东西。 |
+| `check`（默认） | 依次运行 `preflight.mjs`、`doctor.mjs`、`verify-profile.mjs`，再做下面的已知陷阱检查。不改动任何东西。 |
 | `install` | `pnpm install` → `pnpm run build` → `node community/seed.mjs` → 同一套自检，最后给出启动命令。 |
-| `pack` | 转调 `portable.mjs pack`，供同架构、不想在目标机上构建的主机使用。 |
 
 它不重复实现任何一步，价值在于**顺序**与**我们运维这套多主机时踩过的陷阱检查**——这些陷阱的共同特征是失败信息离根因很远：
 
@@ -57,16 +55,6 @@ pnpm dsh web
 - **git 托管的组合包。** 依赖里出现 `github:` 引用时，pnpm 会拦下构建脚本，需要在 profile 的 `pnpm-workspace.yaml` 里按精确 key 补 `allowBuilds`；检查会在安装失败之前报告缺失。
 - **重启纪律。** 新增或修改插件的 Remote 方法后必须重启 `dsh web`：typert manifest 按包名缓存，HMR 不会刷新它。
 - **升级前先存快照。** 装了 `dsh-undo-savepoint` 时，检查会打印升级或改插件前应执行的快照命令。
-
-## 打便携包
-
-`node community/portable.mjs pack` 写出一份 `tar.gz`，内含完整检出目录与构建产物、内置的 Node 与 pnpm、一份离线 pnpm store、已生成好的 profile（含全部插件）、技能与全局配置，以及把 `DSH_HOME` 固定在解压目录内的启动器。同架构的 Windows 主机**解压后直接双击 `DeepSeek Harness.exe`（或 `start.cmd`）即可**：不需要预装 Node 或 pnpm，不需要联网，首次启动自动从包内 store 离线安装，插件与配置随包生效。
-
-- 产物按架构命名（`dsh-portable-x64-<日期>.tar.gz` / `dsh-portable-arm64-<日期>.tar.gz`），**只能在打包时的同一架构上运行**，因此请在目标架构的主机上打包。
-- 检出的 `node_modules` 与 profile 的 `node_modules` 都不随包分发：pnpm 在 Windows 上把它们记成绝对 junction，无法被忠实归档。包内携带的是 store 与清单，目标机首次启动时离线重建这两棵树。
-- 宿主 profile 里只靠开发 junction 存在的插件（没有依赖声明），打包时会从 `community/plugins/tarballs/` 解包后放进 `$DSH_HOME/profiles/node_modules` 共享回退目录，因此目标机不需要重装。
-- 若 profile 固定了 registry 已下架的版本，打包会从**本机已安装的副本**重打成 `file:` tarball，而不是悄悄换版本，并在输出里说明。
-- `node community/portable.mjs check` 用于检查本机是否具备打包条件。
 
 ## 本机装不上的组合包
 
