@@ -27,5 +27,12 @@
             name: "@deepseek-ai/dsh-session-import-codex"
           }
       ]
-    }
+    },
+  # web-app bundle 默认禁用工作流引擎与工作流工具（见 packages/bundle/web-app/cordis.patch.yml）；
+  # 下面三行在 web profile 里重新启用它们。0.1.6 起引擎的 id 与包名由
+  # workflow-worker-thread 改为 workflow-ptc——漏掉第一行会让 tool-workflow 与
+  # tool-ralph 一直 pending 在 workflowEngine 上（启动只告警，功能静默缺失）。
+  { id: workflow-ptc, name: "@deepseek-ai/dsh-workflow-ptc", disabled: false },
+  { id: tool-workflow, name: "@deepseek-ai/dsh-tool-workflow", disabled: false },
+  { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false }
 ]
