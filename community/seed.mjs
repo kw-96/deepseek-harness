@@ -212,10 +212,13 @@ if (existing === undefined || force) {
   const template = JSON.parse(await readFile(join(profileSrc, 'package.json'), 'utf8'))
   const retired = JSON.parse(await readFile(join(profileSrc, 'retired.json'), 'utf8'))
   dropUnresolvable(dropped, existing, template)
-  const changes = repairProfile(existing, { tarballsUrl, dropped, template, retired })
-  changes.push(...await convergeProfileFiles(retired))
-  if (changes.length > 0) {
-    for (const change of changes) console.log(`[community] ${change}`)
+  const manifestChanges = repairProfile(existing, { tarballsUrl, dropped, template, retired })
+  const changes = [...manifestChanges, ...await convergeProfileFiles(retired)]
+  for (const change of changes) console.log(`[community] ${change}`)
+  // 只有清单真的变了才写回并安装。补丁层自愈是每次启动都会发生的机械修复——
+  // 社区插件每次启动都重写自己的托管块——让它在启动时触发一次 pnpm install
+  // 既慢又没有任何依赖变化可装。
+  if (manifestChanges.length > 0) {
     await writeFile(profileManifest, renderProfile(existing), 'utf8')
     installProfile()
   }
