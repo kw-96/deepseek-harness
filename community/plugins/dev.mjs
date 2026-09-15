@@ -10,6 +10,10 @@
  *   node community/plugins/dev.mjs               # 全部自研插件
  *   node community/plugins/dev.mjs codex-shell   # 仅指定插件
  *
+ * 已下线插件（`community/profiles/web/retired.json` 列出的包名）不挂载、不登记、
+ * 也不开 watch：它们的源码保留可回退，但不再属于 profile；把它们移出该清单即可
+ * 恢复挂载。
+ *
  * 前置：dsh web（或桌面壳）已运行，且各插件源码已构建过一次。
  */
 
@@ -26,10 +30,18 @@ const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 const profileDir = join(dshHome, 'profiles', 'web')
 const patchFile = join(profileDir, 'cordis.patch.yml')
 
+/** 已下线插件名单；与播种共用同一份清单。 */
+function readRetired() {
+  const path = join(here, '..', 'profiles', 'web', 'retired.json')
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : []
+}
+
 /** 发现自研插件目录；返回 { dirName, name, dir }。 */
 function discoverPlugins() {
   const wanted = process.argv.slice(2)
+  const retired = readRetired()
   const result = []
+  const skipped = []
   for (const dirName of readdirSync(packagesDir).sort()) {
     const dir = join(packagesDir, dirName)
     const manifestPath = join(dir, 'package.json')
@@ -37,10 +49,19 @@ function discoverPlugins() {
     if (wanted.length > 0 && !wanted.includes(dirName)) continue
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     if (typeof manifest.name !== 'string' || manifest.dsh?.bundle?.patch === undefined) continue
+    // 播种每次启动都会把已下线插件从 profile 里删掉；这里再挂回去只会形成
+    // 「启动删、dev 加」的拉锯，并让它们在清单里看起来从未下线。
+    if (retired.includes(manifest.name)) {
+      console.log(`[dev] 跳过已下线插件 ${manifest.name}（见 community/profiles/web/retired.json）`)
+      skipped.push(manifest.name)
+      continue
+    }
     result.push({ dirName, name: manifest.name, dir })
   }
   if (result.length === 0) {
-    console.error('dev: 未发现社区 bundle 插件（community/plugins/packages/* 且声明 dsh.bundle.patch）')
+    console.error(skipped.length > 0
+      ? `dev: 选中的社区 bundle 插件均已下线（${skipped.join('、')}），见 community/profiles/web/retired.json`
+      : 'dev: 未发现社区 bundle 插件（community/plugins/packages/* 且声明 dsh.bundle.patch）')
     process.exit(1)
   }
   return result
