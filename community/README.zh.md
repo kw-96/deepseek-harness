@@ -9,7 +9,7 @@
 ```
 community/
   plugins/            vendored plugin workspace (source + built tarballs)
-    packages/           manager · marketplace · workorder-agent
+    packages/           manager · workorder-agent
     tarballs/           pinned installable .tgz artifacts
     scripts/            build/pack helpers
   skills/             installed skills, copied to $DSH_HOME/skills at boot

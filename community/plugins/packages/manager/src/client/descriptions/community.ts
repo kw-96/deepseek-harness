@@ -9,7 +9,6 @@ export const COMMUNITY = {
   'dsh-doc': 'DeepSeek Harness 的本地 PDF、Office、图片与 OCR 文档智能',
   'dsh-ocr-local': 'DeepSeek Harness 本地 OCR 插件：粘贴/附加图片，经 PP-OCRv5 + ONNX Runtime 提取文字，完全离线，支持 TUI 与 Web',
   'dsh-plugin-manager': 'DeepSeek Harness 的 Cordis HMR 插件管理器：热加载、查看、启用、停用、分组并管理运行时插件',
-  '@ruihuahe/dsh-plugin-marketplace': 'DeepSeek Harness 的生成目录插件发现与 npm 安装市场',
   '@dap-dsh-plugins/netease-auth': '维护持续刷新的网易内部用户 Access Token：写入 credentials（NETEASE_AUTH_TOKEN），提供 neteaseAuth 服务、校验/刷新/获取 auth key 等工具与设置页（设置 → 网易认证）',
   'dsh-soul-md': 'soul.md 风格人设 + 长期记忆插件：设置页输入人设卡名称和内容即可，文件由插件自动管理；可按工作区指定人设、聊天框可给会话单独切人设；AI 可自行演化人设与记忆（soul_read/soul_update/memory_*）',
   'dsh-mnemon': 'DeepSeek Harness 的可组合三层记忆控制面：持久运行时上下文、可搜索项目文档、可插拔长期记忆、守卫策略、WebUI 与 headless 工具',

@@ -151,7 +151,7 @@ if (!watchOnly) {
     } catch {
       // 目标不存在则忽略。
     }
-    // 作用域包（如 @ruihuahe/...）的父目录在全新 profile 上尚不存在，
+    // 作用域包（如 @scope/name）的父目录在全新 profile 上尚不存在，
     // junction 的创建要求目标父目录就位。
     mkdirSync(dirname(target), { recursive: true })
     symlinkSync(plugin.dir, target, 'junction')

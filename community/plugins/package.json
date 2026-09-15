@@ -11,9 +11,7 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "build": "pnpm -r run build",
-    "pack:check": "pnpm -r run pack:check",
-    "catalog:build": "pnpm --filter @ruihuahe/dsh-plugin-marketplace run catalog:build",
-    "generated:check": "pnpm --filter @ruihuahe/dsh-plugin-marketplace run catalog:check"
+    "pack:check": "pnpm -r run pack:check"
   },
   "devDependencies": {
     "tsx": "^4.23.13",

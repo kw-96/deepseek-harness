@@ -98,8 +98,6 @@ git push origin main --tags
 
 The package has one Host entry, one browser entry, generated Typert Remote artifacts, and one `dsh.bundle` patch. It targets the pre-release `0.1.x` Harness APIs; review release notes before upgrading peer dependencies.
 
-Plugin discovery and npm installation belong to the independent `@ruihuahe/dsh-plugin-marketplace` package in this repository. The manager remains focused on enablement and runtime state for installed plugins.
-
 ## Discoverability
 
 Recommended GitHub topics: `dsh-plugin`, `deepseek-harness`, `dsh`, `cordis`, `plugin-manager`, `plugin-management`, `web-ui`, `deepseek`, `typescript`.

@@ -6,16 +6,14 @@ import { spawnSync } from 'node:child_process'
 const archive = resolve(process.argv[2] ?? '')
 const flavor = process.argv[3]
 if (process.argv[2] === undefined) throw new Error('usage: node scripts/verify-package.mjs <package.tgz>')
-const flavors = ['manager', 'marketplace', 'workorder-agent']
+const flavors = ['manager', 'workorder-agent']
 if (!flavors.includes(flavor)) throw new Error(`package flavor must be one of ${flavors.join(', ')}`)
 const packageNames = {
   manager: 'dsh-plugin-manager',
-  marketplace: '@ruihuahe/dsh-plugin-marketplace',
   'workorder-agent': 'workorder-agent',
 }
 const entryFiles = {
   manager: ['client.js', 'index.js', 'remote.js'],
-  marketplace: ['client.js', 'index.js', 'remote.js'],
   'workorder-agent': ['harness/host.js'],
 }
 

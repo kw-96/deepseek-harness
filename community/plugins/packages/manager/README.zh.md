@@ -98,8 +98,6 @@ git push origin main --tags
 
 该软件包包含一个 Host 入口、一个浏览器入口、生成的 Typert Remote 产物，以及一个 `dsh.bundle` patch。它面向预发布的 `0.1.x` Harness API；升级 peer 依赖前请先阅读发布说明。
 
-插件发现和 npm 安装由本仓库中独立的 `@ruihuahe/dsh-plugin-marketplace` 软件包负责。管理器仍然专注于已安装插件的启停与运行时状态。
-
 ## 可发现性
 
 建议的 GitHub topics：`dsh-plugin`、`deepseek-harness`、`dsh`、`cordis`、`plugin-manager`、`plugin-management`、`web-ui`、`deepseek`、`typescript`。

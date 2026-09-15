@@ -7,5 +7,6 @@
   "@linxin666/dsh-client-ui-skin-center",
   "dsh-browser-agent",
   "ntes-dsh-market",
+  "@ruihuahe/dsh-plugin-marketplace",
   "@dap-dsh-plugins/netease-auth"
 ]
