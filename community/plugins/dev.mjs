@@ -22,6 +22,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, sy
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
+import { findRootArrayClose } from '../profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..', '..')
@@ -70,29 +71,25 @@ function discoverPlugins() {
 const plugins = discoverPlugins()
 const watchOnly = process.argv.includes('--watch-only')
 
-/** 在 profile patch 顶层数组末尾追加 hmr 行（幂等）。 */
+/** 在 profile patch 顶层序列末尾追加 hmr 行（幂等）。 */
 function enableHmr(root) {
   const before = existsSync(patchFile) ? readFileSync(patchFile, 'utf8') : '[]\n'
   if (before.includes('id: hmr')) return
-  // cordis.patch.yml 顶层是 flow collection（`[ {…}, {…} ]`），hmr 条目必须用
-  // 同款 flow 语法；旧的块序列写法（`- id: hmr`）会触发 YAML 解析失败。
-  const entry = [
-    '  # Managed by community dev: enable Cordis HMR for linked plugins.',
-    '  {',
-    '    id: hmr,',
-    '    disabled: false,',
-    '    config: {',
-    '      root: [',
-    `        ${root.replace(/\\/g, '/')}`,
-    '      ]',
-    '    }',
-    '  }',
-  ].join('\n')
-  const close = before.lastIndexOf(']')
-  const next = close < 0
-    ? `${before.trimEnd()}\n[\n${entry}\n]\n`
-    : `${before.slice(0, close).trimEnd()},\n${entry}\n${before.slice(close)}`
-  writeFileSync(patchFile, next)
+  // 顶层可能是 flow 数组（`[ {…} ]`），也可能是插件管理器改写出的块序列
+  // （`- {…}`）：前者插到顶层闭合方括号前，后者在文件末尾追加一行。绝不能用
+  // lastIndexOf(']')——它会命中前面某行 config 里的嵌套数组（如 hmr 自己的
+  // root: [ … ]），把 hmr 行拼进别人的 config。
+  const rootLiteral = JSON.stringify(root.replace(/\\/g, '/'))
+  const row = `{ id: hmr, disabled: false, config: { root: [${rootLiteral}] } }`
+  const comment = '  # Managed by community dev: enable Cordis HMR for linked plugins.'
+  const close = findRootArrayClose(before)
+  if (close < 0) {
+    writeFileSync(patchFile, `${before.trimEnd()}\n${comment}\n- ${row}\n`)
+    return
+  }
+  const body = before.slice(0, close).trimEnd()
+  const separator = body.endsWith('[') || body.endsWith(',') ? '' : ','
+  writeFileSync(patchFile, `${body}${separator}\n${comment}\n  ${row}\n${before.slice(close)}`)
 }
 
 /** 确保 profile 的 bundle 列表包含该插件名（幂等）。 */

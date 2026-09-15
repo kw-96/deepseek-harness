@@ -264,6 +264,84 @@ export function retireHoistPatterns(text, retired) {
 }
 
 /**
+ * Advance past a quoted YAML scalar starting at its opening quote, honouring
+ * the double-quote backslash escape and the single-quote doubled-quote escape.
+ * @param text - the patch file text.
+ * @param start - index of the opening quote.
+ * @returns the index of the closing quote, or -1 when the scalar is unterminated.
+ */
+function skipQuotedScalar(text, start) {
+  const quote = text[start]
+  let index = start + 1
+  while (index < text.length) {
+    const char = text[index]
+    if (quote === '"' && char === '\\') {
+      index += 2
+      continue
+    }
+    if (char === quote) {
+      if (quote === "'" && text[index + 1] === "'") {
+        index += 2
+        continue
+      }
+      return index
+    }
+    index += 1
+  }
+  return -1
+}
+
+/**
+ * Locate the closing bracket of a patch file's top-level flow array. The scan
+ * skips comments and quoted scalars, so a nested array inside an earlier row
+ * (HMR's own `root: [ … ]`, for example) is never mistaken for the top-level
+ * close the way `lastIndexOf(']')` mistakes it.
+ * @param text - the patch file text.
+ * @returns the index of the top-level `]`, or -1 when the root is a block sequence.
+ */
+export function findRootArrayClose(text) {
+  let index = 0
+  while (index < text.length) {
+    const char = text[index]
+    if (char === '#' && (index === 0 || /\s/u.test(text[index - 1]))) {
+      const lineEnd = text.indexOf('\n', index)
+      if (lineEnd === -1) return -1
+      index = lineEnd
+      continue
+    }
+    if (/\s/u.test(char)) {
+      index += 1
+      continue
+    }
+    break
+  }
+  if (text[index] !== '[') return -1
+  let depth = 0
+  for (; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '#' && (index === 0 || /\s/u.test(text[index - 1]))) {
+      const lineEnd = text.indexOf('\n', index)
+      if (lineEnd === -1) return -1
+      index = lineEnd
+      continue
+    }
+    if (char === '"' || char === "'") {
+      const close = skipQuotedScalar(text, index)
+      if (close === -1) return -1
+      index = close
+      continue
+    }
+    if (char === '[') {
+      depth += 1
+    } else if (char === ']') {
+      depth -= 1
+      if (depth === 0) return index
+    }
+  }
+  return -1
+}
+
+/**
  * Fold a plugin's trailing block-style patch rows back into the profile patch
  * array. `remote-web-ui`'s LAN-bind toggle appends a managed block sequence
  * after the file's flow array, which leaves the document invalid YAML and costs
@@ -279,9 +357,7 @@ export function absorbManagedBlock(text) {
   const begin = text.indexOf(MANAGED_BLOCK_BEGIN)
   if (begin === -1) return { text, absorbed: 0 }
   // 文件本身已合法时不做并回：块尾仅在根是 flow 数组时才非法，根为 block
-  // 序列（把根改成 block 风格后）的块尾是合法 YAML。缺这层判断，下面的
-  // lastIndexOf(']') 会在 block 根的文件上命中嵌套数组的右括号，把托管行
-  // 拼进别人的 config 里。
+  // 序列（把根改成 block 风格后）的块尾是合法 YAML。
   try {
     yaml.load(text)
     return { text, absorbed: 0 }
@@ -309,7 +385,7 @@ export function absorbManagedBlock(text) {
     .filter(line => !taken.some(id => isFlowRowForId(line, id)))
     .join('\n')
     .replace(/\s+$/u, '')
-  const close = head.lastIndexOf(']')
+  const close = findRootArrayClose(head)
   if (close === -1) return { text, absorbed: 0 }
   const rows = entries.map(row => JSON.stringify(row))
   const body = head.slice(0, close).replace(/\s+$/u, '')
