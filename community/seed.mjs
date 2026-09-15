@@ -198,8 +198,6 @@ if (existing === undefined || force) {
   // checkout's tarballs live, and which bundles this host can install. The
   // GitHub probe runs only while a GitHub-only bundle is still declared, so a
   // clean boot stays offline.
-  const npmrcPath = join(profileDst, '.npmrc')
-  const npmrc = existsSync(npmrcPath) ? await readFile(npmrcPath, 'utf8') : ''
   // Repair never probes the network. A bundle that is already installed keeps
   // working offline, and a probe that wrongly reports "unreachable" would
   // delete it; only a fresh seed weighs the network, before anything exists.
@@ -213,12 +211,6 @@ if (existing === undefined || force) {
   dropUnresolvable(dropped, existing, template)
   const manifestChanges = repairProfile(existing, { tarballsUrl, dropped, template, retired })
   const changes = [...manifestChanges, ...await convergeProfileFiles(retired)]
-  // 去网易化后不再需要内网 registry：把遗留在 .npmrc 里的内网地址收敛回公网，
-  // 否则这台主机会一直从内网 registry 解析依赖。
-  if (npmrc.includes('nie.netease.com')) {
-    await writeFile(npmrcPath, `registry=${PUBLIC_REGISTRY}\n`, 'utf8')
-    changes.push(`profile 的 registry 从网易内网收敛为 ${PUBLIC_REGISTRY}`)
-  }
   for (const change of changes) console.log(`[community] ${change}`)
   // 清单变了，或这个 profile 从未装过依赖（新主机只带清单、node_modules 被删、
   // 上次安装中断），才安装。补丁层自愈是每次启动都会发生的机械修复——社区插件
