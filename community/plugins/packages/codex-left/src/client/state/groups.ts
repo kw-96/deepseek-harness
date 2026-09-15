@@ -123,19 +123,18 @@ export function projectForPath(path: string, projects: readonly ProjectView[]): 
 /** 按偏好构建侧栏分组模型。 */
 export function buildGroupsModel(input: BuildGroupsInput): GroupsModel {
   const { list, workspaces, archivedIds, meta, prefs, sort } = input
-  const visible = (id: SessionId): boolean => {
-    const summary = list.byId[id]
-    return summary !== undefined && !summary.blank && !archivedIds.includes(id)
-  }
   const sortIds = (ids: readonly SessionId[]): SessionId[] =>
     sortSessionIds(ids, list, meta, sort)
 
+  // 子会话只在父会话彻底不在列表里时才升为顶层：父会话被归档时，子会话仍属于那棵被归档的
+  // 树（经父会话的子代理目录可达），把它提升只会让「未分组」堆满遗留行——子会话从不登记进
+  // 工作区，一旦成为顶层就必然落进未分组。
   const topLevel = new Set<SessionId>()
   for (const id of list.ids) {
     const summary = list.byId[id]
     if (summary === undefined || summary.blank) continue
     if (summary.origin !== 'subagent') topLevel.add(id)
-    else if (!(summary.parentId !== undefined && visible(summary.parentId))) topLevel.add(id)
+    else if (summary.parentId === undefined || list.byId[summary.parentId] === undefined) topLevel.add(id)
   }
 
   const accounted = new Set<string>()

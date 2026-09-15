@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { SessionMetaStore } from '../../src/client/state/session-meta.js'
 import { BrowserPrefsStore } from '../../src/client/state/prefs.js'
-import { orderProjects, pathKey, projectForPath, sortSessionIds } from '../../src/client/state/groups.js'
-import type { ProjectView, SessionId, SessionListStateLike } from '../../src/client/faces.js'
+import { buildGroupsModel, orderProjects, pathKey, projectForPath, sortSessionIds } from '../../src/client/state/groups.js'
+import type {
+  ProjectView, SessionId, SessionListStateLike, WorkspaceViewLike,
+} from '../../src/client/faces.js'
 
 const sid = (id: string) => id as SessionId
 
@@ -156,5 +158,71 @@ describe('projectForPath / pathKey', () => {
     expect(projectForPath('\\vendor', nested)).toBeUndefined()
     expect(pathKey('D:/work/')).toBe('d:\\work')
     expect(pathKey('D:\\work\\\\')).toBe('d:\\work')
+  })
+})
+
+describe('buildGroupsModel：未分组与子会话提升', () => {
+  /** 构造带 origin/parentId 的最小会话列表快照。 */
+  function tree(
+    rows: readonly { id: string; origin?: 'subagent'; parentId?: string }[],
+  ): SessionListStateLike {
+    return {
+      ids: rows.map(row => sid(row.id)),
+      byId: Object.fromEntries(rows.map(row => [row.id, {
+        id: sid(row.id),
+        displayTitle: row.id,
+        running: false,
+        blank: false,
+        updatedAt: 1,
+        ...row.origin === undefined ? {} : { origin: row.origin },
+        ...row.parentId === undefined ? {} : { parentId: sid(row.parentId) },
+      }])),
+      current: undefined,
+      phase: 'ready',
+    }
+  }
+
+  const workspace = (sessionIds: readonly string[]): WorkspaceViewLike => ({
+    workspaceId: 'ws',
+    title: 'ws',
+    path: 'E:\\repo',
+    sessionIds: sessionIds.map(sid),
+  })
+
+  const groupsOf = (
+    list: SessionListStateLike,
+    workspaces: readonly WorkspaceViewLike[],
+    archivedIds: readonly string[],
+  ) => buildGroupsModel({
+    list,
+    workspaces,
+    archivedIds: archivedIds.map(sid),
+    meta: new SessionMetaStore(),
+    prefs: new BrowserPrefsStore(),
+    organize: 'byProject',
+    sort: 'recent',
+  })
+
+  it('父会话被归档时不把子会话提升进未分组', () => {
+    const list = tree([
+      { id: 'parent' },
+      { id: 'child', origin: 'subagent', parentId: 'parent' },
+    ])
+    const groups = groupsOf(list, [workspace(['parent'])], ['parent'])
+    expect(groups.ungrouped).toEqual([])
+    expect(groups.archived).toEqual(['parent'])
+  })
+
+  it('父会话从列表里彻底消失时子会话升为顶层并落进未分组', () => {
+    const list = tree([{ id: 'child', origin: 'subagent', parentId: 'gone' }])
+    const groups = groupsOf(list, [], [])
+    expect(groups.ungrouped).toEqual(['child'])
+  })
+
+  it('登记的会话归进工作区分组，未登记的普通会话进未分组', () => {
+    const list = tree([{ id: 'kept' }, { id: 'loose' }])
+    const groups = groupsOf(list, [workspace(['kept'])], [])
+    expect(groups.grouped[0]?.sessions).toEqual(['kept'])
+    expect(groups.ungrouped).toEqual(['loose'])
   })
 })
