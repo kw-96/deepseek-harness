@@ -32,6 +32,12 @@ export type AppFrameInjected = {
    * （ui-sidebar-right 的 toggleExpanded），组合里没有该包时回落到 details 列。
    */
   toggleRightbar: () => void
+  /**
+   * 底部面板开合（桌面标题栏按钮与 View 菜单）：外部底部工作台在场时由装配层
+   * 直接驱动它并返回 true；返回 false 表示没有该占用者，由框架回落到本地
+   * bottom 列。
+   */
+  toggleBottom: () => boolean
 }
 
 /** Full composed props: runtime share + child-slot render share + store share. */
@@ -148,6 +154,7 @@ export function AppFrame({
   SessionProvider,
   openSession,
   toggleRightbar,
+  toggleBottom: toggleBottomExternal,
   t,
 }: AppFrameProps) {
   const panels = useStore(s => s)
@@ -232,9 +239,12 @@ export function AppFrame({
   const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
   const desktop = isDesktopShell()
   const toggleBottom = useCallback(() => {
+    // 外部底部工作台优先（见 AppFrameInjected.toggleBottom）：它开着时才轮到
+    // 本地 bottom 列的几何开关。
+    if (toggleBottomExternal()) return
     if (panels.bottom === 0) actions.openBottom()
     else actions.closeBottom()
-  }, [actions, panels.bottom])
+  }, [actions, panels.bottom, toggleBottomExternal])
 
   const frame = (
     <div

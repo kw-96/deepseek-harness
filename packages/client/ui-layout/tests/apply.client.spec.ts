@@ -88,6 +88,31 @@ describe('ui-layout client apply', () => {
     expect(actions.toggleDetails).not.toHaveBeenCalled()
   })
 
+  it('drives an external bottom workbench through its header anchor, else reports unhandled', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const actions = {
+      setSidebar: vi.fn(), setDetails: vi.fn(), setBottom: vi.fn(), toggleSidebar: vi.fn(),
+      openDetails: vi.fn(), closeDetails: vi.fn(), toggleDetails: vi.fn(),
+      openBottom: vi.fn(), closeBottom: vi.fn(),
+    }
+    const injected = (slots.entries('root')[0]!.inject as (actions: never) => {
+      toggleBottom: () => boolean
+    })(actions as never)
+    // 组合里没有外部底部工作台：交回本地 bottom 列。
+    expect(injected.toggleBottom()).toBe(false)
+    // 有锚点（dsh-better-sidebar 的工作台开关）：点击它并报告已处理。
+    const anchor = document.createElement('button')
+    anchor.dataset.dshBottomToggle = 'true'
+    const click = vi.fn()
+    anchor.addEventListener('click', click)
+    document.body.append(anchor)
+    expect(injected.toggleBottom()).toBe(true)
+    expect(click).toHaveBeenCalledOnce()
+    anchor.remove()
+  })
+
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {
     const { ctx } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })

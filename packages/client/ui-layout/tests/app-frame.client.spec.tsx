@@ -11,7 +11,7 @@
  * resizes are driven through the ResizeObserver stub.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
@@ -59,7 +59,7 @@ function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapsho
   return function useSelector<S>(sel: (s: T) => S): S { return sel(useSyncExternalStore(inst.subscribe, inst.getSnapshot)) }
 }
 
-function mountFrame() {
+function mountFrame(toggleBottomExternal: () => boolean = () => false) {
   window.innerWidth = frameWidth // first-render viewport source before the observer fires
   const instance = createLayoutStore().create()
   const slotCalls: { key: string; props: unknown }[] = []
@@ -109,6 +109,7 @@ function mountFrame() {
       SessionProvider={SessionProviderStub}
       openSession={vi.fn()}
       toggleRightbar={vi.fn()}
+      toggleBottom={toggleBottomExternal}
       t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
     />
   )
@@ -449,5 +450,36 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
     frameWidth = 1250
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([280, 330])
+  })
+})
+
+describe('AppFrame — 桌面标题栏的底部面板按钮', () => {
+  beforeEach(() => {
+    // 桌面壳检测读 Tauri 全局：打开它才渲染标题栏按钮。
+    ;(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+  })
+
+  afterEach(() => {
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    cleanup()
+  })
+
+  /** 顶栏那一枚底部面板按钮（aria-label 走 t 的 key 直通）。 */
+  const bottomButton = () => screen.getByRole('button', { name: 'desktop.menu.toggleBottom' })
+
+  it('外部底部工作台已处理时，不动本地 bottom 列', () => {
+    const external = vi.fn(() => true)
+    const { instance } = mountFrame(external)
+    act(() => { bottomButton().click() })
+    expect(external).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().bottom).toBe(0)
+  })
+
+  it('没有外部工作台时回落到本地 bottom 列', () => {
+    const external = vi.fn(() => false)
+    const { instance } = mountFrame(external)
+    act(() => { bottomButton().click() })
+    expect(external).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().bottom).toBeGreaterThan(0)
   })
 })

@@ -206,6 +206,17 @@ export function apply(ctx: ClientContext): void {
             if (rightbar?.toggleExpanded === undefined) actions.toggleDetails()
             else rightbar.toggleExpanded()
           },
+          // 底部面板开合：外部底部工作台在场时驱动它（dsh-better-sidebar 的
+          // 工作台开关是会话头的一枚按钮，带 data-dsh-bottom-toggle 锚点），
+          // 返回 false 表示组合里没有这样的占用者，由 AppFrame 回落到本地
+          // bottom 列。锚点探测按需进行，装配顺序不影响；该占用者是可选项，
+          // 不是本包的依赖。
+          toggleBottom: () => {
+            const anchor = document.querySelector<HTMLElement>('[data-dsh-bottom-toggle]')
+            if (anchor === null) return false
+            anchor.click()
+            return true
+          },
         }
       },
     }, AppFrame)
