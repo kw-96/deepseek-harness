@@ -66,9 +66,9 @@ export const Config: z<Config> = z.object({
 
 /** Bind-dependent Web values shared by the trust fence and URL display. */
 export interface WebRuntimeValues {
-  /** LAN IPv4 literals sampled once when the server binds all interfaces. */
+  /** LAN IPv4 literals sampled once when the server binds all interfaces; display only. */
   lanAddresses: string[]
-  /** LAN literals followed by explicit invocation authorities. */
+  /** Explicit invocation authorities trusted by the `/api` fence. */
   trustedHosts: string[]
 }
 
@@ -113,14 +113,16 @@ try {
 `
 
 /**
- * Resolve one LAN-trust snapshot from the active server bind.
+ * Resolve one LAN snapshot from the active server bind.
  *
- * Derived entries are port-less IP literals: DNS rebinding needs an
- * attacker-controlled name, while an IP-literal Host is safe on any port and
- * an OS-assigned port is unknowable before bind.
+ * LAN IPv4 literals are display only: they name the addresses a peer can reach,
+ * so the URL line and the remote panel can advertise them. They are not fence
+ * authorities — an unpaired client on that network still passes browser
+ * authentication for `/api`, and only explicit `--trusted-host` values are
+ * trusted, because a LAN literal never proves the caller was paired.
  * @param bindHost - the active webserver bind host.
  * @param extra - explicit `--trusted-host` values, in argument order.
- * @returns the LAN display addresses and invocation-derived fence authorities.
+ * @returns the LAN display addresses and the invocation's fence authorities.
  */
 export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
   const lanAddresses = bindHost === ALL_INTERFACES_HOST
@@ -128,7 +130,7 @@ export function resolveLanTrust(bindHost: string, extra: readonly string[]): Web
       .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
       .map(iface => iface.address)
     : []
-  return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
+  return { lanAddresses, trustedHosts: [...extra] }
 }
 
 /** Model-visible orientation and acceptance boundary for sessions created through `dsh web`. */
