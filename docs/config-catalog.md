@@ -213,7 +213,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/api/session-controller/src/index.ts:73`](../packages/api/session-controller/src/index.ts)
+Source: [`packages/api/session-controller/src/index.ts:71`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
@@ -353,9 +353,10 @@ export interface ConnectionConfig {
   /**
    * Authorities this deployment serves beyond loopback: exact `host:port`, or
    * port-less `host` matching any port. The /api trust fence refuses any
-   * request whose Host is neither loopback nor listed here, so a non-loopback
-   * (`0.0.0.0`) deployment must declare every name it is reached by. An entry
-   * that is not a bare, canonical authority fails plugin load.
+   * request whose Host is neither loopback nor listed here, so a
+   * non-loopback (`0.0.0.0`) deployment must declare the names it is reached
+   * by; the Web runtime derives LAN IP literals from an active all-interface
+   * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
   /** Absolute browser-session lifetime in days. Default: 30. */
@@ -1917,7 +1918,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/session/session-import-codex/src/index.ts:52`](../packages/session/session-import-codex/src/index.ts)
+Source: [`packages/session/session-import-codex/src/index.ts:54`](../packages/session/session-import-codex/src/index.ts)
 
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
