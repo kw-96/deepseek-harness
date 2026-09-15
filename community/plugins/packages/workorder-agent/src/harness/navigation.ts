@@ -38,6 +38,9 @@ const ENTRY_STYLE = [
  * 入口渲染在官方侧边栏的页脚动作容器里（与「检查更新」「远程访问」同一排）：
  * 宽态是图标 + 文字胶囊，轨道态是单独的图标按钮；宽度形态跟着同排动作的
  * `data-wide` 走，不自己判断断点。
+ *
+ * `mount()` 只能在该属性真的要变时写 `data-wide`：observer 也在监听它，
+ * 同值写入仍会派发 attribute 记录，会让 observer 与 `mount()` 互相触发成死循环。
  * @returns 可内联的经典脚本正文
  */
 export function controlPanelNavigationScript(): string {
@@ -47,7 +50,7 @@ const label='${PRODUCT_NAME}';
 const icon='${ENTRY_ICON}';
 function ensureStyle(){if(document.getElementById('${STYLE_ELEMENT_ID}'))return;const style=document.createElement('style');style.id='${STYLE_ELEMENT_ID}';style.textContent='${ENTRY_STYLE}';document.head.appendChild(style)}
 function createEntry(){const entry=document.createElement('a');entry.dataset.workorderEntry='';entry.href=path;entry.title=label;entry.setAttribute('aria-label','打开 '+label);entry.innerHTML=icon+'<span data-workorder-entry-label>'+label+'</span>';return entry}
-function mount(){const holder=document.querySelector('${FOOTER_ACTIONS_SELECTOR}');let entry=document.querySelector('[data-workorder-entry]');ensureStyle();if(entry===null){if(holder===null){const settings=document.querySelector('${SETTINGS_AREA_SELECTOR}');if(settings===null)return;entry=createEntry();settings.parentElement.insertBefore(entry,settings)}else{entry=createEntry();holder.appendChild(entry)}}const peer=holder===null?null:holder.querySelector('[data-wide]:not([data-workorder-entry])');entry.setAttribute('data-wide',peer===null?holder===null?'wide':'rail':peer.getAttribute('data-wide'))}
+function mount(){const holder=document.querySelector('${FOOTER_ACTIONS_SELECTOR}');let entry=document.querySelector('[data-workorder-entry]');ensureStyle();if(entry===null){if(holder===null){const settings=document.querySelector('${SETTINGS_AREA_SELECTOR}');if(settings===null)return;entry=createEntry();settings.parentElement.insertBefore(entry,settings)}else{entry=createEntry();holder.appendChild(entry)}}const peer=holder===null?null:holder.querySelector('[data-wide]:not([data-workorder-entry])');const wide=peer===null?holder===null?'wide':'rail':peer.getAttribute('data-wide');if(entry.getAttribute('data-wide')!==wide)entry.setAttribute('data-wide',wide)}
 new MutationObserver(mount).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['data-wide']});mount();
 })();`
 }

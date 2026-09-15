@@ -279,7 +279,7 @@ export function absorbManagedBlock(text) {
   if (close === -1) return { text, absorbed: 0 }
   const rows = entries.map(row => JSON.stringify(row))
   const body = head.slice(0, close).replace(/\s+$/u, '')
-  const separator = body.endsWith('[') ? '' : ','
+  const separator = body.endsWith('[') || body.endsWith(',') ? '' : ','
   const tail = text.slice(blockEnd).replace(/^\s+/u, '')
   const merged = `${body}${separator}\n${rows.map(row => `  ${row}`).join(',\n')}\n${head.slice(close)}`
   return { text: tail === '' ? `${merged}\n` : `${merged}\n${tail}`, absorbed: rows.length }

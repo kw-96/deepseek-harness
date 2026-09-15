@@ -1,6 +1,6 @@
 {
   "name": "workorder-agent",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "鑷爺宸ュ崟宸℃鎻掍欢锛氭槗鍗忎綔宸ュ崟鏌ヨ銆佸瓧娈靛鏍搞€丳OPO 閫氱煡涓庢帶鍒堕潰闈㈡澘",
   "license": "UNLICENSED",
   "type": "module",
@@ -28,7 +28,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "pnpm run clean && tsc -p tsconfig.json",
     "test": "vitest run",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.4.tgz workorder-agent"
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.5.tgz workorder-agent"
   },
   "dependencies": {
     "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",

@@ -55,6 +55,9 @@ describe('Ticket Hub 控制面', () => {
     expect(script).toContain("const path='/workorder-agent'")
     expect(script).toContain("const label='Ticket Hub'")
     expect(script).toContain('data-workorder-entry-label')
+    // observer 也在监听 data-wide：同值写入仍会派发 attribute 记录，必须只在值变化时写。
+    expect(script).toContain("const wide=peer===null?holder===null?'wide':'rail':peer.getAttribute('data-wide')")
+    expect(script).toContain("if(entry.getAttribute('data-wide')!==wide)entry.setAttribute('data-wide',wide)")
     expect(script).not.toContain('工单控制面')
     expect(() => new Function(script)).not.toThrow()
     const html = injectControlPanelNavigation('<html><body><main></main></body></html>')

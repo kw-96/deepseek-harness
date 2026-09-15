@@ -37,7 +37,7 @@
     "dsh-workspace-rail": "file:__COMMUNITY_TARBALLS__/dsh-workspace-rail-0.1.0.tgz",
     "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.2-rc.3.tgz",
     "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.2-rc.3.tgz",
-    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.4.tgz",
+    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.5.tgz",
     "dsh-doc": "0.1.1",
     "dsh-mnemon": "^0.5.8",
     "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.1.tgz"
