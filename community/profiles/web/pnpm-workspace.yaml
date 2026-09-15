@@ -16,6 +16,10 @@ allowBuilds:
   # better-sidebar 的真实终端依赖 node-pty 的原生二进制；pnpm 11 默认拦截
   # 构建脚本会导致「node-pty 加载失败」，这里显式放行。
   node-pty: true
+  # ssh 插件的 ssh2 / cpu-features 构建脚本只产出原生加速模块，纯 JS 路径已够用；
+  # 显式拒绝，既避免无 Visual Studio 的机器安装失败，也免去每次安装的交互提示。
+  ssh2: false
+  cpu-features: false
 
 overrides:
   '@xberg-io/xberg': 1.0.0-rc.15
@@ -30,3 +34,7 @@ overrides:
 # 补丁文件随模板播种，重装或重新播种 profile 都会自动重放。
 patchedDependencies:
   '@linxin666/dsh-session-archive@0.3.22': patches/@linxin666__dsh-session-archive@0.3.22.patch
+  # 依赖补丁（dsh-git-panel）：0.1.15 的 tarball 里 package.json 带 UTF-8 BOM，
+  # 严格 JSON 解析（profile 加载 bundle 清单）会直接抛错使整个 profile 起不来。
+  # 补丁只删掉这个 BOM 字节，不改任何字段。
+  dsh-git-panel@0.1.15: patches/dsh-git-panel@0.1.15.patch
