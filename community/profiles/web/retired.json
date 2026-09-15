@@ -4,5 +4,6 @@
   "dsh-git-timeline",
   "@linxin666/dsh-pet",
   "dsh-browser-agent",
-  "ntes-dsh-market"
+  "ntes-dsh-market",
+  "@dap-dsh-plugins/netease-auth"
 ]

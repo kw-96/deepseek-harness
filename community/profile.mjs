@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
-import { GITHUB_BUNDLES, INTERNAL_BUNDLES, NATIVE_BUNDLE_LIMITS, tarballAvailable } from './preflight.mjs'
+import { GITHUB_BUNDLES, NATIVE_BUNDLE_LIMITS, tarballAvailable } from './preflight.mjs'
 
 /** Placeholder seed substitutes with this checkout's tarballs directory. */
 export const TARBALLS_TOKEN = '__COMMUNITY_TARBALLS__'
@@ -33,14 +33,11 @@ const EXACT_VERSION = /^\d+\.\d+\.\d+/
 /**
  * Template bundles this host must not receive, each with the reason shown to
  * the user.
- * @param host - `{ internal, githubReachable, platform, arch }` probe results.
+ * @param host - `{ githubReachable, platform, arch }` probe results.
  * @returns dropped bundle name to Chinese reason.
  */
 export function droppedBundles(host) {
   const dropped = new Map()
-  if (!host.internal) {
-    for (const name of INTERNAL_BUNDLES) dropped.set(name, '只存在于网易内部 registry')
-  }
   if (!host.githubReachable) {
     for (const name of GITHUB_BUNDLES) dropped.set(name, '依赖从 github.com 直接下载，当前网络无法访问')
   }
@@ -237,6 +234,33 @@ export function retirePatchRows(text, retired) {
     removed.push(name)
   }
   return { text: kept.join('\n'), removed }
+}
+
+/**
+ * Remove retired package names from the workspace's inline
+ * `publicHoistPattern`. A profile hoists packages the bundle patches bind
+ * outside the template's dependency tree; when such a package is retired it
+ * must stop being hoisted with it. Only the inline `publicHoistPattern: 'a'`
+ * form is rewritten; a block sequence is left for the user to edit.
+ * @param text - `pnpm-workspace.yaml` text.
+ * @param retired - retired package names.
+ * @returns the repaired text and the names actually removed.
+ */
+export function retireHoistPatterns(text, retired) {
+  const removed = []
+  const lines = text.split(/\r?\n/).flatMap((line) => {
+    const match = /^(publicHoistPattern:\s*)(.+)$/u.exec(line)
+    if (match === null) return [line]
+    const tokens = match[2].match(/['"]?[^'"\s]+['"]?/gu) ?? []
+    const kept = tokens.filter((token) => {
+      const name = token.replace(/^['"]|['"]$/gu, '')
+      if (!retired.includes(name)) return true
+      removed.push(name)
+      return false
+    })
+    return kept.length === 0 ? [] : [`${match[1]}${kept.join(' ')}`]
+  })
+  return { text: lines.join('\n'), removed }
 }
 
 /**

@@ -17,7 +17,6 @@ allowBuilds:
   # 构建脚本会导致「node-pty 加载失败」，这里显式放行。
   node-pty: true
 
-publicHoistPattern: '@dap-dsh-plugins/netease-auth'
 overrides:
   '@xberg-io/xberg': 1.0.0-rc.15
   '@deepseek-ai/dsh-pwsh-local': 0.1.2-rc.1

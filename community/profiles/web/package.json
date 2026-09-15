@@ -13,7 +13,6 @@
         "dsh-mnemon",
         "dsh-plugin-manager",
         "@ruihuahe/dsh-plugin-marketplace",
-        "@dap-dsh-plugins/netease-auth",
         "dsh-workspace-rail",
         "@linxin666/dsh-client-ui-skin-center",
         "@linxin666/dsh-session-archive",
@@ -25,7 +24,6 @@
     }
   },
   "dependencies": {
-    "@dap-dsh-plugins/netease-auth": "^0.1.8",
     "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
     "@huiliyi37/dsh-office": "0.2.1",
     "@linxin666/dsh-client-ui-skin-center": "0.3.22",

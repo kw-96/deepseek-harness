@@ -78,17 +78,3 @@ pnpm build            # or pnpm -r run build
 pnpm pack:check       # regenerates tarballs under each package's dist/
 # copy the .tgz from packages/<pkg>/dist/ into community/plugins/tarballs/
 ```
-
-## NetEase-internal packages (auto-detected)
-
-`@dap-dsh-plugins/netease-auth` exists only on `https://npm.nie.netease.com/` (a company-internal registry that also proxies public npm). `seed.mjs` probes that registry up front:
-
-- **Reachable** → full profile, internal `.npmrc`.
-- **Unreachable** → skips that bundle and dependency, writes the public `registry.npmjs.org` `.npmrc`.
-
-Force a choice instead of auto-detecting:
-
-```sh
-node community/seed.mjs --force --internal   # internal registry + packages
-node community/seed.mjs --force --public     # public registry, skip internal
-```

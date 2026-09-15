@@ -17,13 +17,12 @@
  *            bundles the user added beyond the template untouched. Pass --force
  *            to rewrite the whole profile from the template instead.
  *
- * A bundle the chosen registry, the local network, or the CPU architecture
- * cannot support is dropped with a printed reason, so a seeded profile always
- * installs. `node community/doctor.mjs` reports the same checks without
- * changing anything.
+ * A bundle the local network or the CPU architecture cannot support is dropped
+ * with a printed reason, so a seeded profile always installs.
+ * `node community/doctor.mjs` reports the same checks without changing anything.
  *
  * Env overrides: DSH_SEED_SKIP_INSTALL=1 to never run pnpm in the profile.
- * Flags: --force (re-write the profile manifest), --internal / --public.
+ * Flags: --force (re-write the profile manifest).
  *
  * Identifiers and comments are English; every message a user reads is Chinese.
  */
@@ -36,13 +35,16 @@ import { spawnSync } from 'node:child_process'
 import { probe } from './preflight.mjs'
 import {
   absorbManagedBlock, bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, renderProfile, repairProfile,
-  retirePatchRows, unavailablePinned, unresolvableBundles,
+  retireHoistPatterns, retirePatchRows, unavailablePinned, unresolvableBundles,
 } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
 const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 const tarballsUrl = join(repoRoot, 'community', 'plugins', 'tarballs').replaceAll('\\', '/')
+
+/** Public npm registry every profile installs from. */
+const PUBLIC_REGISTRY = 'https://registry.npmjs.org/'
 
 const profileSrc = join(here, 'profiles', 'web')
 const profileDst = join(dshHome, 'profiles', 'web')
@@ -123,6 +125,11 @@ async function convergeProfileFiles(retired) {
       await writeFile(workspacePath, merged, 'utf8')
       changes.push('合并模板新增的构建白名单 allowBuilds')
     }
+    const hoist = retireHoistPatterns(await readFile(workspacePath, 'utf8'), retired)
+    if (hoist.removed.length > 0) {
+      await writeFile(workspacePath, hoist.text, 'utf8')
+      changes.push(`移除已下线包的 hoist 规则：${[...new Set(hoist.removed)].join('、')}`)
+    }
   }
   const patchPath = join(profileDst, 'cordis.patch.yml')
   if (existsSync(patchPath)) {
@@ -163,17 +170,11 @@ const existing = await readProfileManifest()
 const force = process.argv.includes('--force')
 
 if (existing === undefined || force) {
-  // Fresh seed. The registry is chosen once here and written into .npmrc; a
-  // repair keeps whatever the profile already points at.
-  const internal = process.argv.includes('--internal')
-    ? true
-    : process.argv.includes('--public')
-      ? false
-      : await probe('https://npm.nie.netease.com/')
-  const registry = internal ? 'https://npm.nie.netease.com/' : 'https://registry.npmjs.org/'
+  // Fresh seed. The registry is written once here and into .npmrc; a repair
+  // converges whatever the profile already points at.
+  const registry = PUBLIC_REGISTRY
   const template = JSON.parse(await readFile(join(profileSrc, 'package.json'), 'utf8'))
   const dropped = droppedBundles({
-    internal,
     githubReachable: await probe('https://github.com'),
     platform: platform(),
     arch: arch(),
@@ -190,21 +191,19 @@ if (existing === undefined || force) {
   }
   await writeFile(profileManifest, renderProfile(materializeProfile(template, { tarballsUrl, dropped })), 'utf8')
   await writeFile(join(profileDst, '.npmrc'), `registry=${registry}\n`, 'utf8')
-  console.log(`[community] profile → ${profileDst}（${internal ? '网易内网' : '公网'}）`)
+  console.log(`[community] profile → ${profileDst}（registry ${registry}）`)
   installProfile()
 } else {
   // Repair. Only the two facts that go stale are recomputed: where this
   // checkout's tarballs live, and which bundles this host can install. The
   // GitHub probe runs only while a GitHub-only bundle is still declared, so a
   // clean boot stays offline.
-  const npmrc = existsSync(join(profileDst, '.npmrc'))
-    ? await readFile(join(profileDst, '.npmrc'), 'utf8')
-    : ''
+  const npmrcPath = join(profileDst, '.npmrc')
+  const npmrc = existsSync(npmrcPath) ? await readFile(npmrcPath, 'utf8') : ''
   // Repair never probes the network. A bundle that is already installed keeps
   // working offline, and a probe that wrongly reports "unreachable" would
   // delete it; only a fresh seed weighs the network, before anything exists.
   const dropped = droppedBundles({
-    internal: npmrc.includes('nie.netease.com'),
     githubReachable: true,
     platform: platform(),
     arch: arch(),
@@ -214,6 +213,12 @@ if (existing === undefined || force) {
   dropUnresolvable(dropped, existing, template)
   const manifestChanges = repairProfile(existing, { tarballsUrl, dropped, template, retired })
   const changes = [...manifestChanges, ...await convergeProfileFiles(retired)]
+  // 去网易化后不再需要内网 registry：把遗留在 .npmrc 里的内网地址收敛回公网，
+  // 否则这台主机会一直从内网 registry 解析依赖。
+  if (npmrc.includes('nie.netease.com')) {
+    await writeFile(npmrcPath, `registry=${PUBLIC_REGISTRY}\n`, 'utf8')
+    changes.push(`profile 的 registry 从网易内网收敛为 ${PUBLIC_REGISTRY}`)
+  }
   for (const change of changes) console.log(`[community] ${change}`)
   // 清单变了，或这个 profile 从未装过依赖（新主机只带清单、node_modules 被删、
   // 上次安装中断），才安装。补丁层自愈是每次启动都会发生的机械修复——社区插件

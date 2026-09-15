@@ -110,11 +110,6 @@ if (githubReachable) {
     '配置代理，或直接运行 node community/seed.mjs 让它自动跳过')
 }
 
-const internalReachable = await probe('https://npm.nie.netease.com/')
-record('通过', internalReachable
-  ? '网易内部 registry 可达，seed 会装载完整 profile'
-  : '网易内部 registry 不可达，seed 会装载公网 profile')
-
 if (existsSync(join(repoRoot, 'node_modules'))) {
   record('通过', '仓库依赖已安装')
 } else {
@@ -129,12 +124,7 @@ if (!existsSync(join(profileDir, 'package.json'))) {
   // a bundle already installed keeps working offline.
   const template = JSON.parse(readFileSync(join(templateDir, 'package.json'), 'utf8'))
   const retired = JSON.parse(readFileSync(join(templateDir, 'retired.json'), 'utf8'))
-  // Which registry this profile installs from decides whether the internal
-  // bundles are reachable; seed reads the same .npmrc, so this mirrors it.
-  const npmrcPath = join(profileDir, '.npmrc')
-  const npmrc = existsSync(npmrcPath) ? readFileSync(npmrcPath, 'utf8') : ''
   const expected = droppedBundles({
-    internal: npmrc.includes('nie.netease.com'),
     githubReachable: true,
     ...host,
   })
