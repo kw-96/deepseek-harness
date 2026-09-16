@@ -16,7 +16,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { computeColumns, DETAILS_DEFAULT, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import { computeColumns, DETAILS_DEFAULT, MOBILE_DRAWER_MAX, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
 import { isDesktopShell } from './desktop/detect.ts'
 import { DesktopTitleBar } from './desktop/DesktopTitleBar.tsx'
 import { DocumentTitle } from './DocumentTitle.tsx'
@@ -201,14 +201,24 @@ export function AppFrame({
   // re-expand override, stores.ts). Collapsed is decided here, so the
   // solver stays breakpoint-free: a narrow re-expand passes the preference
   // (or the default when the wide preference is closed) and the center
-  // absorbs the squeeze.
+  // absorbs the squeeze — except on phones, where the re-expanded sidebar
+  // covers the center instead (drawer below).
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { actions.setNarrow(narrow) }, [actions, narrow])
   const sidebarCollapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
   const sidebarPreference = sidebarCollapsed
     ? 0
     : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
-  const cols = computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
+  const solved = computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
+  // Phone re-expand (below MOBILE_DRAWER_MAX): the sidebar leaves the grid and
+  // covers the center, so the content keeps the full viewport width instead of
+  // being squeezed to a sliver. The component owns the width because the
+  // covering column has no track to read it from.
+  const drawer = viewport < MOBILE_DRAWER_MAX && !sidebarCollapsed
+  const drawerWidth = Math.min(Math.round(viewport * 0.84), 320)
+  const cols = drawer
+    ? { sidebar: 0, center: Math.max(0, viewport - solved.details), details: solved.details }
+    : solved
   // 'rightbar' 别名槽的 owner 几何：官方语义要求"正常宽度"（打开时的解析
   // 宽度），本地以 details 列的默认/当前偏好解算——列关闭时面板仍按此宽度
   // 锚定帧右缘滑出（见 ui-sidebar-right 的 .panel 规则）。
@@ -252,6 +262,7 @@ export function AppFrame({
       className={css.frame}
       style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px`, gridTemplateRows: `minmax(0, 1fr) ${detailsSession === undefined ? 0 : panels.bottom}px` }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
+      data-sidebar-drawer={drawer || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
       data-bottom-collapsed={detailsSession === undefined || panels.bottom === 0 || undefined}
       data-dragging={dragging || undefined}
@@ -262,17 +273,23 @@ export function AppFrame({
         useSessions={useSessions}
         usePanelInfo={usePanelInfo}
       />
-      <div className={css.sidebarCol}>
+      <div className={css.sidebarCol} data-drawer={drawer || undefined} style={drawer ? { width: drawerWidth } : undefined}>
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
             component sees its rendered state as owner params decided here
             (collapsed follows the resolved rail, so a derived auto-collapse
-            renders the rail UI too). */}
+            renders the rail UI too). A phone drawer reports its own covering
+            width because its grid track is zero. */}
         {renderSlot('sidebar', {
           collapsed: sidebarCollapsed,
-          width: cols.sidebar,
+          width: drawer ? drawerWidth : cols.sidebar,
         })}
       </div>
+      {drawer && (
+        /* Dismiss surface for the phone drawer: the covering sidebar owns the
+           left edge, so a tap anywhere on the exposed content closes it. */
+        <div className={css.drawerScrim} aria-hidden="true" onClick={() => { actions.toggleSidebar() }} />
+      )}
       <>
         {/* Both column occupants stay at fixed tree positions from first
             paint — no loading gate: a bare status line reads worse than
@@ -304,8 +321,9 @@ export function AppFrame({
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
-      {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {/* The collapsed rail is fixed-width: no resize handle while closed; a
+          phone drawer has no track to resize either. */}
+      {!sidebarCollapsed && !drawer && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )

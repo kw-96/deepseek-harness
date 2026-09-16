@@ -214,6 +214,16 @@
   padding-bottom: 0;
 }
 
+/* Touch devices have no hover to enable the reveal above, so a wide table
+   would stay unscrollable there; coarse pointers keep the bar painted and the
+   horizontal scroll available at rest. */
+@media (hover: none) {
+  .tableScroll:global(.md-table-wide) {
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+}
+
 /* Chromium keyboard-focuses scrollable containers by default; the ring uses
    the sheet's link focus color. */
 .tableScroll:focus-visible {

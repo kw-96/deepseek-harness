@@ -479,3 +479,50 @@
 .root[data-phase='settling'] .composerSeat {
   visibility: hidden;
 }
+
+/* Phone (below 768px): the header seats do not fit the column — registrants
+   stack several controls inside the title cluster (mode router, undo/restore,
+   snapshot) and the row overflowed, covering the utility glyphs and clipping
+   its own buttons past the right edge. Below the breakpoint the row becomes a
+   single sideways-scrolling strip: every seat keeps its intrinsic width and
+   stays reachable by swiping, and the header keeps one row height. */
+@media (max-width: 767px) {
+  .header {
+    min-height: 0;
+    padding: 8px 12px 0;
+  }
+
+  .titleRow {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-height: 0;
+  }
+
+  /* Natural widths are what make the strip scrollable; shrinking would squash
+     the seats back into the column instead. */
+  .titleCluster,
+  .headerActions,
+  .headerUtilities,
+  .headerCorner {
+    flex: 0 0 auto;
+  }
+
+  .headerUtilities {
+    margin-left: 16px;
+  }
+
+  .headerCorner {
+    /* The -16px overhang in the base rule belongs to the 28px desktop padding. */
+    margin-right: 0;
+  }
+
+  .crumb {
+    max-width: 160px;
+  }
+
+  .tabs {
+    gap: 28px;
+    margin-top: 6px;
+  }
+}

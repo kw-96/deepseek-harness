@@ -11,7 +11,7 @@
  * resizes are driven through the ResizeObserver stub.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
@@ -381,6 +381,46 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([400, 0])
+  })
+})
+
+describe('AppFrame — phone drawer', () => {
+  it('re-expands below the drawer breakpoint as a covering column with a dismissal scrim', () => {
+    frameWidth = 390
+    const { frame, instance, slotCalls } = mountFrame()
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    act(() => { instance.actions.toggleSidebar() })
+    // The covering column leaves the grid: center keeps the whole viewport.
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(frame.style.gridTemplateColumns).toBe('0px minmax(0, 1fr) 0px')
+    expect(frame.hasAttribute('data-sidebar-drawer')).toBe(true)
+    expect((frame.querySelector('[class*="sidebarCol"]') as HTMLElement).style.width).toBe('320px')
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 320 })
+    // No track to resize, so no drag handle while the drawer covers the center.
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+    expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(1)
+    act(() => { fireEvent.click(frame.querySelector('[class*="drawerScrim"]')!) })
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.hasAttribute('data-sidebar-drawer')).toBe(false)
+    expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(0)
+  })
+
+  it('narrows the covering column with the viewport below its 320px ceiling', () => {
+    frameWidth = 320
+    const { frame, instance, slotCalls } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    expect((frame.querySelector('[class*="sidebarCol"]') as HTMLElement).style.width).toBe('269px')
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 269 })
+  })
+
+  it('keeps the squeezed-track re-expand at and above the drawer breakpoint', () => {
+    frameWidth = 768
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    expect(tracks(frame)).toEqual([280, 0])
+    expect(frame.hasAttribute('data-sidebar-drawer')).toBe(false)
+    expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(0)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
   })
 })
 

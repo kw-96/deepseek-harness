@@ -234,3 +234,71 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Phone (below 768px): the dialog takes the whole viewport and the nav rail
+   becomes a horizontally scrolling strip above the section. The section then
+   keeps the full width instead of being squeezed into the ~155px left over by
+   the 188px rail on a 390px screen. */
+@media (max-width: 767px) {
+  .panel {
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    box-sizing: border-box;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .nav {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    padding: 10px 12px 6px;
+  }
+
+  .navTitle {
+    flex: none;
+    padding: 0 4px;
+  }
+
+  /* The strip scrolls sideways; its own scrollbar would eat row height. */
+  .navList {
+    flex: 1;
+    min-width: 0;
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  /* Touch-sized cells: the strip keeps the 36px height of a phone toolbar
+     rather than the rail's 40px rows, and never shrinks to fit the viewport. */
+  .navCell {
+    flex: none;
+    height: 36px;
+    padding: 7px 12px;
+  }
+
+  .navLabel {
+    flex: none;
+    max-width: 40vw;
+  }
+
+  .header {
+    height: 44px;
+    padding: 8px 10px 4px;
+  }
+
+  .close {
+    width: 36px;
+    height: 36px;
+  }
+
+  .options {
+    padding: 0 16px 16px;
+  }
+}
