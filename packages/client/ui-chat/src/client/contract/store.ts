@@ -11,10 +11,10 @@ export interface SelectionTarget {
   toolName?: string
 }
 
-/** One manually expanded Turn answer generation (null answerStep while streaming). */
+/** One manually expanded Turn answer generation. */
 export interface TurnProcessViewEntry {
   readonly turn: number
-  readonly answerStep: number | null
+  readonly answerStep: number
 }
 
 /** Per-Session state shared only by the Chat view and details surface. */

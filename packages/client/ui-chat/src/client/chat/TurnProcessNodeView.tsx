@@ -10,39 +10,29 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
   if (turnProcess === undefined) throw new Error('turn-process node requires Turn process owner state')
   if (!turnProcess.foldable) return null
   const open = turnProcess.open
-  // While streaming, the disclosure counts the settled calls it folded (never
-  // messages — a live answer stays visible); the closed Turn's spec carries
-  // the full answer-boundary counts instead.
-  const toolCallCount = turnProcess.streamingFold === true
-    ? turnProcess.foldedToolCalls ?? 0
-    : node.data.toolCallCount
-  const subagentCount = turnProcess.streamingFold === true
-    ? turnProcess.foldedSubagents ?? 0
-    : node.data.subagentCount
-  const messageCount = turnProcess.streamingFold === true ? 0 : node.data.messageCount
   const labels: string[] = []
-  if (toolCallCount > 0) {
+  if (node.data.toolCallCount > 0) {
     labels.push(t(
-      toolCallCount === 1
+      node.data.toolCallCount === 1
         ? 'message.turnProcess.toolCalls.one'
         : 'message.turnProcess.toolCalls.other',
-      { count: toolCallCount },
+      { count: node.data.toolCallCount },
     ))
   }
-  if (messageCount > 0) {
+  if (node.data.messageCount > 0) {
     labels.push(t(
-      messageCount === 1
+      node.data.messageCount === 1
         ? 'message.turnProcess.messages.one'
         : 'message.turnProcess.messages.other',
-      { count: messageCount },
+      { count: node.data.messageCount },
     ))
   }
-  if (subagentCount > 0) {
+  if (node.data.subagentCount > 0) {
     labels.push(t(
-      subagentCount === 1
+      node.data.subagentCount === 1
         ? 'message.turnProcess.subagents.one'
         : 'message.turnProcess.subagents.other',
-      { count: subagentCount },
+      { count: node.data.subagentCount },
     ))
   }
   const label = labels.length === 0
@@ -54,9 +44,9 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
       className={css.root}
       data-open={open || undefined}
       data-turn-process={node.data.turn}
-      data-turn-process-messages={messageCount}
-      data-turn-process-tool-calls={toolCallCount}
-      data-turn-process-subagents={subagentCount}
+      data-turn-process-messages={node.data.messageCount}
+      data-turn-process-tool-calls={node.data.toolCallCount}
+      data-turn-process-subagents={node.data.subagentCount}
       aria-expanded={open}
       onClick={(event) => {
         event.currentTarget.focus()

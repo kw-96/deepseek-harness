@@ -385,9 +385,7 @@ describe('built-in conversation node Definitions', () => {
       reason: { kind: 'aborted', reason: { kind: 'user' } },
     }))
     value.flush()
-    // 本地定制：中断收尾的轮次没有最终 answer，保持流式折叠规则
-    //（latestAnswer 对 closed+interrupted 返回 null）。
-    expect(process()).toMatchObject({ answerAnchorSeq: null, answerStep: null })
+    expect(process()).toMatchObject({ answerAnchorSeq: 14.1, answerStep: 2 })
 
     const recovered = assembler([
       at(20, 'turn/start', { turn: 2 }),
@@ -403,9 +401,8 @@ describe('built-in conversation node Definitions', () => {
       at(26, 'turn/end', { turn: 2, reason: { kind: 'interrupted' } }),
     ])
     const recoveredProcess = snapshot(recovered).timeline.turns.get(2)?.data.get('turn-process')
-    // 本地定制：中断收尾的轮次没有最终 answer，保持流式折叠规则。
     expect(recoveredProcess)
-      .toMatchObject({ answerStep: null, answerAnchorSeq: null })
+      .toMatchObject({ answerStep: 2, answerAnchorSeq: 25.1 })
 
     const partialWindow = assembler([
       at(30, 'assistant/live-chunk', {
