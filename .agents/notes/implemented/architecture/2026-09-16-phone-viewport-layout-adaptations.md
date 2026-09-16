@@ -27,6 +27,8 @@ Phones (below 768px, the width `ui-sidebar-right` already reads for its fullscre
 
 **Coarse pointers keep wide tables scrollable.** Under `@media (hover: none)` the wide-table container keeps `overflow-x: auto` at rest, because the hover reveal that enables it on pointer devices never fires on touch.
 
+**The composer does not take focus on a touch device.** Its unlock effect returns focus to the draft box on mount and on every session switch — the desktop reading, where the next keystroke should land in the box that was just opened. A phone answers that focus by raising the software keyboard over the conversation the switch was made to show. A device reporting `(hover: none)` or `(pointer: coarse)` is left alone on both paths, mount and switch; tapping the box still focuses it, and the pointer path is unchanged.
+
 Desktop geometry is untouched: every change is inside a viewport or pointer media query, and the drawer branch only exists below the phone breakpoint.
 
 ## Consequences

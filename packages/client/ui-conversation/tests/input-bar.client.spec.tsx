@@ -1194,6 +1194,31 @@ describe('running and lock semantics', () => {
     expect(focused).toEqual([true])
   })
 
+  it('a touch device keeps the draft unfocused across a session switch', () => {
+    // jsdom 不实现 matchMedia：先装一个只对 hover 查询为真的替身，测后移除。
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes('hover: none'),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    })
+    onTestFinished(() => { Reflect.deleteProperty(window, 'matchMedia') })
+    const { view, textarea, props } = bench({ draft: 'line one' })
+    const focused: (boolean | undefined)[] = []
+    textarea.focus = (options?: FocusOptions) => { focused.push(options?.preventScroll) }
+    act(() => { view.rerender(<InputBar {...props} sessionId={'s2' as SessionId} />) })
+    // 不抢焦点：手机上由聚焦引起的软键盘会盖住刚切过来的会话。
+    expect(focused).toEqual([])
+  })
+
   it('a persisted draft adopted after mount does not steal focus from another control', () => {
     const { shell } = bench()
     const other = document.createElement('input')

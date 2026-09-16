@@ -161,9 +161,16 @@ export const InputBar = memo(function InputBar({
   // reveal that comes with it. Lexical's focus() suppresses the browser's
   // scroll walk (preventScroll inside), so the reveal in our own scrollport
   // is ours to perform — switching to a longer draft otherwise leaves the
-  // caret (restored at the draft's end) off screen.
+  // caret (restored at the draft's end) off screen. A touch device keeps its
+  // focus: raising the software keyboard on every session switch covers the
+  // conversation the switch was made to show. Tapping the box still focuses it.
+  // Both readings are consulted because a browser in desktop mode may report
+  // either one; jsdom implements no matchMedia (the unit lane), and there the
+  // box is a keyboard surface, so an absent reading focuses as a pointer does.
   useEffect(() => {
     if (locked || editor === null) return
+    if (typeof window.matchMedia === 'function'
+      && window.matchMedia('(hover: none), (pointer: coarse)').matches) return
     focusDraftEditor(editor, revealSelection)
   }, [locked, sessionId, editor])
 
