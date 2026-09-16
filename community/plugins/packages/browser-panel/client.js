@@ -329,6 +329,8 @@ window.__ModuleLoader__.load({
 			var imgRef = useRef(null);
 			var boxRef = useRef(null);
 			var srcState = useState(""); var src = srcState[0], setSrc = srcState[1];
+			// 帧流是否还连着：断开时界面上要看得见，否则用户只会以为页面卡住了。
+			var connState = useState("live"); var conn = connState[0], setConn = connState[1];
 			var sizeRef = useRef({ w: 900, h: 700 });
 
 			// Match the remote viewport to the pane so nothing is letterboxed.
@@ -409,11 +411,14 @@ window.__ModuleLoader__.load({
 				}
 				es.onmessage = function (ev) {
 					if (!alive || !ev.data) return;
+					setConn("live");
 					// A data: URL avoids a blob allocation per frame at this rate.
 					setSrc("data:image/jpeg;base64," + ev.data);
 				};
+				es.onopen = function () { setConn("live"); };
 				es.onerror = function () {
 					// EventSource reconnects on its own using the server's retry hint.
+					setConn("lost");
 				};
 				return function () {
 					alive = false;
@@ -518,7 +523,16 @@ window.__ModuleLoader__.load({
 					: (src
 						? h("img", { ref: imgRef, src: src, draggable: false,
 							style: { width: "100%", height: "100%", objectFit: "fill", imageRendering: "auto", display: "block", userSelect: "none" } })
-						: h("div", { style: { padding: 20, color: "#7d8592", fontSize: 12.5 } }, "正在启动浏览器…"))
+						: h("div", { style: { padding: 20, color: "var(--dsw-alias-label-tertiary, #7d8592)", fontSize: 12.5 } }, "正在启动浏览器…")),
+				conn === "lost"
+					? h("div", {
+						style: {
+							position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+							background: "var(--dsw-alias-bg-mask-2, rgba(0,0,0,.12))",
+							color: "var(--dsw-alias-label-primary, #dfe3e9)", fontSize: 12.5, pointerEvents: "none"
+						}
+					}, "连接已断开，正在重连…")
+					: null
 			);
 		}
 
@@ -1257,10 +1271,11 @@ window.__ModuleLoader__.load({
 		var headerStyle = {
 			display: "flex", alignItems: "center", justifyContent: "space-between",
 			padding: "7px 8px 7px 12px", borderBottom: "1px solid " + BORDER,
-			background: "rgba(255,255,255,.03)"
+			background: "var(--dsw-alias-bg-layer-2, rgba(255,255,255,.03))"
 		};
 		var iconBtn = {
-			border: "1px solid transparent", background: "transparent", color: "#aab1bd",
+			border: "1px solid transparent", background: "transparent",
+			color: "var(--dsw-alias-label-secondary, #aab1bd)",
 			borderRadius: 6, width: 24, height: 24, cursor: "pointer", fontSize: 13,
 			lineHeight: "22px", padding: 0
 		};
@@ -1269,41 +1284,52 @@ window.__ModuleLoader__.load({
 			borderBottom: "1px solid " + BORDER
 		};
 		var addrInputStyle = {
-			flex: 1, minWidth: 0, background: "rgba(0,0,0,.28)",
-			border: "1px solid " + BORDER, borderRadius: 7, color: "#dfe3e9",
+			flex: 1, minWidth: 0, background: "var(--dsw-specific-input-major, rgba(0,0,0,.28))",
+			border: "1px solid " + BORDER, borderRadius: 7,
+			color: "var(--dsw-alias-label-primary, #dfe3e9)",
 			padding: "5px 9px", fontSize: 11.5, outline: "none",
 			fontFamily: 'ui-monospace, "Cascadia Code", Consolas, monospace'
 		};
-		var spinnerStyle = { color: "#6fb3ff", fontSize: 9, opacity: .9 };
+		var spinnerStyle = { color: "var(--dsw-alias-link, #6fb3ff)", fontSize: 9, opacity: .9 };
 		var tabStripStyle = {
 			display: "flex", gap: 4, padding: "6px 8px",
-			borderBottom: "1px solid " + BORDER, overflowX: "auto", background: "rgba(0,0,0,.16)"
+			borderBottom: "1px solid " + BORDER, overflowX: "auto",
+			background: "var(--dsw-alias-bg-layer-2, rgba(0,0,0,.16))"
 		};
 		var tabStyle = {
 			display: "flex", alignItems: "center", gap: 5, maxWidth: 170,
-			padding: "3px 8px", borderRadius: 6, fontSize: 11.5, color: "#9aa1ad",
-			cursor: "pointer", background: "rgba(0,0,0,.25)", border: "1px solid transparent",
-			flex: "0 0 auto"
+			padding: "3px 8px", borderRadius: 6, fontSize: 11.5,
+			color: "var(--dsw-alias-label-tertiary, #9aa1ad)",
+			cursor: "pointer", background: "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.25))",
+			border: "1px solid transparent", flex: "0 0 auto"
 		};
-		var tabActiveStyle = { color: "#fff", background: "rgba(255,255,255,.14)", borderColor: BORDER };
+		var tabActiveStyle = {
+			color: "var(--dsw-alias-label-primary, #fff)",
+			background: "var(--dsw-alias-interactive-bg-active, rgba(255,255,255,.14))",
+			borderColor: BORDER
+		};
 		var tabLabelStyle = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 };
 		var newTabStyle = {
 			flex: "0 0 auto", border: "1px dashed " + BORDER, background: "transparent",
-			color: "#8b929e", borderRadius: 6, width: 24, height: 22, cursor: "pointer",
+			color: "var(--dsw-alias-label-caption, #8b929e)",
+			borderRadius: 6, width: 24, height: 22, cursor: "pointer",
 			fontSize: 14, lineHeight: "18px", padding: 0
 		};
 		var closeXStyle = {
-			border: "none", background: "transparent", color: "#8b929e", cursor: "pointer",
+			border: "none", background: "transparent",
+			color: "var(--dsw-alias-label-caption, #8b929e)", cursor: "pointer",
 			fontSize: 13, lineHeight: "13px", padding: 0, width: 14, height: 14
 		};
 		var frameStyle = { width: "100%", height: "100%", border: 0, background: "#fff", display: "block" };
 		var emptyStyle = {
-			padding: 28, color: "#7d8592", fontSize: 12.5, lineHeight: 1.6,
+			padding: 28, color: "var(--dsw-alias-label-tertiary, #7d8592)",
+			fontSize: 12.5, lineHeight: 1.6,
 			display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
 			height: "100%", textAlign: "center", background: BG
 		};
 		var codeStyle = {
-			background: "rgba(255,255,255,.08)", borderRadius: 4, padding: "1px 5px",
+			background: "var(--dsw-alias-markdown-inline-code, rgba(255,255,255,.08))",
+			borderRadius: 4, padding: "1px 5px",
 			fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 11
 		};
 		function launcherStyle(active, railWidth) {
