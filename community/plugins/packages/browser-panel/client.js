@@ -59,6 +59,14 @@ window.__ModuleLoader__.load({
 		var IS_SHELL = typeof navigator !== "undefined"
 			&& /Electron\//.test(navigator.userAgent || "");
 
+		/**
+		 * 是否运行在 Tauri 桌面壳里。
+		 *
+		 * 壳开启了 withGlobalTauri，这个全局对象就是「能不能请原生侧把一块真实子 WebView
+		 * 放到面板位置上」的判据。成立时面板不再走图像流：渲染、滚动与输入全是原生的。
+		 */
+		var IS_TAURI = typeof window !== "undefined" && !!(window.__TAURI__ && window.__TAURI__.core);
+
 		function postJson(path, body) {
 			return fetch(path, {
 				method: "POST",
@@ -316,6 +324,8 @@ window.__ModuleLoader__.load({
 		function LiveView(props) {
 			// 面板显示的是浏览器里的某一个真实标签；换标签就换帧流、换输入目标。
 			var targetId = (props && props.targetId) || null;
+			// 原生壳需要地址本身：它让子 WebView 直接加载这个网址，而不是转发像素。
+			var liveUrl = (props && props.url) || "about:blank";
 			var imgRef = useRef(null);
 			var boxRef = useRef(null);
 			var srcState = useState(""); var src = srcState[0], setSrc = srcState[1];
@@ -342,6 +352,42 @@ window.__ModuleLoader__.load({
 				ro.observe(box);
 				return function () { ro.disconnect(); };
 			}, [targetId]);
+
+			/**
+			 * 原生壳：把面板这块矩形交给壳里的子 WebView。
+			 *
+			 * 每次全量上报位置与尺寸，所以右栏拖拽、窗口缩放、标签切换都只需再发一次；
+			 * 卸载时关闭原生视图，避免它在面板消失后继续盖在界面上。
+			 */
+			useEffect(function () {
+				if (!IS_TAURI) return undefined;
+				var box = boxRef.current;
+				if (!box) return undefined;
+				function call(cmd, args) {
+					try {
+						var pending = window.__TAURI__.core.invoke(cmd, args);
+						if (pending && typeof pending.catch === "function") {
+							pending.catch(function () { /* 壳可能正在退出，忽略 */ });
+						}
+					} catch (e) { /* 同上 */ }
+				}
+				function sync() {
+					var r = box.getBoundingClientRect();
+					call("browser_view_sync", { url: liveUrl, x: r.left, y: r.top, width: r.width, height: r.height });
+				}
+				sync();
+				var ro = new ResizeObserver(sync);
+				ro.observe(box);
+				window.addEventListener("resize", sync);
+				// 右栏拖拽、面板折叠这类不触发 ResizeObserver 的布局变化，用轮询兜底。
+				var timer = setInterval(sync, 500);
+				return function () {
+					ro.disconnect();
+					window.removeEventListener("resize", sync);
+					clearInterval(timer);
+					call("browser_view_close", {});
+				};
+			}, [liveUrl, targetId]);
 
 			// Frames arrive PUSHED, over Server-Sent Events. Chrome emits one only
 			// when the page actually repaints, so an idle page costs nothing and a
@@ -415,10 +461,13 @@ window.__ModuleLoader__.load({
 					}
 				}
 			},
-				src
-					? h("img", { ref: imgRef, src: src, draggable: false,
-						style: { width: "100%", height: "100%", objectFit: "fill", imageRendering: "auto", display: "block", userSelect: "none" } })
-					: h("div", { style: { padding: 20, color: "#7d8592", fontSize: 12.5 } }, "正在启动浏览器…")
+				IS_TAURI
+					// 原生子 WebView 就盖在这块矩形上绘制网页，面板只留一个占位底色。
+					? h("div", { style: { width: "100%", height: "100%", background: "#fff" } })
+					: (src
+						? h("img", { ref: imgRef, src: src, draggable: false,
+							style: { width: "100%", height: "100%", objectFit: "fill", imageRendering: "auto", display: "block", userSelect: "none" } })
+						: h("div", { style: { padding: 20, color: "#7d8592", fontSize: 12.5 } }, "正在启动浏览器…"))
 			);
 		}
 
@@ -1062,7 +1111,7 @@ window.__ModuleLoader__.load({
 						: (viewKind === "browser"
 							? (activeTargetId
 								// key 带上 target：换标签就是换帧流与输入目标，让 React 整块重建视图。
-								? h(LiveView, { key: "live-" + activeTargetId, targetId: activeTargetId })
+								? h(LiveView, { key: "live-" + activeTargetId, targetId: activeTargetId, url: (activeTarget && activeTarget.url) || "about:blank" })
 								: emptyPane())
 							: ((activeTab && activeTab.url)
 								? h("iframe", Object.assign({
