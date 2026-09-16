@@ -40,7 +40,7 @@ dsh plugin --profile web remove dsh-plugin-manager
 pnpm install
 pnpm run build
 pnpm --filter dsh-plugin-manager pack
-dsh plugin --profile web add ./packages/manager/dsh-plugin-manager-0.1.0.tgz
+dsh plugin --profile web add ./packages/manager/dsh-plugin-manager-0.1.2.tgz
 ```
 
 通过 Git 安装会执行 `prepare` 构建，在 pnpm 10 及更高版本中需要显式授权构建脚本。已发布的 npm 软件包和 tarball 已包含 `lib/`，不需要安装时的构建权限。

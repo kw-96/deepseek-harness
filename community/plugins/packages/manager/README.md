@@ -40,7 +40,7 @@ For a local checkout or tarball:
 pnpm install
 pnpm run build
 pnpm --filter dsh-plugin-manager pack
-dsh plugin --profile web add ./packages/manager/dsh-plugin-manager-0.1.0.tgz
+dsh plugin --profile web add ./packages/manager/dsh-plugin-manager-0.1.2.tgz
 ```
 
 Git installs run the `prepare` build and require explicit build-script authorization under pnpm 10 and newer. Published npm packages and tarballs already contain `lib/` and do not need install-time build permission.
