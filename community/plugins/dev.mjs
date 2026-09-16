@@ -198,16 +198,21 @@ function mountPluginHostDeps() {
       console.log(`[dev] 跳过缺失的宿主依赖 ${depName}（${relative}）`)
       continue
     }
-    const target = join(here, 'node_modules', depName)
-    try {
-      if (lstatSync(target).isSymbolicLink()) unlinkSync(target)
-      else rmSync(target, { recursive: true, force: true })
-    } catch {
-      // 目标不存在则忽略。
+    // 两处都要挂：插件从源码目录解析（社区 workspace 的 node_modules），而 Loader 若按
+    // 链接路径解析则会落到 profile 的 node_modules。与 mountPresetPlugins 同理，只挂一处
+    // 会在另一处报 cannot be resolved。
+    for (const base of [join(here, 'node_modules'), join(profileDir, 'node_modules')]) {
+      const target = join(base, depName)
+      try {
+        if (lstatSync(target).isSymbolicLink()) unlinkSync(target)
+        else rmSync(target, { recursive: true, force: true })
+      } catch {
+        // 目标不存在则忽略。
+      }
+      mkdirSync(dirname(target), { recursive: true })
+      symlinkSync(dir, target, 'junction')
     }
-    mkdirSync(dirname(target), { recursive: true })
-    symlinkSync(dir, target, 'junction')
-    console.log(`[dev] 宿主依赖 junction ${depName} → ${relative}`)
+    console.log(`[dev] 宿主依赖 junction ${depName} → ${relative}（社区 workspace + profile）`)
   }
 }
 
