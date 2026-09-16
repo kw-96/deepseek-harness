@@ -357,12 +357,27 @@ export async function setViewport(width, height, dpr, targetId) {
   })
 }
 
-export async function mouse(type, x, y, button = 'left', clickCount = 1, deltaY = 0, targetId) {
+export async function mouse(type, x, y, button = 'left', clickCount = 1, deltaY = 0, targetId, deltaX = 0) {
   const s = await ensureSession(targetId)
   if (type === 'wheel') {
-    return s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY })
+    return s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX, deltaY })
   }
   return s.send('Input.dispatchMouseEvent', { type, x, y, button, clickCount, buttons: type === 'mouseReleased' ? 0 : 1 })
+}
+
+/**
+ * 派发一个触摸点事件，供触屏设备（手机、平板）操作面板里的页面。
+ * @param {string} type touchStart、touchMove、touchEnd 或 touchCancel
+ * @param {number} x 视口坐标 X（CSS 像素）
+ * @param {number} y 视口坐标 Y（CSS 像素）
+ * @param {string} [targetId] 目标标签
+ * @returns {Promise<object>} CDP 应答
+ */
+export async function touch(type, x, y, targetId) {
+  const s = await ensureSession(targetId)
+  // 抬手与取消没有触点，其余事件带一个触点；单指足够覆盖滑动与点击。
+  const touchPoints = (type === 'touchEnd' || type === 'touchCancel') ? [] : [{ x, y }]
+  return s.send('Input.dispatchTouchEvent', { type, touchPoints })
 }
 
 export async function typeText(text, targetId) {
@@ -392,6 +407,23 @@ export async function reload(targetId) {
   const s = await ensureSession(targetId)
   await s.send('Page.reload', {})
   await sleep(700)
+  return state(targetId)
+}
+
+/**
+ * 在历史里前进一页。
+ * @param {string} [targetId] 目标标签
+ * @returns {Promise<object>} 前进后的页面状态
+ */
+export async function goForward(targetId) {
+  const s = await ensureSession(targetId)
+  const h = await s.send('Page.getNavigationHistory')
+  const idx = h.result?.currentIndex
+  const entries = h.result?.entries || []
+  if (typeof idx === 'number' && idx < entries.length - 1) {
+    await s.send('Page.navigateToHistoryEntry', { entryId: entries[idx + 1].id })
+    await sleep(500)
+  }
   return state(targetId)
 }
 

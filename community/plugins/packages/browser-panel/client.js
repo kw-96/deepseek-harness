@@ -440,24 +440,60 @@ window.__ModuleLoader__.load({
 			return h("div", {
 				ref: boxRef,
 				tabIndex: 0,
-				style: { position: "relative", width: "100%", height: "100%", background: "#fff", outline: "none", overflow: "hidden" },
+				style: { position: "relative", width: "100%", height: "100%", background: "#fff", outline: "none", overflow: "hidden", touchAction: "none" },
 				onMouseDown: function (e) { e.preventDefault(); boxRef.current && boxRef.current.focus(); var p = at(e); send("down", { x: p.x, y: p.y, clickCount: e.detail || 1 }); },
 				onMouseUp: function (e) { var p = at(e); send("up", { x: p.x, y: p.y, clickCount: e.detail || 1 }); },
 				onMouseMove: function (e) { if (e.buttons) { var p = at(e); send("move", { x: p.x, y: p.y }); } },
-				onWheel: function (e) { var p = at(e); send("wheel", { x: p.x, y: p.y, deltaY: e.deltaY }); },
+				// 触屏设备：单指的点击与滑动同样要送到页面，否则手机上这块面板只能看不能动。
+				onTouchStart: function (e) {
+					e.preventDefault();
+					boxRef.current && boxRef.current.focus();
+					var t = e.touches[0]; if (!t) return;
+					var p = at(t);
+					send("touch", { phase: "touchStart", x: p.x, y: p.y });
+				},
+				onTouchMove: function (e) {
+					e.preventDefault();
+					var t = e.touches[0]; if (!t) return;
+					var p = at(t);
+					send("touch", { phase: "touchMove", x: p.x, y: p.y });
+				},
+				onTouchEnd: function (e) {
+					e.preventDefault();
+					var last = e.changedTouches && e.changedTouches[0];
+					var p = last ? at(last) : { x: 0, y: 0 };
+					send("touch", { phase: "touchEnd", x: p.x, y: p.y });
+				},
+				// 右键交给页面自己处理，面板不弹浏览器菜单。
+				onContextMenu: function (e) {
+					e.preventDefault();
+					var p = at(e);
+					send("down", { x: p.x, y: p.y, button: "right", clickCount: 1 });
+					send("up", { x: p.x, y: p.y, button: "right", clickCount: 1 });
+				},
+				onWheel: function (e) { var p = at(e); send("wheel", { x: p.x, y: p.y, deltaY: e.deltaY, deltaX: e.deltaX }); },
 				onKeyDown: function (e) {
-					// Printable characters go through insertText so IME and shifted
-					// symbols behave; everything else is a raw key event.
-					if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+					// 修饰键必须一起下发，否则 Ctrl+A / Ctrl+C 这类组合在页面里等同于普通按键。
+					var mods = (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
+					var named = { Enter: 13, Backspace: 8, Tab: 9, Escape: 27, Delete: 46,
+						ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35,
+						PageUp: 33, PageDown: 34, Insert: 45, F5: 116 };
+					// 无修饰键的可打印字符走 insertText，输入法与符号行为才正常；
+					// 带 Ctrl/Cmd/Alt 的单字符是快捷键，按按键事件带修饰键下发。
+					if (e.key.length === 1 && mods === 0) {
 						e.preventDefault();
 						send("text", { text: e.key });
 						return;
 					}
-					var named = { Enter: 13, Backspace: 8, Tab: 9, Escape: 27, Delete: 46,
-						ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35 };
+					if (e.key.length === 1) {
+						e.preventDefault();
+						var vk = e.key.toUpperCase().charCodeAt(0);
+						send("key", { event: { key: e.key, code: e.code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: mods } });
+						return;
+					}
 					if (named[e.key]) {
 						e.preventDefault();
-						send("key", { event: { key: e.key, code: e.code, windowsVirtualKeyCode: named[e.key], nativeVirtualKeyCode: named[e.key] } });
+						send("key", { event: { key: e.key, code: e.code, windowsVirtualKeyCode: named[e.key], nativeVirtualKeyCode: named[e.key], modifiers: mods } });
 					}
 				}
 			},
@@ -973,6 +1009,13 @@ window.__ModuleLoader__.load({
 				setTimeout(function () { try { a.remove(); } catch (e) { /* gone */ } }, 0);
 			}
 
+			/** 历史前进/后退；作用对象始终是面板正在显示的那个标签。 */
+			function goStep(direction) {
+				var q = activeTargetId ? ("?target=" + encodeURIComponent(activeTargetId)) : "";
+				setBusy(true);
+				postJson(LIVE_PATH + "/" + direction + q, {}).then(function () { setBusy(false); });
+			}
+
 			function reload() {
 				if (viewKind === "browser") {
 					// 重载面板正在显示的那个标签；它未必是浏览器当前活动的标签。
@@ -1018,6 +1061,8 @@ window.__ModuleLoader__.load({
 								style: iconBtn
 							}, "↓")
 							: null,
+						h("button", { onClick: function () { goStep("back"); }, title: "后退", style: iconBtn }, "←"),
+						h("button", { onClick: function () { goStep("forward"); }, title: "前进", style: iconBtn }, "→"),
 						h("button", { onClick: reload, title: "重新载入", style: iconBtn }, "↻"),
 						h("button", {
 							onClick: function () {

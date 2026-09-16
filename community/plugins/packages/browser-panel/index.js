@@ -427,6 +427,7 @@ export function apply(ctx, config) {
             return json(res, 200, { ok: true })
           }
           if (action === 'back') return json(res, 200, { ok: true, ...(await live.goBack(targetId)) })
+          if (action === 'forward') return json(res, 200, { ok: true, ...(await live.goForward(targetId)) })
           if (action === 'reload') return json(res, 200, { ok: true, ...(await live.reload(targetId)) })
           if (action === 'input') {
             const k = body?.kind
@@ -435,7 +436,8 @@ export function apply(ctx, config) {
             if (k === 'move') await live.mouse('mouseMoved', body.x, body.y, 'left', 1, 0, to)
             else if (k === 'down') await live.mouse('mousePressed', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
             else if (k === 'up') await live.mouse('mouseReleased', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
-            else if (k === 'wheel') await live.mouse('wheel', body.x, body.y, 'none', 0, body.deltaY || 0, to)
+            else if (k === 'wheel') await live.mouse('wheel', body.x, body.y, 'none', 0, body.deltaY || 0, to, body.deltaX || 0)
+            else if (k === 'touch') await live.touch(String(body.phase || 'touchStart'), body.x, body.y, to)
             else if (k === 'text') await live.typeText(String(body.text || ''), to)
             else if (k === 'key') {
               await live.key('keyDown', body.event || {}, to)

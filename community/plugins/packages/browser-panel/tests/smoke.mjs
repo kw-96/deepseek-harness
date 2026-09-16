@@ -44,6 +44,8 @@ const live = await import('../cdpbrowser.js')
 for (const fn of [
   'configure', 'ensureBrowser', 'listTargets', 'createTarget', 'closeTarget',
   'activateTarget', 'browserStatus', 'profilePath', 'startScreencast', 'navigate',
+  // 输入与导航面：触摸、键盘、滚轮与历史前进后退都在这条链上。
+  'mouse', 'touch', 'key', 'typeText', 'setViewport', 'goBack', 'goForward', 'reload',
 ]) {
   assert.equal(typeof live[fn], 'function', `cdpbrowser 必须导出 ${fn}`)
 }
