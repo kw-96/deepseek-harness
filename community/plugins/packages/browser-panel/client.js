@@ -420,7 +420,7 @@ window.__ModuleLoader__.load({
 		// ── the pane ─────────────────────────────────────────────────────────
 
 		function PreviewOverlay() {
-			var openState = useState(false); var open = openState[0], setOpen = openState[1];
+			var openState = useState(true); var open = openState[0], setOpen = openState[1];
 			var tabsState = useState([]); var tabs = tabsState[0], setTabs = tabsState[1];
 			var activeState = useState(null); var activeId = activeState[0], setActiveId = activeState[1];
 			var widthState = useState(readWidth); var width = widthState[0], setWidth = widthState[1];
@@ -640,11 +640,7 @@ window.__ModuleLoader__.load({
 			}, [pushState]);
 
 			var closeTab = useCallback(function (cid) {
-				setTabs(function (prev) {
-					var next = prev.filter(function (t) { return t.id !== cid; });
-					if (next.length === 0) setOpen(false);
-					return next;
-				});
+				setTabs(function (prev) { return prev.filter(function (t) { return t.id !== cid; }); });
 				setActiveId(function (a) {
 					if (a !== cid) return a;
 					var rest = (tabsRef.current || []).filter(function (t) { return t.id !== cid; });
@@ -751,49 +747,8 @@ window.__ModuleLoader__.load({
 				return function () { document.removeEventListener("click", onClick, true); };
 			}, []);
 
-			// Hold the reserved track. The layout package rewrites the frame's
-			// inline grid-template on its own re-renders (a sidebar toggle wipes
-			// it), so an observer re-applies ours instead of losing the space.
-			var railState = useState(false); var railed = railState[0], setRailed = railState[1];
-			var frameTopState = useState(PANE_TOP); var frameTop = frameTopState[0], setFrameTop = frameTopState[1];
-
-			useEffect(function () {
-				if (!open) { releaseRail(); setRailed(false); return; }
-
-				var ok = reserveRail(width);
-				setRailed(ok);
-				if (!ok) return;   // shell shape unknown -> stay floating
-
-				var frame = findFrame();
-				function syncTop() {
-					if (!frame) return;
-					var r = frame.getBoundingClientRect();
-					setFrameTop(Math.max(0, Math.round(r.top)));
-				}
-				syncTop();
-
-				var reapplying = false;
-				var observer = new MutationObserver(function () {
-					if (reapplying) return;
-					var current = frame.style.gridTemplateColumns || "";
-					var track = frame.getAttribute(RAIL_ATTR);
-					if (track && current.endsWith(" " + track)) return;  // still ours
-					reapplying = true;
-					reserveRail(width);
-					syncTop();
-					// Let the write we just made settle before listening again,
-					// otherwise the observer retriggers on its own mutation.
-					setTimeout(function () { reapplying = false; }, 0);
-				});
-				observer.observe(frame, { attributes: true, attributeFilter: ["style"] });
-				window.addEventListener("resize", syncTop);
-
-				return function () {
-					observer.disconnect();
-					window.removeEventListener("resize", syncTop);
-					releaseRail();
-				};
-			}, [open, width]);
+			// 面板由官方右侧栏承载，宽度与轨道归右栏所有：原先那套"占用 grid 轨道 +
+			// 观察页面重写"的逻辑在这里必须停用，否则会与右栏自己的布局互相踩。
 
 			// Drag-to-resize from the pane's left edge.
 			var dragRef = useRef(null);
@@ -986,32 +941,14 @@ window.__ModuleLoader__.load({
 			}
 
 			// ── render ────────────────────────────────────────────────────────
-			// The toggle is always mounted, so it reads as a persistent control
-			// rather than something that vanishes once used. While the pane holds
-			// a layout track it shifts left by that width, keeping it at the
-			// bottom-right of the CONVERSATION instead of floating over the pane.
-			var toggle = h("button", {
-				key: "toggle",
-				onClick: function () { setOpen(function (v) { return !v; }); },
-				title: open ? "收起浏览器面板" : "打开浏览器面板",
-				"data-dsh-preview": "1",
-				style: launcherStyle(open, railed ? width : 0)
-			},
-				h("span", { style: dotStyle(open) }),
-				"浏览器"
-			);
-
-			if (!open) return toggle;
-
+			// 面板住在官方右侧栏的一个标签里：显示与否由右栏的标签决定，没有浮层开关，
+			// 也没有自己的轨道与宽度。
 			var activeTab = tabOf(activeId);
 
-			return h(react.Fragment, null, toggle, h("div", { style: paneStyle(width, railed, frameTop), "data-dsh-preview": "1" },
-				// resize grip
-				h("div", {
-					onMouseDown: function () { dragRef.current = 1; document.body.style.userSelect = "none"; },
-					title: "拖动以调整宽度",
-					style: gripStyle
-				}),
+			return h("div", {
+				style: { display: "flex", flexDirection: "column", width: "100%", height: "100%", minHeight: 0, background: "transparent" },
+				"data-dsh-preview": "1"
+			},
 
 				// header
 				h("div", { style: headerStyle },
@@ -1131,7 +1068,7 @@ window.__ModuleLoader__.load({
 								}, frameSandbox(activeTab)))
 								: emptyPane()))
 				)
-			));
+			);
 		}
 
 		/** Tab label: basename for files, hostname for pages. */
@@ -1279,17 +1216,38 @@ window.__ModuleLoader__.load({
 			};
 		}
 
-		var inject = [ "slots" ];
+		// 依赖的宿主服务（Cordis 服务名）：右栏标签注册表与插槽系统。
+		var inject = [ "slots", "sidebarRightTabs" ];
+
+		// 右栏里的身份：id 是插槽 seat 的 key，kind 是 openTab 用的判别标签。
+		var TAB_ID = "dsh-plugin-browser";
+		var TAB_KIND = "browser";
 
 		function apply(ctx) {
-			// 注册必须由 effect 持有：官方契约要求每一个 slot 贡献都挂在 effect 上，
-			// 卸载（含 Cordis HMR 热替换）时据此回收；不做就会在热替换后残留旧组件，
-			// 同一个 shell.overlay 上叠出两个面板。
+			// ① 类型：向官方右侧栏声明"浏览器"这类标签，并给引导页一枚入口胶囊，
+			//    于是入口就在右栏自己的添加入口里，不再需要浮层按钮。
 			ctx.effect(function () {
-				return ctx.slots.inject("shell.overlay", function () {
+				return ctx.sidebarRightTabs.register({
+					id: TAB_ID,
+					kind: TAB_KIND,
+					priority: "extension",
+					title: function () { return "浏览器"; },
+					guide: [{
+						id: "open",
+						order: 30,
+						title: function () { return "浏览器"; },
+						description: function () { return "用真实 Chrome 打开网页，人与 Agent 共用同一个浏览器"; }
+					}]
+				});
+			});
+
+			// ② 正文：面板本体注册进右栏的标签正文席位，key 必须是上面那个 id。
+			//    两个注册都由 effect 持有，卸载（含 HMR 热替换）时随之回收。
+			ctx.effect(function () {
+				return ctx.slots.inject("sidebar.right.pane.tab", function () {
 					return ctx.slots.register({
-						name: "shell.overlay",
-						id: "preview-browser",
+						name: "sidebar.right.pane.tab",
+						key: TAB_ID,
 						inject: function () { return {}; }
 					}, PreviewOverlay);
 				});

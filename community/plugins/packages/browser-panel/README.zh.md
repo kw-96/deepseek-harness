@@ -11,7 +11,7 @@
 
 | 场景 | 结果 |
 | --- | --- |
-| 在 DSH 里访问网页 | 面板是一列真实布局（对话让出宽度），地址栏输网址即可打开，不必切到系统浏览器 |
+| 在 DSH 里访问网页 | 入口在**官方右侧栏**：引导页里的「浏览器」胶囊点开即用；面板由右栏承载，地址栏输网址就能打开，不必切到系统浏览器 |
 | 需要登录的站点 | 面板驱动的是独立 profile（默认 `~/.dsh/browser-profile`）里的真 Chrome，登录一次长期保留，且不碰用户日常 Chrome |
 | 让 Agent 操作同一个浏览器 | 官方 browser-use 提供方 attach 到同一端点，工具看到的就是你眼前这个页面、这份 Cookie |
 
@@ -41,6 +41,10 @@
    CDP 连接（`sessions: Map<targetId, Session>`），每个标签各有自己的帧流、输入目标与导航历史。
    `live` 前缀路由新增 `targets` / `activate` / `newtab` / `closetab`，其余动作（`stream` / `input` / `state` /
    `text` / `viewport` / `back` / `reload` / `open`）都可带 `target` 指定作用对象。
+10. **入口改挂官方右侧栏**：面板不再是 `shell.overlay` 上的浮动卡片，而是用 `ctx.sidebarRightTabs.register(...)`
+    注册的右栏标签类型（kind `browser`，并给引导页一枚入口胶囊），正文注册进 `sidebar.right.pane.tab` 席位。
+    原来的浮动开关、占位轨道与拖拽手柄一并移除：宽度与轨道归右栏所有，插件那套"改写页面 grid 轨道"的逻辑
+    会与右栏布局互相踩，必须停用。
 
 ## 多标签下的分工
 
@@ -60,7 +64,8 @@ CDP 读它的真实 DOM，所以「人眼前这一页」与「Agent 读到的一
 node community/plugins/dev.mjs browser-panel
 ```
 
-之后重启 `dsh web`（bundle 列表在启动时读取），硬刷新页面，右下角会出现「浏览器」按钮。
+之后重启 `dsh web`（bundle 列表在启动时读取），硬刷新页面。入口在右侧栏：点右栏的添加入口，
+在引导页里选「浏览器」胶囊，面板就以一个右栏标签的形式打开；也可以在会话里让 Agent 调 `open_preview` 打开网页。
 
 纯 JS 插件没有构建步骤，Host 侧改动由 Cordis HMR 直接热替换；客户端改动需要重建/刷新页面。
 

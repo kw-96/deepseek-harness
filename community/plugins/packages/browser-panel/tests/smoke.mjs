@@ -100,10 +100,37 @@ const clientExports = registration.factory((name) => {
   if (name === 'react') return reactStub
   throw new Error(`客户端半请求了未在基线中播种的模块：${name}`)
 })
-assert.deepEqual(clientExports.inject, ['slots'], '客户端半只依赖 slots 服务')
+assert.deepEqual(clientExports.inject, ['slots', 'sidebarRightTabs'], '客户端半依赖插槽系统与右栏标签注册表')
 assert.equal(typeof clientExports.apply, 'function', '客户端半必须导出 apply')
+
+// 真正跑一遍客户端 apply：浏览器入口必须落在官方右侧栏，而不是浮层。
+const clientRegistrations = { types: [], seats: [] }
+const clientCtx = {
+  effect(fn) { const dispose = fn(); return () => { if (typeof dispose === 'function') dispose() } },
+  sidebarRightTabs: {
+    register(definition) { clientRegistrations.types.push(definition); return () => {} },
+  },
+  slots: {
+    inject(name, contribute) { clientRegistrations.seats.push(`inject:${name}`); return contribute() },
+    register(spec) { clientRegistrations.seats.push(`register:${spec.name}:${spec.key ?? spec.id}`); return () => {} },
+  },
+}
+clientExports.apply(clientCtx)
+
+assert.equal(clientRegistrations.types.length, 1, '必须注册且只注册一个右栏标签类型')
+assert.equal(clientRegistrations.types[0].kind, 'browser', '标签 kind 必须是 browser')
+assert.ok(
+  Array.isArray(clientRegistrations.types[0].guide) && clientRegistrations.types[0].guide.length > 0,
+  '必须给右栏引导页一枚入口胶囊（这就是浏览器入口）',
+)
+assert.equal(clientRegistrations.types[0].title(''), '浏览器', '标签标题必须是中文')
+assert.ok(
+  clientRegistrations.seats.includes('register:sidebar.right.pane.tab:dsh-plugin-browser'),
+  '面板正文必须注册进右栏标签正文席位',
+)
 
 console.log(
   `[smoke] OK｜宿主半：路由 ${routes.length} 条、工具 ${tools.length} 个；`
-  + `浏览器半：注册 id=${registration.id}、依赖模块 [${requested.join(', ')}]`,
+  + `浏览器半：注册 id=${registration.id}、依赖模块 [${requested.join(', ')}]；`
+  + `右栏：类型 kind=${clientRegistrations.types[0].kind}、引导入口 ${clientRegistrations.types[0].guide.length} 个、正文席位已注册`,
 )
