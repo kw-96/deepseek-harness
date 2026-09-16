@@ -66,10 +66,18 @@ CLI 解析顺序：`DSH_DESKTOP_CLI` → 自本 exe 向上查找 → 自进程 c
 
 托盘文案来自 Web 侧的 locale 字典（`desktop.tray.*`、`desktop.menu.quit`）；在页面加载完成之前，壳显示内置的中文兜底文案。
 
-隐藏行为可用 `scripts/smoke-tray-hide.ps1` 验证（需要空闲端口，脚本自行清理进程树）：
+壳是**单实例**的：重复双击 `DeepSeek Harness.exe` 不会再起第二个壳或第二个托盘图标，而是把已有窗口恢复出来（判定标识即 `tauri.conf.json` 里的 identifier；插件的第二实例在启动自己的 `dsh web` 之前就已退出）。
+
+隐藏行为可用 `scripts/smoke-tray-hide.ps1` 验证（默认用 3080，可用 `-Port` 换一个空闲端口；脚本只按自己启动的进程树判定，同机上另有 dsh 实例也不会误判，并在结束前自行清理）：
 
 ```powershell
-pwsh -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1
+powershell -ExecutionPolicy Bypass -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1 -Port 3199
+```
+
+脚本断言：单实例守卫（第二次启动立即退出，并把已有窗口叫回来）、关闭窗口后窗口隐藏而进程仍在（这一条同时说明托盘已经装好——托盘挂不上时壳会退回关闭即退出）、真实模式下 `dsh web` 仍在服务。加上 `-FakeCli` 可以只验证壳行为：脚本造一个假后端，不占端口、不碰 profile，因此在同机已有 dsh 实例运行时也能跑。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1 -FakeCli -Port 3199
 ```
 
 -----
@@ -101,5 +109,4 @@ Decision record: [experimental Web desktop shell](../../../.agents/notes/impleme
 - **exe 文件图标不能随主题变色** — Windows 资源管理器不会按系统浅色/深色重绘 PE 图标；当前交付为深色底 + 白色小鱼，保证两主题都可读。
 - **自定义顶栏依赖 Tauri IPC** — 窗口关闭系统装饰后，启动页与 Web 顶栏通过 `withGlobalTauri` 与 remote capability 调用最小化/最大化/关闭；普通浏览器打开同一 Web 时不显示该顶栏。
 - **关闭窗口不释放端口** — 关窗只是隐藏到托盘；要结束后端并释放端口，必须走托盘菜单的「退出」或 文件 → 退出。
-- **没有单实例约束** — 再启动一次 `DeepSeek Harness.exe` 会得到第二个外壳与第二个托盘图标；壳不做跨进程协调。
 - **后端重启不会重载窗口** — 壳只导航一次，恢复依赖 Web 客户端自身的重连循环；若该循环不再重试，窗口会一直停在重连提示，直到重载或重新启动。

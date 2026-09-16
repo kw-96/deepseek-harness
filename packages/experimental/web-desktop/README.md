@@ -66,10 +66,18 @@ The shell installs a tray icon at startup: the title-bar close button, `Ctrl+W`,
 
 Tray copy comes from the Web side's locale dictionaries (`desktop.tray.*`, `desktop.menu.quit`); before the page loads, the shell shows built-in Chinese fallbacks.
 
-The hide behavior is assertable with `scripts/smoke-tray-hide.ps1` (needs a free port; the script cleans up the process tree itself):
+The shell is **single-instance**: launching `DeepSeek Harness.exe` again neither starts a second shell nor a second tray icon — it restores the existing window (the guard's identity is the `tauri.conf.json` identifier, and the second process exits before it would spawn its own `dsh web`).
+
+The hide behavior is assertable with `scripts/smoke-tray-hide.ps1` (3080 by default, `-Port` picks a free one; the script judges only the process tree it started, so another dsh instance on the same machine cannot confuse it, and it cleans up before exiting):
 
 ```powershell
-pwsh -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1
+powershell -ExecutionPolicy Bypass -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1 -Port 3199
+```
+
+It asserts the single-instance guard (a second launch exits at once and reveals the running window), that closing the window hides it while the process stays alive (which also proves the tray was installed — without one the shell falls back to closing the app), and, in the real mode, that `dsh web` keeps serving. Add `-FakeCli` to check the shell alone: the script fabricates a backend, so it takes no port and touches no profile, which makes it runnable while another dsh instance is already serving.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1 -FakeCli -Port 3199
 ```
 
 -----
@@ -101,5 +109,4 @@ None; the shell neither assembles nor sends a provider request.
 - **No theme-switching .exe file icon** — Windows Explorer does not recolor PE icons from system light/dark mode; the shipped icon uses a dark tile and white mark so both themes stay readable.
 - **Custom title bar needs Tauri IPC** — with system decorations off, the splash and Web title bar call minimize / maximize / close through `withGlobalTauri` and the remote capability; the same Web UI in a normal browser does not show that chrome.
 - **Closing the window does not release the port** — closing only hides to the tray; ending the backend and freeing the port requires Quit from the tray menu or File → Quit.
-- **No single-instance guard** — launching `DeepSeek Harness.exe` again yields a second shell and a second tray icon; the shell does no cross-process coordination.
 - **A restarted backend does not reload the window** — the shell navigates once, so recovery depends on the Web client's own reconnect loop; if that loop ever stopped retrying, the window would keep the notice until it is reloaded or relaunched.

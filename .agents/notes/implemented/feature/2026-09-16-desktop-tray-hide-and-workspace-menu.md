@@ -14,6 +14,8 @@ The main window no longer ends the process. The shell installs a tray icon at st
 
 The tray menu carries the workspaces. `ui-layout`'s apply world subscribes to the workspace list through `ctx.inject(['workspaces'])`, pushes `{id, title}` rows plus localized labels with the `set_desktop_tray` command, and rebuilds the menu on every workspace or language change. Selecting a workspace row shows the window and emits `tray-open-workspace`; the page turns that into `uiWorkspace.openWorkspace(id)`, so the click lands in that workspace's session. Menu copy comes from the client locale dictionaries (`desktop.tray.*`, `desktop.menu.quit`); the shell keeps Chinese fallbacks only for the window between process start and page load.
 
+One tray icon means one shell: `tauri-plugin-single-instance` is registered first, so a relaunch of `DeepSeek Harness.exe` exits during plugin initialization — before this app's setup, hence before spawning a backend or a tray icon — after asking the running shell to reveal its window. The guard's identity is the `tauri.conf.json` identifier.
+
 ## Alternatives considered
 
 **A tray owned by the Web frontend.** Rejected: the tray must exist before the WebView reaches the harness URL — the splash page is closable to the tray too — and the shell stays the single owner of window and process lifetime.
@@ -22,8 +24,8 @@ The tray menu carries the workspaces. `ui-layout`'s apply world subscribes to th
 
 **A native context menu on the title-bar close button.** Rejected: not requested, and the tray row is the requested entry point.
 
-**Single-instance enforcement.** Rejected for this cut: launching the exe twice still starts a second shell and therefore a second tray icon, and nothing here needs cross-process coordination.
+**A hand-rolled mutex guard.** Rejected: the official plugin already covers the Windows named mutex, the `WM_COPYDATA` handoff carrying the relaunch's argv, and the exit point before this app's setup.
 
 ## Consequences
 
-Closing the window keeps the port and the running session alive; only Quit releases them, and `scripts/smoke-tray-hide.ps1` asserts exactly that split (window hidden, exe alive, ports still serving, then a script-driven tree kill). A harness that exits on its own still restarts under the possibly hidden window, so the tray icon is the only remaining signal that the backend is alive. If the tray cannot be installed (icon decode or system tray unavailable), the shell logs one boot line and the close button keeps its previous end-the-app behavior, because hiding a window with no restore entry point would otherwise strand the process.
+Closing the window keeps the port and the running session alive; only Quit releases them, and `scripts/smoke-tray-hide.ps1` asserts exactly that split (window hidden, exe alive, ports still serving, then a script-driven tree kill). The same script asserts the single-instance guard: a second launch exits while the first shell keeps running. A harness that exits on its own still restarts under the possibly hidden window, so the tray icon is the only remaining signal that the backend is alive. If the tray cannot be installed (icon decode or system tray unavailable), the shell logs one boot line and the close button keeps its previous end-the-app behavior, because hiding a window with no restore entry point would otherwise strand the process.

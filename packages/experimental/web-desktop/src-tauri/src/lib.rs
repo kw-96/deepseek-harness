@@ -36,6 +36,13 @@ pub fn run() {
   let extra_args = passthrough_args();
 
   let app = tauri::Builder::default()
+    // 单实例必须排在第一位：第二个实例在插件初始化阶段（早于本应用的 setup）
+    // 就会发现自己不是主实例，通知主实例后立即退出，因此不会启动自己的
+    // `dsh web`，也不会多挂一个托盘图标。
+    .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+      // 再次双击 exe：把已有实例的窗口恢复出来。
+      tray::reveal_main(app);
+    }))
     .plugin(external_links::navigation_plugin())
     .invoke_handler(tauri::generate_handler![
       get_boot_logs,

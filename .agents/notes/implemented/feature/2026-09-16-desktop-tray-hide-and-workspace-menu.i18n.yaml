@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-desktop-tray-hide-and-workspace-menu.md
-2026-09-16-desktop-tray-hide-and-workspace-menu.md: 20d76ad6b844f9ddf92a150ebc6ede8854aa72ab
-2026-09-16-desktop-tray-hide-and-workspace-menu.zh.md: 9f967d18e3378393bc7282eb74189dfd161adbaa
+2026-09-16-desktop-tray-hide-and-workspace-menu.md: 15191cd21d3a1398bde6e00a7e7735da5ca6c304
+2026-09-16-desktop-tray-hide-and-workspace-menu.zh.md: 3204cd9011507dca82187049c32ce6bf715802e7
