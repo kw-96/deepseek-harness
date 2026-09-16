@@ -40,6 +40,7 @@
    title row, the tab strip's 10px margin, a 16px tab line, and its 9px bottom
    inset — so no row below may grow past its figure. */
 .header {
+  position: relative; /* anchors the phone-pinned corner seat (see the 767px block) */
   flex: none;
   box-sizing: border-box;
   min-height: 76px;
@@ -497,6 +498,8 @@
     overflow-x: auto;
     scrollbar-width: none;
     min-height: 0;
+    /* Reserved for the pinned corner seat so the strip never scrolls under it. */
+    margin-right: 40px;
   }
 
   /* Natural widths are what make the strip scrollable; shrinking would squash
@@ -512,9 +515,16 @@
     margin-left: 16px;
   }
 
+  /* The corner seat holds the only way into the right panel while it is
+     collapsed. In the scrolling strip it would sit at the far end of 800-odd
+     pixels of header — off-screen and unreachable by touch — so a phone pins it
+     to the header's trailing edge instead. */
   .headerCorner {
-    /* The -16px overhang in the base rule belongs to the 28px desktop padding. */
-    margin-right: 0;
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    margin: 0;
+    background: var(--dsw-alias-bg-base);
   }
 
   .crumb {
