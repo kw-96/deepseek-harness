@@ -437,33 +437,48 @@ window.__ModuleLoader__.load({
 				postJson(LIVE_PATH + "/input", Object.assign({ kind: kind, target: targetId }, extra));
 			}
 
+			/** 把一组触点换算到页面坐标后下发。 */
+			function sendTouches(phase, list) {
+				var points = [];
+				for (var i = 0; i < (list ? list.length : 0); i++) {
+					var p = at(list[i]);
+					points.push({ x: p.x, y: p.y });
+				}
+				send("touchPoints", { phase: phase, points: points });
+			}
+
+			// 图像流只带像素、不带指针形状：按坐标向宿主回问页面光标，节流后写进容器，
+			// 否则链接与输入框上看到的永远是默认箭头，手感与真浏览器差一截。
+			var cursorState = useState("default"); var cursor = cursorState[0], setCursor = cursorState[1];
+			var cursorAskedAt = useRef(0);
+			function trackCursor(e) {
+				var now = Date.now();
+				if (now - cursorAskedAt.current < 150) return;
+				cursorAskedAt.current = now;
+				var p = at(e);
+				var q = targetId ? ("?target=" + encodeURIComponent(targetId)) : "";
+				postJson(LIVE_PATH + "/cursor" + q, { x: p.x, y: p.y }).then(function (d) {
+					if (d && typeof d.cursor === "string") setCursor(d.cursor);
+				});
+			}
+
 			return h("div", {
 				ref: boxRef,
 				tabIndex: 0,
-				style: { position: "relative", width: "100%", height: "100%", background: "#fff", outline: "none", overflow: "hidden", touchAction: "none" },
+				style: { position: "relative", width: "100%", height: "100%", background: "#fff", outline: "none", overflow: "hidden", touchAction: "none", cursor: cursor },
 				onMouseDown: function (e) { e.preventDefault(); boxRef.current && boxRef.current.focus(); var p = at(e); send("down", { x: p.x, y: p.y, clickCount: e.detail || 1 }); },
 				onMouseUp: function (e) { var p = at(e); send("up", { x: p.x, y: p.y, clickCount: e.detail || 1 }); },
-				onMouseMove: function (e) { if (e.buttons) { var p = at(e); send("move", { x: p.x, y: p.y }); } },
-				// 触屏设备：单指的点击与滑动同样要送到页面，否则手机上这块面板只能看不能动。
+				onMouseMove: function (e) { trackCursor(e); if (e.buttons) { var p = at(e); send("move", { x: p.x, y: p.y }); } },
+				// 触屏设备：把全部触点原样转发，单指滑动与双指捏合都由页面自己处理，
+				// 面板不猜测手势；end/cancel 传抬手后剩余的触点（CDP 的语义）。
 				onTouchStart: function (e) {
 					e.preventDefault();
 					boxRef.current && boxRef.current.focus();
-					var t = e.touches[0]; if (!t) return;
-					var p = at(t);
-					send("touch", { phase: "touchStart", x: p.x, y: p.y });
+					sendTouches("touchStart", e.touches);
 				},
-				onTouchMove: function (e) {
-					e.preventDefault();
-					var t = e.touches[0]; if (!t) return;
-					var p = at(t);
-					send("touch", { phase: "touchMove", x: p.x, y: p.y });
-				},
-				onTouchEnd: function (e) {
-					e.preventDefault();
-					var last = e.changedTouches && e.changedTouches[0];
-					var p = last ? at(last) : { x: 0, y: 0 };
-					send("touch", { phase: "touchEnd", x: p.x, y: p.y });
-				},
+				onTouchMove: function (e) { e.preventDefault(); sendTouches("touchMove", e.touches); },
+				onTouchEnd: function (e) { e.preventDefault(); sendTouches("touchEnd", e.touches); },
+				onTouchCancel: function (e) { e.preventDefault(); sendTouches("touchCancel", e.touches); },
 				// 右键交给页面自己处理，面板不弹浏览器菜单。
 				onContextMenu: function (e) {
 					e.preventDefault();

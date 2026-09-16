@@ -437,13 +437,19 @@ export function apply(ctx, config) {
             else if (k === 'down') await live.mouse('mousePressed', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
             else if (k === 'up') await live.mouse('mouseReleased', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
             else if (k === 'wheel') await live.mouse('wheel', body.x, body.y, 'none', 0, body.deltaY || 0, to, body.deltaX || 0)
-            else if (k === 'touch') await live.touch(String(body.phase || 'touchStart'), body.x, body.y, to)
+            else if (k === 'touch') await live.touch(String(body.phase || 'touchStart'), body.points, to)
             else if (k === 'text') await live.typeText(String(body.text || ''), to)
             else if (k === 'key') {
               await live.key('keyDown', body.event || {}, to)
               await live.key('keyUp', body.event || {}, to)
             } else return json(res, 400, { ok: false, error: 'unknown-input' })
             return json(res, 200, { ok: true })
+          }
+
+          // ── 光标形状：图像流不带指针形状，面板按坐标回问一次 ────────────
+          if (action === 'cursor') {
+            const cursor = await live.cursorAt(Number(body?.x) || 0, Number(body?.y) || 0, targetId)
+            return json(res, 200, { ok: true, cursor })
           }
 
           // ── 真实标签页管理 ──────────────────────────────────────────────

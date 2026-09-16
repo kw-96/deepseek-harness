@@ -373,11 +373,32 @@ export async function mouse(type, x, y, button = 'left', clickCount = 1, deltaY 
  * @param {string} [targetId] 目标标签
  * @returns {Promise<object>} CDP 应答
  */
-export async function touch(type, x, y, targetId) {
+export async function touch(type, points, targetId) {
   const s = await ensureSession(targetId)
-  // 抬手与取消没有触点，其余事件带一个触点；单指足够覆盖滑动与点击。
-  const touchPoints = (type === 'touchEnd' || type === 'touchCancel') ? [] : [{ x, y }]
-  return s.send('Input.dispatchTouchEvent', { type, touchPoints })
+  // CDP 语义：start/move 传当前全部触点，end/cancel 传抬手后**剩余**的触点。
+  // 原样转发全部触点，单指滑动与双指捏合就都由页面自己解释，面板不猜手势。
+  const list = Array.isArray(points)
+    ? points.filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+    : []
+  return s.send('Input.dispatchTouchEvent', { type, touchPoints: list })
+}
+
+/**
+ * 读取页面在某个坐标处的 CSS 光标关键字，供面板把鼠标指针画成页面里的样子。
+ * 图像流只传像素、不带指针形状，不查询的话鼠标永远是默认箭头。
+ * @param {number} x 视口坐标 X（CSS 像素）
+ * @param {number} y 视口坐标 Y（CSS 像素）
+ * @param {string} [targetId] 目标标签
+ * @returns {Promise<string>} 光标关键字（如 pointer、text），取不到时为 default
+ */
+export async function cursorAt(x, y, targetId) {
+  const s = await ensureSession(targetId)
+  const r = await s.send('Runtime.evaluate', {
+    expression: '(() => { const el = document.elementFromPoint(' + Math.round(x) + ', ' + Math.round(y) + ');'
+      + " return el ? getComputedStyle(el).cursor : 'default'; })()",
+    returnByValue: true,
+  })
+  return String(r.result?.result?.value || 'default')
 }
 
 export async function typeText(text, targetId) {
