@@ -34,5 +34,28 @@
   # tool-ralph 一直 pending 在 workflowEngine 上（启动只告警，功能静默缺失）。
   { id: workflow-ptc, name: "@deepseek-ai/dsh-workflow-ptc", disabled: false },
   { id: tool-workflow, name: "@deepseek-ai/dsh-tool-workflow", disabled: false },
-  { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false }
+  { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false },
+  # Agent 浏览器/电脑自动化。这些包官方未发布到 npm，由 community/plugins/dev.mjs
+  # 在启动时从源码 checkout junction 进 profile，因此新机器同样可用。
+  # browser-use 一次只能启用一个 provider，这里选 Playwright MCP 后端。
+  {
+      insert: [
+        { id: browser-use, name: "@deepseek-ai/dsh-browser-use" },
+        {
+            id: browser-use-playwright-mcp,
+            name: "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
+            config: { mode: launch, headless: true }
+          }
+      ]
+    },
+  # computer-use：Cua Driver 原生后端（嵌入 npm SDK，无需外部可执行文件）。
+  {
+      insert: [
+        { id: computer-use, name: "@deepseek-ai/dsh-computer-use" },
+        {
+            id: computer-use-cua-driver-native,
+            name: "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native"
+          }
+      ]
+    }
 ]

@@ -9,8 +9,11 @@
  *
  * - skills:  copies any missing skill into $DSH_HOME/skills (never overwrites)
  * - home:    copies any missing global home file into $DSH_HOME (never overwrites)
- * - presets: copies any missing agent preset file into $DSH_HOME/.agent-presets
- *            (never overwrites; a preset the user edited stays untouched)
+ * - presets: converges a shipped preset on the repository copy when the file
+ *            still matches what an earlier seed wrote (tracked by a content
+ *            ledger beside the presets); a preset the user edited is kept
+ *            untouched, and the first update over a pre-ledger install leaves a
+ *            `.bak` beside the replaced file
  * - profile: writes $DSH_HOME/profiles/web when it is absent; otherwise converges
  *            it on the template — tarball paths left by another checkout, bundles
  *            this host cannot install, bundles the template retired
@@ -30,6 +33,7 @@
  */
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir, arch, platform } from 'node:os'
@@ -199,19 +203,69 @@ if (existsSync(homeSrc)) {
   }
 }
 
-// Agent presets: fill in any missing preset file from community/presets;
-// never overwrite a preset the user already has at $DSH_HOME/.agent-presets.
+// Agent presets: converge a shipped preset on the repository copy when the
+// installed file still matches what an earlier seed wrote. A ledger beside the
+// presets records each seeded file's content hash, so an upgrade replaces only
+// files this repository owns: a preset the user edited keeps its content, and
+// an install predating the ledger keeps its replaced file as `.bak`.
 const presetsSrc = join(here, 'presets')
 const presetsDst = join(dshHome, '.agent-presets')
+const presetLedger = join(presetsDst, '.seeded.json')
+const digest = value => createHash('sha256').update(value).digest('hex')
 if (existsSync(presetsSrc)) {
+  let ledger = {}
+  if (existsSync(presetLedger)) {
+    try {
+      ledger = JSON.parse(await readFile(presetLedger, 'utf8'))
+    } catch {
+      // A damaged ledger means every installed preset reads as user-owned
+      // below, which keeps files in place instead of guessing.
+      ledger = {}
+    }
+  }
+  let ledgerChanged = false
+  const remember = (key, hash) => {
+    if (ledger[key] === hash) return
+    ledger[key] = hash
+    ledgerChanged = true
+  }
   for (const id of await readdir(presetsSrc)) {
     for (const name of await readdir(join(presetsSrc, id))) {
+      const key = `${id}/${name}`
+      const from = join(presetsSrc, id, name)
       const dest = join(presetsDst, id, name)
-      if (existsSync(dest)) continue
-      await mkdir(dirname(dest), { recursive: true })
-      await cp(join(presetsSrc, id, name), dest)
-      console.log(`[community] 安装预设 → ${id}/${name}`)
+      const sourceHash = digest(await readFile(from))
+      if (!existsSync(dest)) {
+        await mkdir(dirname(dest), { recursive: true })
+        await cp(from, dest)
+        console.log(`[community] 安装预设 → ${key}`)
+        remember(key, sourceHash)
+        continue
+      }
+      const installedHash = digest(await readFile(dest))
+      if (installedHash === sourceHash) {
+        remember(key, sourceHash)
+        continue
+      }
+      const recorded = ledger[key]
+      if (recorded !== undefined && recorded !== installedHash) {
+        console.log(`[community] 保留本地改过的预设 → ${key}`)
+        continue
+      }
+      if (recorded === undefined) {
+        // An install from before the ledger cannot prove ownership; keep the
+        // replaced file beside it so nothing is lost either way.
+        await cp(dest, `${dest}.bak`)
+        console.log(`[community] 旧预设已备份为 ${key}.bak`)
+      }
+      await cp(from, dest, { force: true })
+      console.log(`[community] 更新预设 → ${key}`)
+      remember(key, sourceHash)
     }
+  }
+  if (ledgerChanged) {
+    await mkdir(presetsDst, { recursive: true })
+    await writeFile(presetLedger, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8')
   }
 }
 

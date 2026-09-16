@@ -140,6 +140,45 @@ function mountPresetPlugins() {
   }
 }
 
+/**
+ * 仓库内提供、但未发布到 npm 的可选能力包。
+ *
+ * agent 浏览器/电脑自动化在 web profile 的 patch 里按包名引用，而这些包只存在于
+ * 源码 checkout（根 package.json 的 devDependencies），既不在 profile 的依赖里，
+ * 也不进共享 fallback，只能在这里 junction 进 profile 才解析得到。缺包不阻断启动。
+ */
+const WORKSPACE_CAPABILITY_PACKAGES = [
+  'packages/browser-use/browser-use',
+  'packages/experimental/browser-use-runtime',
+  'packages/experimental/browser-use-playwright-mcp',
+  'packages/computer-use/computer-use',
+  'packages/experimental/computer-use-cua-driver-native',
+]
+
+/** 把上列能力包 junction 进 profile 的 node_modules。 */
+function mountWorkspaceCapabilities() {
+  for (const relative of WORKSPACE_CAPABILITY_PACKAGES) {
+    const dir = join(repoRoot, relative)
+    const manifestPath = join(dir, 'package.json')
+    if (!existsSync(manifestPath)) {
+      console.log(`[dev] 跳过缺失的能力包 ${relative}`)
+      continue
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (typeof manifest.name !== 'string') continue
+    const target = join(profileDir, 'node_modules', manifest.name)
+    try {
+      if (lstatSync(target).isSymbolicLink()) unlinkSync(target)
+      else rmSync(target, { recursive: true, force: true })
+    } catch {
+      // 目标不存在则忽略。
+    }
+    mkdirSync(dirname(target), { recursive: true })
+    symlinkSync(dir, target, 'junction')
+    console.log(`[dev] 能力包 junction 挂载 ${manifest.name}`)
+  }
+}
+
 if (!watchOnly) {
   enableHmr(packagesDir)
   console.log(`[dev] 已启用 Cordis HMR，root=${packagesDir}`)
@@ -165,6 +204,7 @@ if (!watchOnly) {
     ensureBundle(plugin.name)
   }
   mountPresetPlugins()
+  mountWorkspaceCapabilities()
 }
 
 // 启动 watch 构建：双面插件跑 host/client 两套 tsc + tsdown，单面插件只跑 tsc。
