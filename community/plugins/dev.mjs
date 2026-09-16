@@ -179,6 +179,38 @@ function mountWorkspaceCapabilities() {
   }
 }
 
+/**
+ * 纯 JS 自研插件所需的宿主运行时包。
+ *
+ * 这类插件没有构建步骤，运行时由 Node 直接 import 宿主包（browser-panel 需要
+ * @deepseek-ai/dsh-tools 的 defineTool）。模块解析发生在插件源码目录，所以链接必须建在
+ * 社区 workspace 的 node_modules 里；目标只能是本仓库源码包——npm 上的同名包可能是另一
+ * 代（上游 README 记录过 dsh-tools 与 harness 错配会让整个 profile 起不来）。
+ */
+const PLUGIN_HOST_DEP_PATHS = {
+  '@deepseek-ai/dsh-tools': 'packages/core/tools',
+}
+
+function mountPluginHostDeps() {
+  for (const [depName, relative] of Object.entries(PLUGIN_HOST_DEP_PATHS)) {
+    const dir = join(repoRoot, relative)
+    if (!existsSync(join(dir, 'package.json'))) {
+      console.log(`[dev] 跳过缺失的宿主依赖 ${depName}（${relative}）`)
+      continue
+    }
+    const target = join(here, 'node_modules', depName)
+    try {
+      if (lstatSync(target).isSymbolicLink()) unlinkSync(target)
+      else rmSync(target, { recursive: true, force: true })
+    } catch {
+      // 目标不存在则忽略。
+    }
+    mkdirSync(dirname(target), { recursive: true })
+    symlinkSync(dir, target, 'junction')
+    console.log(`[dev] 宿主依赖 junction ${depName} → ${relative}`)
+  }
+}
+
 if (!watchOnly) {
   enableHmr(packagesDir)
   console.log(`[dev] 已启用 Cordis HMR，root=${packagesDir}`)
@@ -205,6 +237,7 @@ if (!watchOnly) {
   }
   mountPresetPlugins()
   mountWorkspaceCapabilities()
+  mountPluginHostDeps()
 }
 
 // 启动 watch 构建：双面插件跑 host/client 两套 tsc + tsdown，单面插件只跑 tsc。
@@ -229,8 +262,13 @@ for (const plugin of plugins) {
     run(`${plugin.dirName} tsc client`, tsc, ['-p', 'tsconfig.client.json', '--watch'], plugin.dir)
     run(`${plugin.dirName} tsdown host`, tsdown, ['--config', 'tsdown.host.config.ts', '--watch'], plugin.dir)
     run(`${plugin.dirName} tsdown client`, tsdown, ['--config', 'tsdown.client.config.ts', '--watch'], plugin.dir)
-  } else {
+  } else if (existsSync(join(plugin.dir, 'tsconfig.json'))) {
     run(`${plugin.dirName} tsc`, tsc, ['-p', 'tsconfig.json', '--watch'], plugin.dir)
+  } else {
+    // 纯 JS 插件（如 browser-panel）没有编译步骤：源码本身就是运行时产物，由 Host
+    // 侧的 Cordis HMR 直接热替换；起一个 tsc watch 只会立刻失败，并因下面的退出处理
+    // 把整条 dev 链一起拖停。
+    console.log(`[dev] ${plugin.dirName} 无构建配置（纯 JS 插件），跳过 watch`)
   }
 }
 

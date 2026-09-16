@@ -1,0 +1,15 @@
+# browser-panel 组合补丁：把内置浏览器面板挂进 profile。
+#
+# 浏览器面板自己启动并持有一个真实 Chrome（专用 profile，登录态持久），
+# 同时把它的 CDP 端点暴露在 config.port 上；官方 browser-use 提供方可以用
+# `mode: attach` + `endpoint: http://127.0.0.1:<port>` 接进同一个浏览器，
+# 于是「人看的面板」和「Agent 操作的浏览器」是同一个进程、同一份 Cookie。
+#
+# autoLaunch: 插件加载时就启动浏览器（而不是等第一次 open_preview），
+# 这样 browser-use 的 attach 在会话一开始就有端点可连。
+- insert:
+    - id: browser-panel
+      name: dsh-plugin-browser
+      config:
+        port: 9334
+        autoLaunch: true
