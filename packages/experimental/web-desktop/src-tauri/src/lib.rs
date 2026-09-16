@@ -31,6 +31,7 @@ fn passthrough_args() -> Vec<String> {
 pub fn run() {
   let child_slot: ChildSlot = Arc::new(Mutex::new(None));
   let child_for_setup = Arc::clone(&child_slot);
+  let child_for_window = Arc::clone(&child_slot);
   let child_for_exit = Arc::clone(&child_slot);
   let extra_args = passthrough_args();
 
@@ -48,7 +49,15 @@ pub fn run() {
       app.manage(Arc::clone(&logs));
       // 托盘退出与窗口关闭路径共用同一子进程槽位。
       app.manage(Arc::clone(&child_for_setup));
-      tray::setup(app.handle())?;
+      if let Err(error) = tray::setup(app.handle()) {
+        // 托盘挂不上就不能把窗口藏起来（没有恢复入口）：记一行启动日志，关闭
+        // 窗口退回"结束应用"的旧行为。
+        let line = format!("托盘不可用：{error}；关闭窗口将直接退出");
+        if let Ok(mut guard) = logs.lock() {
+          guard.push(line.clone());
+        }
+        let _ = app.handle().emit("boot-log", line);
+      }
       let boot_logs = Arc::clone(&logs);
       thread::spawn(move || {
         let result = (|| -> Result<(), String> {
@@ -72,8 +81,14 @@ pub fn run() {
     })
     .on_window_event(move |window, event| {
       if let WindowEvent::CloseRequested { api, .. } = event {
-        // 关闭按钮不再结束 DSH：隐藏窗口并常驻托盘，`dsh web` 继续在后台
-        // 服务；真正退出走托盘菜单或顶栏 File 菜单的退出项。
+        if !tray::is_installed() {
+          // 没有托盘就没有恢复入口：退回"结束应用"（无控制台窗口的进程否则会
+          // 留下窗口都没了的残影），而不是把窗口藏起来。
+          child::shutdown(&child_for_window);
+          std::process::exit(0);
+        }
+        // 关闭按钮不结束 DSH：隐藏窗口并常驻托盘，`dsh web` 继续在后台服务；
+        // 真正退出走托盘菜单或顶栏 File 菜单的退出项。
         api.prevent_close();
         let _ = window.hide();
       }

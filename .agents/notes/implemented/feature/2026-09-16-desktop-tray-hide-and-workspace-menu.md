@@ -26,4 +26,4 @@ The tray menu carries the workspaces. `ui-layout`'s apply world subscribes to th
 
 ## Consequences
 
-Closing the window keeps the port and the running session alive; only Quit releases them, and `scripts/smoke-tray-hide.ps1` asserts exactly that split (window hidden, exe alive, ports still serving, then a script-driven tree kill). A harness that exits on its own still restarts under the possibly hidden window, so the tray icon is the only remaining signal that the backend is alive.
+Closing the window keeps the port and the running session alive; only Quit releases them, and `scripts/smoke-tray-hide.ps1` asserts exactly that split (window hidden, exe alive, ports still serving, then a script-driven tree kill). A harness that exits on its own still restarts under the possibly hidden window, so the tray icon is the only remaining signal that the backend is alive. If the tray cannot be installed (icon decode or system tray unavailable), the shell logs one boot line and the close button keeps its previous end-the-app behavior, because hiding a window with no restore entry point would otherwise strand the process.

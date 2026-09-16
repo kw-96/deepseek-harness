@@ -5,6 +5,7 @@
 
 use crate::child::{self, ChildSlot};
 use serde::Deserialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -26,6 +27,14 @@ const TRAY_ICON: &[u8] = include_bytes!("../icons/32x32.png");
 const FALLBACK_SHOW: &str = "显示主窗口";
 const FALLBACK_QUIT: &str = "退出 DeepSeek Harness";
 const FALLBACK_EMPTY: &str = "暂无工作区";
+
+/// 托盘是否已装好：没装好时窗口关闭退回"结束应用"，避免窗口藏起来后没有恢复入口。
+static INSTALLED: AtomicBool = AtomicBool::new(false);
+
+/// 托盘是否已成功安装。
+pub(crate) fn is_installed() -> bool {
+    INSTALLED.load(Ordering::Relaxed)
+}
 
 /// 托盘菜单里的一个工作区条目。
 #[derive(Clone, Deserialize)]
@@ -144,6 +153,7 @@ pub(crate) fn setup(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    INSTALLED.store(true, Ordering::Relaxed);
     Ok(())
 }
 
