@@ -29,6 +29,8 @@
     "dsh-git-panel": "^0.1.15",
     "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.6-alpha.1.tgz",
     "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.6-alpha.1.tgz",
+    "@deepseek-ai/dsh-client-ui-layout": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-client-ui-layout-0.1.6-alpha.1.tgz",
+    "@deepseek-ai/dsh-api-workspace-controller": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-api-workspace-controller-0.1.6-alpha.1.tgz",
     "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.5.tgz",
     "dsh-doc": "0.1.1",
     "dsh-mnemon": "^0.5.8",
