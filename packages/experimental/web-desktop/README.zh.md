@@ -32,7 +32,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-**任意 Windows checkout 在 `git clone` / `git pull` 之后：** 双击仓库根目录的 `DeepSeek Harness.exe`。exe 后的额外参数会转发到 `dsh web` 的 `--no-open` 之后（例如 `--port 3080`）。
+**任意 Windows checkout 在 `git clone` / `git pull` 之后：** 双击仓库根目录的 `DeepSeek Harness.exe`。exe 后的额外参数会转发到 `dsh web` 的 `--no-open` 之后。注意这些参数不会覆盖 profile 里 `webserver` 行的显式配置：本机 web profile 把 `port` 固定为 3080，传 `--port` 不会改变监听端口（实测仍会因 3080 被占用而失败）。
 
 **改动本壳（Rust/UI）并准备推送时：** 重建并提交更新后的根目录 exe：
 

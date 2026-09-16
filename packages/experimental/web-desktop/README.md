@@ -32,7 +32,7 @@ A private Windows-first Tauri shell that opens `dsh web` in its own native windo
 <a id="use-this-package"></a>
 ## Use this package
 
-**On any Windows checkout after `git clone` / `git pull`:** double-click repository-root `DeepSeek Harness.exe`. Extra CLI arguments after the exe are forwarded to `dsh web` after `--no-open` (for example `--port 3080`).
+**On any Windows checkout after `git clone` / `git pull`:** double-click repository-root `DeepSeek Harness.exe`. Extra CLI arguments after the exe are forwarded to `dsh web` after `--no-open`. They do not override an explicit `webserver` row in the profile: this machine's web profile pins `port` to 3080, so `--port` does not move the listener (measured: it still fails on 3080 being in use).
 
 **When you change this shell (Rust/UI) before pushing:** rebuild and commit the updated root exe:
 
