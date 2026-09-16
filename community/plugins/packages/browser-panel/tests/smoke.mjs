@@ -84,6 +84,11 @@ globalThis.window = {
   },
 }
 
+// 客户端半会往 document 注入进度条动画，这里给最小替身。
+globalThis.document = {
+  head: { appendChild() {} },
+  createElement: () => ({ textContent: '', parentNode: null }),
+}
 const reactStub = {
   createElement: () => null,
   useEffect() {},

@@ -39,7 +39,6 @@ window.__ModuleLoader__.load({
 		var COMMANDS_PATH = "/api/preview/commands";
 		var COMMAND_POLL_MS = 500;
 		var LIVE_PUSH_MS = 2000;
-		var PANE_TOP = 44;              // clear the top chrome
 		var MIN_W = 320, MAX_W = 1200, DEFAULT_W = 460;
 		var WIDTH_KEY = "dsh-preview-width";
 		var LIVE_PATH = "/api/preview/live";
@@ -152,59 +151,6 @@ window.__ModuleLoader__.load({
 		//
 		// Everything here fails SAFE: if the frame cannot be found or its shape
 		// changes, reserve() returns false and the pane falls back to floating.
-
-		var RAIL_ATTR = "data-dsh-preview-rail";
-
-		function findFrame() {
-			// [data-shell-overlay] is an explicit attribute the layout sets, so it
-			// survives CSS-module hashing in a way a class name would not.
-			var ov = document.querySelector("[data-shell-overlay]");
-			return (ov && ov.parentElement) || null;
-		}
-
-		/** Strip any track we previously appended, returning the shell's own template. */
-		function baseTemplate(frame) {
-			var t = frame.style.gridTemplateColumns || "";
-			var marker = frame.getAttribute(RAIL_ATTR);
-			if (marker && t.endsWith(" " + marker)) return t.slice(0, -(marker.length + 1));
-			return t;
-		}
-
-		/**
-		 * Reserve a right-hand track of `width` px.
-		 * @returns {boolean} whether the shell was in a shape we could extend.
-		 */
-		function reserveRail(width) {
-			var frame = findFrame();
-			if (!frame) return false;
-			var cs = window.getComputedStyle(frame);
-			if (cs.display !== "grid") return false;
-
-			var spacer = frame.querySelector("[" + RAIL_ATTR + "-col]");
-			if (!spacer) {
-				spacer = document.createElement("div");
-				spacer.setAttribute(RAIL_ATTR + "-col", "1");
-				// Purely a spacer: the pane itself is painted over it, flush right.
-				spacer.style.cssText = "min-width:0;overflow:hidden";
-				frame.appendChild(spacer);
-			}
-			var track = width + "px";
-			frame.setAttribute(RAIL_ATTR, track);
-			var base = baseTemplate(frame);
-			if (!base) return false;
-			frame.style.gridTemplateColumns = base + " " + track;
-			return true;
-		}
-
-		function releaseRail() {
-			var frame = findFrame();
-			if (!frame) return;
-			var base = baseTemplate(frame);
-			frame.removeAttribute(RAIL_ATTR);
-			var spacer = frame.querySelector("[" + RAIL_ATTR + "-col]");
-			if (spacer && spacer.parentElement) spacer.parentElement.removeChild(spacer);
-			if (base) frame.style.gridTemplateColumns = base;
-		}
 
 		/**
 		 * A live view of the real browser.
@@ -1162,6 +1108,7 @@ window.__ModuleLoader__.load({
 
 				// viewport
 				h("div", { style: { flex: 1, position: "relative", minHeight: 0, background: "#fff" } },
+					busy ? h("div", { style: progressTrackStyle }, h("div", { style: progressBarStyle })) : null,
 					IS_SHELL
 						// 桌面壳里 live 标签是一个真 <webview>；本次多标签改造只覆盖 Web 模式，
 						// 壳这条路保持原行为。
@@ -1238,36 +1185,6 @@ window.__ModuleLoader__.load({
 		var BORDER = "var(--dsw-alias-border-l2, #2b2f37)";
 		var BG = "var(--dsw-alias-bg-base, #16181d)";
 
-		/**
-		 * Railed: fill the reserved track exactly — flush right, full height, no
-		 * rounding or shadow, so it reads as a column of the app rather than a
-		 * card floating above it.
-		 * Unrailed: the original floating card, used when the shell shape is
-		 * unrecognised.
-		 */
-		function paneStyle(width, railed, frameTop) {
-			var common = {
-				position: "fixed", width: width, zIndex: 30,
-				display: "flex", flexDirection: "column",
-				background: BG, overflow: "hidden", pointerEvents: "auto"
-			};
-			if (railed) {
-				return Object.assign(common, {
-					top: frameTop, right: 0, bottom: 0,
-					borderLeft: "1px solid " + BORDER,
-					borderTop: "1px solid " + BORDER
-				});
-			}
-			return Object.assign(common, {
-				top: PANE_TOP, right: 8, bottom: 8,
-				border: "1px solid " + BORDER, borderRadius: 12,
-				boxShadow: "0 12px 40px rgba(0,0,0,.45)"
-			});
-		}
-		var gripStyle = {
-			position: "absolute", left: 0, top: 0, bottom: 0, width: 6,
-			cursor: "col-resize", zIndex: 2
-		};
 		var headerStyle = {
 			display: "flex", alignItems: "center", justifyContent: "space-between",
 			padding: "7px 8px 7px 12px", borderBottom: "1px solid " + BORDER,
@@ -1291,13 +1208,23 @@ window.__ModuleLoader__.load({
 			fontFamily: 'ui-monospace, "Cascadia Code", Consolas, monospace'
 		};
 		var spinnerStyle = { color: "var(--dsw-alias-link, #6fb3ff)", fontSize: 9, opacity: .9 };
+		// 加载进度：网页区域顶端一条不确定态细条（与浏览器惯用样式一致）。
+		var progressTrackStyle = {
+			position: "absolute", left: 0, right: 0, top: 0, height: 2,
+			overflow: "hidden", pointerEvents: "none", zIndex: 3
+		};
+		var progressBarStyle = {
+			position: "absolute", height: "100%",
+			background: "var(--dsw-alias-link, #6fb3ff)",
+			animation: "dshbp-progress 1.1s ease-in-out infinite"
+		};
 		var tabStripStyle = {
 			display: "flex", gap: 4, padding: "6px 8px",
 			borderBottom: "1px solid " + BORDER, overflowX: "auto",
 			background: "var(--dsw-alias-bg-layer-2, rgba(0,0,0,.16))"
 		};
 		var tabStyle = {
-			display: "flex", alignItems: "center", gap: 5, maxWidth: 170,
+			display: "flex", alignItems: "center", gap: 5, maxWidth: "min(170px, 42vw)",
 			padding: "3px 8px", borderRadius: 6, fontSize: 11.5,
 			color: "var(--dsw-alias-label-tertiary, #9aa1ad)",
 			cursor: "pointer", background: "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.25))",
@@ -1332,30 +1259,6 @@ window.__ModuleLoader__.load({
 			borderRadius: 4, padding: "1px 5px",
 			fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 11
 		};
-		function launcherStyle(active, railWidth) {
-			return {
-				position: "fixed", bottom: 14, right: 14 + (railWidth || 0), zIndex: 31,
-				pointerEvents: "auto",
-				border: "1px solid " + (active ? "rgba(111,179,255,.55)" : BORDER),
-				background: active ? "rgba(111,179,255,.14)" : "var(--dsw-alias-bg-base, #1e2127)",
-				color: active ? "#cfe4ff" : "#c7ccd4",
-				borderRadius: 999,
-				padding: "7px 13px", cursor: "pointer", fontSize: 11.5, fontWeight: 560,
-				letterSpacing: .2, boxShadow: "0 4px 16px rgba(0,0,0,.35)",
-				display: "flex", alignItems: "center", gap: 7,
-				transition: "right .18s ease, background .15s ease, border-color .15s ease"
-			};
-		}
-
-		/** Small state lamp: filled when the pane is showing. */
-		function dotStyle(active) {
-			return {
-				width: 6, height: 6, borderRadius: 999, display: "inline-block",
-				background: active ? "#6fb3ff" : "#5b6472",
-				boxShadow: active ? "0 0 6px rgba(111,179,255,.9)" : "none"
-			};
-		}
-
 		// 依赖的宿主服务（Cordis 服务名）：右栏标签注册表与插槽系统。
 		var inject = [ "slots", "sidebarRightTabs" ];
 
@@ -1364,6 +1267,19 @@ window.__ModuleLoader__.load({
 		var TAB_KIND = "browser";
 
 		function apply(ctx) {
+			// 进度条的动画：内联 style 声明不了 keyframes，注入一段样式并由 effect 回收。
+			ctx.effect(function () {
+				// 非浏览器上下文（例如冒烟测试）没有 document：进度条只是视觉增强，跳过即可。
+				if (typeof document === "undefined") return undefined;
+				var style = document.createElement("style");
+				style.textContent = "@keyframes dshbp-progress {"
+					+ " 0% { left: -40%; width: 40% }"
+					+ " 50% { left: 20%; width: 55% }"
+					+ " 100% { left: 100%; width: 40% } }";
+				document.head.appendChild(style);
+				return function () { if (style.parentNode) style.parentNode.removeChild(style); };
+			});
+
 			// ① 类型：向官方右侧栏声明"浏览器"这类标签，并给引导页一枚入口胶囊，
 			//    于是入口就在右栏自己的添加入口里，不再需要浮层按钮。
 			ctx.effect(function () {
