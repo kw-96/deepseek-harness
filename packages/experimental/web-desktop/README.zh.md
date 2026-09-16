@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-这是一个以 Windows 为先的私有 Tauri 壳：无控制台窗口拉起 `dsh web`，先显示启动页，待带鉴权的 `dsh web: http://…` 就绪行到达后导航 WebView2。它还会看护后端：后端退出即自动重启，窗口自行重连；连续 3 次启动失败则携带真实原因放弃重启，而不是只报超时。仓库跟踪根目录 `DeepSeek Harness.exe`。壳本身不挂载 Cordis；Node 应用仍只通过 `dsh` CLI 与 `web` profile 启动（[应用启动](../../../docs/architecture.zh.md#application-launch)）。
+这是一个以 Windows 为先的私有 Tauri 壳：无控制台窗口拉起 `dsh web`，先显示启动页，待带鉴权的 `dsh web: http://…` 就绪行到达后导航 WebView2。它还会看护后端：后端退出即自动重启，窗口自行重连；连续 3 次启动失败则携带真实原因放弃重启，而不是只报超时。仓库跟踪根目录 `DeepSeek Harness.exe`。壳本身不挂载 Cordis；Node 应用仍只通过 `dsh` CLI 与 `web` profile 启动（[应用启动](../../../docs/architecture.zh.md#application-launch)）。关闭按钮只把窗口隐藏到托盘，`dsh web` 继续在后台服务。
 
 ## 目录
 
@@ -60,12 +60,24 @@ CLI 解析顺序：`DSH_DESKTOP_CLI` → 自本 exe 向上查找 → 自进程 c
 
 壳从不安装依赖、也不构建前端：它只拉起 `dsh web --no-open` 并导航到带鉴权的地址，由该服务提供已经构建好的 `apps/web/dist`。请先构建产物（`pnpm run build`，只重建前端可用 `pnpm run build:web`）并让 profile 已安装（`node community/seed.mjs`）；缺失时壳会直接报告服务自身的失败原因。
 
+### 托盘
+
+壳启动时安装托盘图标：标题栏关闭按钮、`Ctrl+W` 与 `Alt+F4` 都只把窗口隐藏到托盘，`dsh web` 继续在后台服务；左键单击图标把窗口恢复并置前。右键菜单列出当前工作区（由 Web 侧经 `set_desktop_tray` 下发，顺序与左栏一致）、「显示主窗口」与「退出」——点击某个工作区即显示窗口并进入该工作区的会话；「退出」（或 文件 → 退出，`Ctrl+Q`）结束 `dsh` 进程树并关闭外壳。
+
+托盘文案来自 Web 侧的 locale 字典（`desktop.tray.*`、`desktop.menu.quit`）；在页面加载完成之前，壳显示内置的中文兜底文案。
+
+隐藏行为可用 `scripts/smoke-tray-hide.ps1` 验证（需要空闲端口，脚本自行清理进程树）：
+
+```powershell
+pwsh -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1
+```
+
 -----
 
 <a id="dev-note"></a>
 ## 开发备注
 
-Decision record: [experimental Web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.zh.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.zh.md).
+Decision record: [experimental Web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.zh.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.zh.md); [desktop tray hide and workspace menu](../../../.agents/notes/implemented/feature/2026-09-16-desktop-tray-hide-and-workspace-menu.zh.md).
 
 -----
 
@@ -88,4 +100,6 @@ Decision record: [experimental Web desktop shell](../../../.agents/notes/impleme
 - **已提交的 exe 可能过期** — 改了壳源码却未再跑 `pnpm run desktop:web` 并提交新的 `DeepSeek Harness.exe` 时，对端仍会用旧二进制。
 - **exe 文件图标不能随主题变色** — Windows 资源管理器不会按系统浅色/深色重绘 PE 图标；当前交付为深色底 + 白色小鱼，保证两主题都可读。
 - **自定义顶栏依赖 Tauri IPC** — 窗口关闭系统装饰后，启动页与 Web 顶栏通过 `withGlobalTauri` 与 remote capability 调用最小化/最大化/关闭；普通浏览器打开同一 Web 时不显示该顶栏。
+- **关闭窗口不释放端口** — 关窗只是隐藏到托盘；要结束后端并释放端口，必须走托盘菜单的「退出」或 文件 → 退出。
+- **没有单实例约束** — 再启动一次 `DeepSeek Harness.exe` 会得到第二个外壳与第二个托盘图标；壳不做跨进程协调。
 - **后端重启不会重载窗口** — 壳只导航一次，恢复依赖 Web 客户端自身的重连循环；若该循环不再重试，窗口会一直停在重连提示，直到重载或重新启动。

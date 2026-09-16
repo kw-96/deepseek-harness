@@ -1,6 +1,7 @@
 /** Menu model builders for the desktop title bar. */
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { dispatchDesktopCommand } from './commands.ts'
+import { quitDesktopApp } from './tray.ts'
 import type { DesktopAppWindow } from './window.ts'
 
 import type { CommonKey } from '@deepseek-ai/dsh-client-locale/client'
@@ -151,8 +152,9 @@ export function buildMenus(input: BuildMenusInput): { id: MenuId; label: string;
         { kind: 'item', id: 'new', label: t('desktop.menu.newSession'), shortcut: 'Ctrl+N', run: () => { dispatchDesktopCommand('new-session') } },
         { kind: 'item', id: 'open', label: t('desktop.menu.openWorkspace'), shortcut: 'Ctrl+O', run: () => { dispatchDesktopCommand('add-workspace') } },
         { kind: 'sep' },
+        // 「关闭窗口」只隐藏到托盘（壳拦截 CloseRequested）；「退出」才结束进程。
         { kind: 'item', id: 'close', label: t('desktop.menu.closeWindow'), shortcut: 'Ctrl+W', run: () => { void win?.close() } },
-        { kind: 'item', id: 'quit', label: t('desktop.menu.quit'), shortcut: 'Ctrl+Q', run: () => { void win?.close() } },
+        { kind: 'item', id: 'quit', label: t('desktop.menu.quit'), shortcut: 'Ctrl+Q', run: () => { quitDesktopApp() } },
       ],
     },
     {

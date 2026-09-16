@@ -25,3 +25,5 @@ Users who want CodeMaker-Hub-style independent-window access to DeepSeek Harness
 ## Consequences
 
 Peer Windows hosts `git pull` and double-click repository-root `DeepSeek Harness.exe` (tracked). Maintainers who change the shell re-run `pnpm run desktop:web` and commit the new exe. Official releases and `verify-application-entrypoints` continue to treat `dsh` profiles as the only Node application launchers; this package adds no Node `bin`. Main CI does not compile the Rust target until a suitable runner is allocated.
+
+Closing the window hides it to the tray and keeps `dsh web` serving; only Quit (tray row or File → Quit) terminates the process tree described above ([tray decision](2026-09-16-desktop-tray-hide-and-workspace-menu.md)).

@@ -50,6 +50,8 @@ export const en = {
   'desktop.menu.openWorkspace': 'Open Workspace',
   'desktop.menu.closeWindow': 'Close Window',
   'desktop.menu.quit': 'Quit DeepSeek Harness',
+  'desktop.tray.showWindow': 'Show Window',
+  'desktop.tray.noWorkspace': 'No Workspaces',
   'desktop.menu.undo': 'Undo',
   'desktop.menu.redo': 'Redo',
   'desktop.menu.cut': 'Cut',

@@ -25,3 +25,5 @@ Status: implemented
 ## 后果
 
 对端 Windows 主机 `git pull` 后双击仓库根目录已跟踪的 `DeepSeek Harness.exe`。维护者改动壳后需再跑 `pnpm run desktop:web` 并提交新 exe。正式 release 与 `verify-application-entrypoints` 仍只承认 `dsh` profile 为 Node 应用启动器；本包不新增 Node `bin`。在分配合适 runner 之前，主 CI 不编译该 Rust 目标。
+
+关闭窗口会把窗口隐藏到托盘并让 `dsh web` 继续服务；只有「退出」（托盘菜单项或 文件 → 退出）才结束上文所述的进程树（[托盘决策](2026-09-16-desktop-tray-hide-and-workspace-menu.zh.md)）。

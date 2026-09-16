@@ -27,3 +27,5 @@ The splash page carries a thin drag region plus the three window buttons so the 
 Maintainers rebuild `DeepSeek Harness.exe` after shell changes. Browser `dsh web` is unchanged. Opening a workspace from the File menu requires a `dsh-codex-shell` release that listens for `dsh-desktop:command` (0.6.2+).
 
 Bar sizing, blank-area dismissal, and maximize-state sync are fixed in [2026-09-08-desktop-titlebar-ux-fixes](2026-09-08-desktop-titlebar-ux-fixes.md).
+
+The close button (and `Ctrl+W` / `Alt+F4`) hides the window to the shell's tray instead of ending the app; quitting is File → Quit, which calls the shell's `quit_desktop_app` command ([tray decision](2026-09-16-desktop-tray-hide-and-workspace-menu.md)).

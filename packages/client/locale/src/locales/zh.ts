@@ -48,6 +48,8 @@ export const zh = {
   'desktop.menu.openWorkspace': '打开工作区',
   'desktop.menu.closeWindow': '关闭窗口',
   'desktop.menu.quit': '退出 DeepSeek Harness',
+  'desktop.tray.showWindow': '显示主窗口',
+  'desktop.tray.noWorkspace': '暂无工作区',
   'desktop.menu.undo': '撤销',
   'desktop.menu.redo': '重做',
   'desktop.menu.cut': '剪切',

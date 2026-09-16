@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { MainPanelId, UsePanelInfo } from './service.ts'
 import type { PanelActions } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
+import { installDesktopTray } from './desktop/tray.ts'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import { ThemePresenter } from './theme-presenter.ts'
@@ -240,4 +241,7 @@ export function apply(ctx: ClientContext): void {
       presenter.dispose()
     }
   }, 'ui-layout: theme presenter')
+
+  // 桌面壳托盘：窗口关闭后常驻，菜单随工作区与语言刷新；浏览器里是空操作。
+  ctx.effect(() => installDesktopTray(ctx), 'ui-layout: desktop tray')
 }

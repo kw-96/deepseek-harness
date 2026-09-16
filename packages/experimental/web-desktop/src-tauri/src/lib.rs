@@ -6,6 +6,7 @@ mod backend;
 mod child;
 mod external_links;
 mod resolve;
+mod tray;
 
 use child::ChildSlot;
 use std::env;
@@ -30,17 +31,24 @@ fn passthrough_args() -> Vec<String> {
 pub fn run() {
   let child_slot: ChildSlot = Arc::new(Mutex::new(None));
   let child_for_setup = Arc::clone(&child_slot);
-  let child_for_window = Arc::clone(&child_slot);
   let child_for_exit = Arc::clone(&child_slot);
   let extra_args = passthrough_args();
 
   let app = tauri::Builder::default()
     .plugin(external_links::navigation_plugin())
-    .invoke_handler(tauri::generate_handler![get_boot_logs, external_links::open_external])
+    .invoke_handler(tauri::generate_handler![
+      get_boot_logs,
+      external_links::open_external,
+      tray::set_desktop_tray,
+      tray::quit_desktop_app
+    ])
     .setup(move |app| {
       let handle = app.handle().clone();
       let logs: BootLogs = Arc::new(Mutex::new(Vec::new()));
       app.manage(Arc::clone(&logs));
+      // 托盘退出与窗口关闭路径共用同一子进程槽位。
+      app.manage(Arc::clone(&child_for_setup));
+      tray::setup(app.handle())?;
       let boot_logs = Arc::clone(&logs);
       thread::spawn(move || {
         let result = (|| -> Result<(), String> {
@@ -62,12 +70,12 @@ pub fn run() {
       });
       Ok(())
     })
-    .on_window_event(move |_window, event| {
-      if let WindowEvent::CloseRequested { .. } = event {
-        // Tear down dsh web, then hard-exit. Undecorated WebView2 shells can
-        // otherwise linger as a window-less process after WM_CLOSE.
-        child::shutdown(&child_for_window);
-        std::process::exit(0);
+    .on_window_event(move |window, event| {
+      if let WindowEvent::CloseRequested { api, .. } = event {
+        // 关闭按钮不再结束 DSH：隐藏窗口并常驻托盘，`dsh web` 继续在后台
+        // 服务；真正退出走托盘菜单或顶栏 File 菜单的退出项。
+        api.prevent_close();
+        let _ = window.hide();
       }
     })
     .build(tauri::generate_context!())

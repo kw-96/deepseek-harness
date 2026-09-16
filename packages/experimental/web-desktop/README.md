@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-A private Windows-first Tauri shell that opens `dsh web` in its own native window: it spawns the CLI without a console, shows a splash until the authenticated `dsh web: http://…` line arrives, then navigates WebView2 there. It also watches the harness, restarting an exited one so the window reconnects, and gives up after three consecutive startup failures with the real cause instead of a timeout. The repository tracks root `DeepSeek Harness.exe`. The shell never mounts Cordis; the Node application still starts only through the `dsh` CLI and the `web` profile ([application launch](../../../docs/architecture.md#application-launch)).
+A private Windows-first Tauri shell that opens `dsh web` in its own native window: it spawns the CLI without a console, shows a splash until the authenticated `dsh web: http://…` line arrives, then navigates WebView2 there. It also watches the harness, restarting an exited one so the window reconnects, and gives up after three consecutive startup failures with the real cause instead of a timeout. The repository tracks root `DeepSeek Harness.exe`. The shell never mounts Cordis; the Node application still starts only through the `dsh` CLI and the `web` profile ([application launch](../../../docs/architecture.md#application-launch)). The close button hides to the tray.
 
 ## Table of Contents
 
@@ -60,12 +60,24 @@ A harness that exits before printing its ready line closes the wait with its exi
 
 The shell never installs dependencies or builds the frontend: it spawns `dsh web --no-open` and navigates to the authenticated URL, and that server serves the already-built `apps/web/dist`. Build the artifacts first (`pnpm run build`, or `pnpm run build:web` for the frontend alone) and have the profile installed (`node community/seed.mjs`); when either is missing, the shell reports the server's own failure instead of repairing it.
 
+### Tray
+
+The shell installs a tray icon at startup: the title-bar close button, `Ctrl+W`, and `Alt+F4` only hide the window, so `dsh web` keeps serving in the background, and left-clicking the icon restores and focuses the window. The right-click menu lists the current workspaces (pushed by the Web side through `set_desktop_tray`, in the same order as the sidebar), plus Show Window and Quit — selecting a workspace shows the window and opens that workspace's session, while Quit (or File → Quit, `Ctrl+Q`) ends the `dsh` process tree and exits the shell.
+
+Tray copy comes from the Web side's locale dictionaries (`desktop.tray.*`, `desktop.menu.quit`); before the page loads, the shell shows built-in Chinese fallbacks.
+
+The hide behavior is assertable with `scripts/smoke-tray-hide.ps1` (needs a free port; the script cleans up the process tree itself):
+
+```powershell
+pwsh -File packages/experimental/web-desktop/scripts/smoke-tray-hide.ps1
+```
+
 -----
 
 <a id="dev-note"></a>
 ## Dev Note
 
-Decision record: [experimental web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.md).
+Decision record: [experimental web desktop shell](../../../.agents/notes/implemented/feature/2026-09-07-experimental-web-desktop-shell.md); [Codex-style desktop title bar](../../../.agents/notes/implemented/feature/2026-09-07-codex-style-desktop-titlebar.md); [desktop tray hide and workspace menu](../../../.agents/notes/implemented/feature/2026-09-16-desktop-tray-hide-and-workspace-menu.md).
 
 -----
 
@@ -88,4 +100,6 @@ None; the shell neither assembles nor sends a provider request.
 - **Committed exe can go stale** — changing shell sources without re-running `pnpm run desktop:web` and committing the new `DeepSeek Harness.exe` leaves peers on an old binary.
 - **No theme-switching .exe file icon** — Windows Explorer does not recolor PE icons from system light/dark mode; the shipped icon uses a dark tile and white mark so both themes stay readable.
 - **Custom title bar needs Tauri IPC** — with system decorations off, the splash and Web title bar call minimize / maximize / close through `withGlobalTauri` and the remote capability; the same Web UI in a normal browser does not show that chrome.
+- **Closing the window does not release the port** — closing only hides to the tray; ending the backend and freeing the port requires Quit from the tray menu or File → Quit.
+- **No single-instance guard** — launching `DeepSeek Harness.exe` again yields a second shell and a second tray icon; the shell does no cross-process coordination.
 - **A restarted backend does not reload the window** — the shell navigates once, so recovery depends on the Web client's own reconnect loop; if that loop ever stopped retrying, the window would keep the notice until it is reloaded or relaunched.

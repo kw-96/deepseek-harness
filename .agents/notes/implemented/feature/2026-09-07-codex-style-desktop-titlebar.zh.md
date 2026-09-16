@@ -27,3 +27,5 @@ Status: implemented
 维护者改壳后需重建 `DeepSeek Harness.exe`。浏览器路径的 `dsh web` 不变。从文件菜单打开工作区需要监听 `dsh-desktop:command` 的 `dsh-codex-shell` 发布（0.6.2+）。
 
 顶栏的尺寸、空白处收起与最大化状态同步在 [2026-09-08-desktop-titlebar-ux-fixes](2026-09-08-desktop-titlebar-ux-fixes.zh.md) 中修正。
+
+关闭按钮（以及 `Ctrl+W` / `Alt+F4`）把窗口隐藏到壳的托盘，不再结束应用；退出是 文件 → 退出，它调用壳的 `quit_desktop_app` 命令（[托盘决策](2026-09-16-desktop-tray-hide-and-workspace-menu.zh.md)）。

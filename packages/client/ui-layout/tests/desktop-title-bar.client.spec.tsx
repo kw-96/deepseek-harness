@@ -37,6 +37,7 @@ function makeDesktopWindow() {
     isMaximized,
     toggleMaximize,
     startDragging,
+    close,
     setMaximized(next: boolean): void {
       maximized = next
       for (const handler of [...resizeHandlers]) handler()
@@ -45,19 +46,22 @@ function makeDesktopWindow() {
 }
 
 /** Expose a window face through the Tauri global before the component mounts. */
-function installDesktopWindow(face: DesktopAppWindow): void {
-  ;(window as unknown as { __TAURI__: { window: { getCurrentWindow(): DesktopAppWindow } } }).__TAURI__ = {
+function installDesktopWindow(face: DesktopAppWindow): { invoke: ReturnType<typeof vi.fn> } {
+  const invoke = vi.fn(async () => undefined)
+  ;(window as unknown as { __TAURI__: unknown }).__TAURI__ = {
     window: { getCurrentWindow: () => face },
+    core: { invoke },
   }
+  return { invoke }
 }
 
 /** Render the title bar with recording props and a static session feed. */
 function mountBar(win: DesktopAppWindow) {
-  installDesktopWindow(win)
+  const tauri = installDesktopWindow(win)
   const t = ((key: string) => key) as DesktopTitleBarProps['t']
   const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
     sel({ ids: [], current: undefined } as unknown as SessionListState))
-  return render(
+  return { ...render(
     <DesktopTitleBar
       t={t}
       sidebarCollapsed={false}
@@ -68,7 +72,7 @@ function mountBar(win: DesktopAppWindow) {
       openSession={vi.fn()}
       useSessions={useSessions}
     />,
-  )
+  ), ...tauri }
 }
 
 afterEach(() => {
@@ -190,5 +194,19 @@ describe('DesktopTitleBar panel toggles', () => {
     expect(toggleBottom).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleDetails' }))
     expect(toggleRightbar).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DesktopTitleBar window commands', () => {
+  it('hides to the tray through the window face and quits through the shell command', () => {
+    const win = makeDesktopWindow()
+    const { invoke } = mountBar(win.face)
+    fireEvent.click(screen.getByRole('button', { name: 'close' }))
+    // 「关闭」只走窗口关闭请求（壳把它改成隐藏到托盘）。
+    expect(win.close).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.file' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /desktop\.menu\.quit/ }))
+    expect(invoke).toHaveBeenCalledWith('quit_desktop_app')
+    expect(win.close).toHaveBeenCalledTimes(1)
   })
 })
