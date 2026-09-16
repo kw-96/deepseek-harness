@@ -59,6 +59,16 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
 ])
 
 /**
+ * 构建产物路径：`/assets/<名字>-<内容 hash>.<扩展名>`。文件名带内容 hash，
+ * 内容一变必然换名，所以可以按不可变资源长期缓存；其余路径（index、无 hash
+ * 的静态文件）保持不缓存，避免升级后仍用旧页面或旧文件。
+ */
+const IMMUTABLE_ASSET = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/
+
+/** 不可变资源的 Cache-Control 值（Vite 产物的标准缓存策略）。 */
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+/**
  * Serve one GET/HEAD static request from the dist root.
  * @param pathname - decoded URL pathname of the request.
  * @param res - the node:http response to write.
@@ -101,7 +111,10 @@ export async function serveStatic(
     res.end()
     return
   }
-  res.writeHead(200, { 'content-type': type })
+  res.writeHead(200, {
+    'content-type': type,
+    ...IMMUTABLE_ASSET.test(pathname) ? { 'cache-control': IMMUTABLE_CACHE_CONTROL } : {},
+  })
   res.end(body)
 }
 
