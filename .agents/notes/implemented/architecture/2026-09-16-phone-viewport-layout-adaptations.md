@@ -23,7 +23,7 @@ Phones (below 768px, the width `ui-sidebar-right` already reads for its fullscre
 
 **The conversation header becomes a sideways-scrolling strip.** The title row stops wrapping and scrolls horizontally, and each seat keeps its intrinsic width; shrinking them would squash the registered controls back into the column. The crumb cap drops to 160px, the header's horizontal padding to 12px.
 
-**The header corner seat is pinned rather than scrolled.** That seat holds the only control that reopens a collapsed right panel. Inside the strip it landed at the far end of 800-odd pixels of header — `x = 877` on a 390px viewport, off-screen and therefore unreachable by touch — so a phone anchors it to the header's trailing edge and the strip reserves 40px beside it.
+**The header corner seat is pinned rather than scrolled.** That seat holds the only control that reopens a collapsed right panel. Inside the strip it landed at the far end of 800-odd pixels of header — `x = 877` on a 390px viewport, off-screen and therefore unreachable by touch — so a phone anchors it to the header's trailing edge and the strip reserves 40px beside it. It also sits above the sidebar drawer's scrim, so the first tap opens the panel instead of being read as a tap outside the drawer.
 
 **Coarse pointers keep wide tables scrollable.** Under `@media (hover: none)` the wide-table container keeps `overflow-x: auto` at rest, because the hover reveal that enables it on pointer devices never fires on touch.
 

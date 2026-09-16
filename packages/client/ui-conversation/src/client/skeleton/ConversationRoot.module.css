@@ -524,6 +524,10 @@
     top: 8px;
     right: 12px;
     margin: 0;
+    /* Above the sidebar drawer's scrim (AppFrame), below the drawer itself:
+       while the drawer is open this entry must still open the right panel on
+       the first tap instead of being read as a tap outside the drawer. */
+    z-index: 26;
     background: var(--dsw-alias-bg-base);
   }
 

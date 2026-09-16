@@ -12,8 +12,8 @@
  * the panel. A fullscreen opening reserves its underlying track only after
  * the panel covers the frame, without animating those hidden columns.
  *
- * The panel has no header of its own: its two controls — presentation switch
- * and collapse — ride the docking kit's chrome seat at the end of the top-right
+ * The panel has no header of its own: its two controls 鈥?presentation switch
+ * and collapse 鈥?ride the docking kit's chrome seat at the end of the top-right
  * pane's tab strip, so the strip is the panel's whole top edge. The way back in
  * while collapsed is not here either: it is one button in the conversation
  * header (`ExpandButton.tsx`), because it exists only while this panel is
@@ -23,8 +23,8 @@
  * Tab bodies do not live here. Each one is a registration under its type's kind,
  * dispatched through the keyed `sidebar.right.pane.tab` seat (and a live chip
  * title through `sidebar.right.pane.tab.title`), so a new tab type needs no edit
- * to this file. What a body receives beyond the record — navigation, lifetime
- * signal, actions — is read through the slot-owned useTabInfo hook. The Tab
+ * to this file. What a body receives beyond the record 鈥?navigation, lifetime
+ * signal, actions 鈥?is read through the slot-owned useTabInfo hook. The Tab
  * domain follows each session's store commits, including sessions off screen.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
@@ -131,7 +131,7 @@ interface PanelProps {
   readonly useStore: Store['useStore']
   readonly occurrence: SidebarRightInjected['occurrence']
   readonly fullscreen: boolean
-  readonly autoFullscreen: boolean
+  readonly noTrack: boolean
   /** Receives the kit's room-rule readings for the service's `split`. */
   readonly reportRoom: (fits: ReadonlyMap<PaneId, HalvesFit>) => void
 }
@@ -252,7 +252,7 @@ function ExitFullscreenGlyph(): ReactNode {
 }
 
 /** The panel's two controls, placed by the kit at the top-right pane's strip end. */
-function PanelChrome({ sessionId, fullscreen, autoFullscreen, actions, t }: Pick<PanelProps, 'sessionId' | 'actions' | 't' | 'fullscreen' | 'autoFullscreen'>): ReactNode {
+function PanelChrome({ sessionId, fullscreen, noTrack, actions, t }: Pick<PanelProps, 'sessionId' | 'actions' | 't' | 'fullscreen' | 'noTrack'>): ReactNode {
   const next: DockMode = fullscreen ? 'push' : 'fullscreen'
   const modeLabel = fullscreen ? t('chrome.exitFullscreen') : t('chrome.toFullscreen')
   return (
@@ -264,7 +264,7 @@ function PanelChrome({ sessionId, fullscreen, autoFullscreen, actions, t }: Pick
           aria-label={modeLabel}
           data-sidebar-right-mode={next}
           onClick={() => {
-            if (fullscreen && autoFullscreen) actions.setExpanded(sessionId, false)
+            if (fullscreen && noTrack) actions.setExpanded(sessionId, false)
             actions.setMode(sessionId, next)
           }}
         >
@@ -291,7 +291,7 @@ function PanelChrome({ sessionId, fullscreen, autoFullscreen, actions, t }: Pick
  * anchored to the frame's right edge and slid off it while collapsed.
  */
 function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<HTMLDivElement> }): ReactNode {
-  const { sessionId, surface, actions, t, renderSlot, openTab, width, reportRoom, fullscreen, autoFullscreen, panelRef } = panel
+  const { sessionId, surface, actions, t, renderSlot, openTab, width, reportRoom, fullscreen, noTrack, panelRef } = panel
   const { expanded } = surface.layout
   return (
     <div
@@ -320,7 +320,7 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
           renderTabTitle={titlesFor(panel)}
           renderTabMenuItems={(tab, dismiss) =>
             renderSlot('sidebar.right.tab.menu.item', { tab, dismiss })}
-          chrome={<PanelChrome sessionId={sessionId} fullscreen={fullscreen} autoFullscreen={autoFullscreen} actions={actions} t={t} />}
+          chrome={<PanelChrome sessionId={sessionId} fullscreen={fullscreen} noTrack={noTrack} actions={actions} t={t} />}
           onRoom={reportRoom}
         />
       </div>
@@ -364,22 +364,24 @@ export function RightbarSeat({
   const surfaces = useStore(state => state.bySession)
   const surface = surfaces[sessionId]
   const shown = surface !== undefined && surface.layout.expanded
-  const autoFullscreen = viewportWidth < 768
-  const fullscreen = autoFullscreen || surface?.layout.mode === 'fullscreen'
+  // A docked panel needs a track. Below 768px the frame gives it none, and
+  // above that the solved track bottoms out at zero while the conversation
+  // keeps CENTER_MIN and the sidebar never concedes — so a viewport between
+  // 768px and that sum (a phone browser in desktop mode, a narrow window) would
+  // open the panel and close it again in the same commit, which reads as a dead
+  // entry button. Both cases cover the viewport instead.
+  const noTrack = viewportWidth < 768 || !canShow
+  const fullscreen = noTrack || surface?.layout.mode === 'fullscreen'
   const panelRef = useRef<HTMLDivElement | null>(null)
   // The kit's room-rule readings, kept in a ref: the service reads them at
   // call time through the binding, and a reading never re-renders anything.
   const room = useRef<ReadonlyMap<PaneId, HalvesFit>>(new Map())
   const reportRoom = useCallback((fits: ReadonlyMap<PaneId, HalvesFit>): void => { room.current = fits }, [])
-  const track = shown && !autoFullscreen
+  const track = shown && !noTrack
 
   useEffect(() => {
     if (surface === undefined) actions.open(sessionId)
   }, [actions, sessionId, surface])
-
-  useLayoutEffect(() => {
-    if (shown && !fullscreen && !canShow) actions.setExpanded(sessionId, false)
-  }, [actions, sessionId, shown, fullscreen, canShow])
 
   // Fullscreen leaves the previous column report in force until its own slide
   // completes. Normal presentation and zero-duration transitions report before paint.
@@ -420,7 +422,7 @@ export function RightbarSeat({
   if (surface === undefined) return null
   const panel: PanelProps = {
     sessionId, actions, t, renderSlot, surface, openTab, closeTab, useTabTypes, useTabNavigation, useStore, occurrence,
-    fullscreen, autoFullscreen, reportRoom,
+    fullscreen, noTrack, reportRoom,
   }
   return (
     <>
