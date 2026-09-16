@@ -39,6 +39,18 @@ const host = await import('../index.js')
 assert.equal(host.name, 'dsh-plugin-browser', '插件名必须是 dsh-plugin-browser')
 assert.deepEqual(host.inject, ['tools', 'webServer'], '宿主半必须注入 tools 与 webServer')
 
+// 会话层：多标签能力必须在宿主侧成立，面板才可能列出真实标签。
+const live = await import('../cdpbrowser.js')
+for (const fn of [
+  'configure', 'ensureBrowser', 'listTargets', 'createTarget', 'closeTarget',
+  'activateTarget', 'browserStatus', 'profilePath', 'startScreencast', 'navigate',
+]) {
+  assert.equal(typeof live[fn], 'function', `cdpbrowser 必须导出 ${fn}`)
+}
+const applied = live.configure({ port: 19334 })
+assert.equal(applied.port, 19334, 'configure 必须接受端口覆盖')
+assert.equal(typeof applied.profileDir, 'string', 'configure 必须返回 profile 目录')
+
 // autoLaunch 关掉：冒烟测试不拉起真实浏览器。
 host.apply(ctx, { port: 9334, autoLaunch: false })
 

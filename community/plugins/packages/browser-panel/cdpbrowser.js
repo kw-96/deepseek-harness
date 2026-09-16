@@ -138,7 +138,16 @@ class Session {
 }
 
 let launching = null
-let session = null
+/**
+ * 每个 page target 一个 CDP 会话。
+ *
+ * 面板要在浏览器的真实标签之间切换（包括 Agent 自己开出来的标签），所以会话按
+ * target 缓存而不是全局只留一个：切换标签时换用另一个会话，两边各自的输入目标、
+ * 帧流与导航历史互不干扰。
+ */
+const sessions = new Map()
+/** 面板当前显示的标签；null 表示还没选定，首次取浏览器里的第一个 page。 */
+let activeTargetId = null
 
 function findBrowser() {
   for (const p of BROWSERS) if (existsSync(p)) return p
@@ -205,18 +214,30 @@ export async function ensureBrowser() {
   try { return await launching } finally { launching = null }
 }
 
-/** Attach to a page target, creating one if needed. */
-async function ensureSession() {
-  if (session && !session.closed) return session
+/**
+ * 取得某个标签的 CDP 会话，必要时建立连接。
+ * @param {string} [targetId] 目标标签；省略时用当前活动标签，再不行取浏览器第一个 page
+ * @returns {Promise<Session>} 可用的 CDP 会话
+ */
+async function ensureSession(targetId) {
+  const wanted = targetId || activeTargetId
+  if (wanted) {
+    const cached = sessions.get(wanted)
+    if (cached && !cached.closed) return cached
+    sessions.delete(wanted)
+  }
   await ensureBrowser()
 
   const list = await (await fetch(`http://127.0.0.1:${runtime.port}/json/list`)).json()
-  let page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+  const pages = list.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+  let page = (wanted ? pages.find((t) => t.id === wanted) : null) || pages[0]
   if (!page) {
     page = await (await fetch(`http://127.0.0.1:${runtime.port}/json/new?about:blank`, { method: 'PUT' })).json()
   }
-  session = await new Session(page.id, page.webSocketDebuggerUrl).open()
-  return session
+  const opened = await new Session(page.id, page.webSocketDebuggerUrl).open()
+  sessions.set(page.id, opened)
+  activeTargetId = page.id
+  return opened
 }
 
 /** Is a real browser available at all? Used to decide against the proxy. */
@@ -225,16 +246,22 @@ export async function browserAvailable() {
   return findBrowser() !== null
 }
 
-export async function navigate(url) {
-  const s = await ensureSession()
+/**
+ * 在指定标签（默认当前标签）里导航。
+ * @param {string} url 目标地址
+ * @param {string} [targetId] 目标标签
+ * @returns {Promise<object>} 导航后的页面状态
+ */
+export async function navigate(url, targetId) {
+  const s = await ensureSession(targetId)
   await s.send('Page.navigate', { url })
   // Give the load a moment so the first frame is not a blank white flash.
   await sleep(600)
-  return state()
+  return state(targetId)
 }
 
-export async function state() {
-  const s = await ensureSession()
+export async function state(targetId) {
+  const s = await ensureSession(targetId)
   const r = await s.send('Runtime.evaluate', {
     expression: 'JSON.stringify({url: location.href, title: document.title, ready: document.readyState})',
     returnByValue: true,
@@ -245,8 +272,8 @@ export async function state() {
 }
 
 /** A JPEG frame of the live page. */
-export async function screenshot(quality = 88) {
-  const s = await ensureSession()
+export async function screenshot(quality = 88, targetId) {
+  const s = await ensureSession(targetId)
   const r = await s.send('Page.captureScreenshot', { format: 'jpeg', quality, captureBeyondViewport: false })
   const data = r.result?.data
   return data ? Buffer.from(data, 'base64') : null
@@ -269,7 +296,7 @@ export async function screenshot(quality = 88) {
  * @returns {Promise<() => void>} stop function
  */
 export async function startScreencast(onFrame, opts = {}) {
-  const s = await ensureSession()
+  const s = await ensureSession(opts.targetId)
   const off = s.on('Page.screencastFrame', (params) => {
     if (!params) return
     // Ack first: a dropped ack silently ends the stream.
@@ -290,8 +317,8 @@ export async function startScreencast(onFrame, opts = {}) {
 }
 
 /** The page's real rendered text — the DOM, not a re-parsed fetch. */
-export async function readText() {
-  const s = await ensureSession()
+export async function readText(targetId) {
+  const s = await ensureSession(targetId)
   const r = await s.send('Runtime.evaluate', {
     expression: '(document.body && (document.body.innerText || document.body.textContent) || "")',
     returnByValue: true,
@@ -316,8 +343,8 @@ export async function evaluate(expression) {
 
 let view = { width: 1280, height: 800, dpr: 2 }
 
-export async function setViewport(width, height, dpr) {
-  const s = await ensureSession()
+export async function setViewport(width, height, dpr, targetId) {
+  const s = await ensureSession(targetId)
   view.width = Math.max(320, Math.round(width))
   view.height = Math.max(240, Math.round(height))
   const scale = Number(dpr)
@@ -330,27 +357,27 @@ export async function setViewport(width, height, dpr) {
   })
 }
 
-export async function mouse(type, x, y, button = 'left', clickCount = 1, deltaY = 0) {
-  const s = await ensureSession()
+export async function mouse(type, x, y, button = 'left', clickCount = 1, deltaY = 0, targetId) {
+  const s = await ensureSession(targetId)
   if (type === 'wheel') {
     return s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY })
   }
   return s.send('Input.dispatchMouseEvent', { type, x, y, button, clickCount, buttons: type === 'mouseReleased' ? 0 : 1 })
 }
 
-export async function typeText(text) {
-  const s = await ensureSession()
+export async function typeText(text, targetId) {
+  const s = await ensureSession(targetId)
   return s.send('Input.insertText', { text })
 }
 
-export async function key(type, opts) {
-  const s = await ensureSession()
+export async function key(type, opts, targetId) {
+  const s = await ensureSession(targetId)
   return s.send('Input.dispatchKeyEvent', Object.assign({ type }, opts))
 }
 
 
-export async function goBack() {
-  const s = await ensureSession()
+export async function goBack(targetId) {
+  const s = await ensureSession(targetId)
   const h = await s.send('Page.getNavigationHistory')
   const idx = h.result?.currentIndex
   const entries = h.result?.entries || []
@@ -358,19 +385,82 @@ export async function goBack() {
     await s.send('Page.navigateToHistoryEntry', { entryId: entries[idx - 1].id })
     await sleep(500)
   }
-  return state()
+  return state(targetId)
 }
 
-export async function reload() {
-  const s = await ensureSession()
+export async function reload(targetId) {
+  const s = await ensureSession(targetId)
   await s.send('Page.reload', {})
   await sleep(700)
-  return state()
+  return state(targetId)
 }
 
-/** Close the CDP session; the browser itself keeps running so logins persist. */
+/** 关闭全部 CDP 会话；浏览器本身继续运行，登录态因此得以保留。 */
 export function detach() {
-  if (session) { session.close(); session = null }
+  for (const s of sessions.values()) s.close()
+  sessions.clear()
+  activeTargetId = null
+}
+
+/**
+ * 列出浏览器里的真实标签页。
+ * @returns {Promise<Array<{ id: string, title: string, url: string, active: boolean }>>} 标签列表
+ */
+export async function listTargets() {
+  await ensureBrowser()
+  const list = await (await fetch(`http://127.0.0.1:${runtime.port}/json/list`)).json()
+  return list
+    .filter((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+    .map((t) => ({ id: t.id, title: t.title || '', url: t.url || '', active: t.id === activeTargetId }))
+}
+
+/**
+ * 新建一个标签页。
+ * @param {string} [url] 初始地址，默认 about:blank
+ * @returns {Promise<{ id: string, title: string, url: string }>} 新标签
+ */
+export async function createTarget(url = 'about:blank') {
+  await ensureBrowser()
+  const created = await (await fetch(
+    `http://127.0.0.1:${runtime.port}/json/new?${encodeURIComponent(url)}`, { method: 'PUT' },
+  )).json()
+  return { id: created.id, title: created.title || '', url: created.url || url }
+}
+
+/**
+ * 关闭一个标签页并释放它的会话。
+ * @param {string} targetId 要关闭的标签
+ * @returns {Promise<{ ok: boolean }>} 关闭结果
+ */
+export async function closeTarget(targetId) {
+  const s = sessions.get(targetId)
+  if (s) { s.close(); sessions.delete(targetId) }
+  if (activeTargetId === targetId) activeTargetId = null
+  try {
+    await fetch(`http://127.0.0.1:${runtime.port}/json/close/${encodeURIComponent(targetId)}`)
+  } catch {
+    // 标签可能已被其他操作关闭：终态相同，不必报错。
+  }
+  return { ok: true }
+}
+
+/**
+ * 把某个标签设为面板当前显示的对象。
+ *
+ * 同时让浏览器激活它：窗口在屏幕外，激活不会打扰用户；但不激活时后台标签的渲染会被
+ * 节流，帧流看起来就像卡住了。
+ * @param {string} targetId 目标标签
+ * @returns {Promise<{ ok: boolean, targetId: string }>} 切换结果
+ */
+export async function activateTarget(targetId) {
+  activeTargetId = targetId
+  await ensureSession(targetId)
+  try {
+    await fetch(`http://127.0.0.1:${runtime.port}/json/activate/${encodeURIComponent(targetId)}`)
+  } catch {
+    // 激活失败不影响面板切换显示对象，只是该标签可能被渲染节流。
+  }
+  return { ok: true, targetId }
 }
 
 /**

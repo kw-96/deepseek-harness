@@ -350,10 +350,13 @@ export function apply(ctx, config) {
       kind: 'prefix',
       path: LIVE_PATH,
       handler: async (req, res) => {
-        const action = new URL(req.url, 'http://localhost').pathname.slice(LIVE_PATH.length + 1)
+        const liveUrl = new URL(req.url, 'http://localhost')
+        const action = liveUrl.pathname.slice(LIVE_PATH.length + 1)
+        // 面板可以指定要显示/操作哪个真实标签；省略时用当前标签。
+        const targetId = liveUrl.searchParams.get('target') || undefined
         try {
           if (action === 'frame') {
-            const buf = await live.screenshot()
+            const buf = await live.screenshot(88, targetId)
             if (!buf) return json(res, 503, { ok: false, error: 'no-frame' })
             res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' })
             return res.end(buf)
@@ -397,7 +400,7 @@ export function apply(ctx, config) {
                 // One frame per SSE message. Base64 costs ~33% but avoids
                 // hand-rolling a WebSocket frame writer on a raw socket.
                 res.write('data: ' + b64 + '\n\n')
-              })
+              }, { targetId })
             } catch (error) {
               res.write('event: error'+'\n'+'data: ' + JSON.stringify(String(error)) + '\n\n')
               res.end()
@@ -406,8 +409,9 @@ export function apply(ctx, config) {
             // Held open deliberately; the disposer below tears it down.
             return undefined
           }
-          if (action === 'state') return json(res, 200, { ok: true, ...(await live.state()) })
-          if (action === 'text') return json(res, 200, { ok: true, text: await live.readText() })
+          if (action === 'targets') return json(res, 200, { ok: true, targets: await live.listTargets() })
+          if (action === 'state') return json(res, 200, { ok: true, ...(await live.state(targetId)) })
+          if (action === 'text') return json(res, 200, { ok: true, text: await live.readText(targetId) })
 
           if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method-not-allowed' })
           const body = await readJsonBody(req)
@@ -416,26 +420,46 @@ export function apply(ctx, config) {
             const target = String(body?.url || '').trim()
             if (!target) return json(res, 400, { ok: false, error: 'missing-url' })
             const url = /^[a-z]+:\/\//i.test(target) ? target : 'https://' + target
-            return json(res, 200, { ok: true, ...(await live.navigate(url)) })
+            return json(res, 200, { ok: true, ...(await live.navigate(url, targetId)) })
           }
           if (action === 'viewport') {
-            await live.setViewport(Number(body?.width) || 900, Number(body?.height) || 700, Number(body?.dpr) || 2)
+            await live.setViewport(Number(body?.width) || 900, Number(body?.height) || 700, Number(body?.dpr) || 2, body?.target || targetId)
             return json(res, 200, { ok: true })
           }
-          if (action === 'back') return json(res, 200, { ok: true, ...(await live.goBack()) })
-          if (action === 'reload') return json(res, 200, { ok: true, ...(await live.reload()) })
+          if (action === 'back') return json(res, 200, { ok: true, ...(await live.goBack(targetId)) })
+          if (action === 'reload') return json(res, 200, { ok: true, ...(await live.reload(targetId)) })
           if (action === 'input') {
             const k = body?.kind
-            if (k === 'move') await live.mouse('mouseMoved', body.x, body.y)
-            else if (k === 'down') await live.mouse('mousePressed', body.x, body.y, body.button || 'left', body.clickCount || 1)
-            else if (k === 'up') await live.mouse('mouseReleased', body.x, body.y, body.button || 'left', body.clickCount || 1)
-            else if (k === 'wheel') await live.mouse('wheel', body.x, body.y, 'none', 0, body.deltaY || 0)
-            else if (k === 'text') await live.typeText(String(body.text || ''))
+            // 输入必须发给面板正在显示的那个标签，否则在 A 标签上打字会落到 B 标签。
+            const to = body?.target || targetId
+            if (k === 'move') await live.mouse('mouseMoved', body.x, body.y, 'left', 1, 0, to)
+            else if (k === 'down') await live.mouse('mousePressed', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
+            else if (k === 'up') await live.mouse('mouseReleased', body.x, body.y, body.button || 'left', body.clickCount || 1, 0, to)
+            else if (k === 'wheel') await live.mouse('wheel', body.x, body.y, 'none', 0, body.deltaY || 0, to)
+            else if (k === 'text') await live.typeText(String(body.text || ''), to)
             else if (k === 'key') {
-              await live.key('keyDown', body.event || {})
-              await live.key('keyUp', body.event || {})
+              await live.key('keyDown', body.event || {}, to)
+              await live.key('keyUp', body.event || {}, to)
             } else return json(res, 400, { ok: false, error: 'unknown-input' })
             return json(res, 200, { ok: true })
+          }
+
+          // ── 真实标签页管理 ──────────────────────────────────────────────
+          // 面板的标签条直接反映浏览器里的真实标签，Agent 自己开出来的标签同样出现
+          // 在这里：人切过去就能看着它干活，两边各自导航、互不清场。
+          if (action === 'activate') {
+            const id = String(body?.targetId || '').trim()
+            if (!id) return json(res, 400, { ok: false, error: 'missing-target' })
+            return json(res, 200, { ok: true, ...(await live.activateTarget(id)) })
+          }
+          if (action === 'newtab') {
+            const url = String(body?.url || '').trim()
+            return json(res, 200, { ok: true, target: await live.createTarget(url || 'about:blank') })
+          }
+          if (action === 'closetab') {
+            const id = String(body?.targetId || '').trim()
+            if (!id) return json(res, 400, { ok: false, error: 'missing-target' })
+            return json(res, 200, { ok: true, ...(await live.closeTarget(id)) })
           }
           return json(res, 404, { ok: false, error: 'unknown-live-action' })
         } catch (error) {

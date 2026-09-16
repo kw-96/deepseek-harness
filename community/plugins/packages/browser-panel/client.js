@@ -314,6 +314,8 @@ window.__ModuleLoader__.load({
 		}
 
 		function LiveView(props) {
+			// 面板显示的是浏览器里的某一个真实标签；换标签就换帧流、换输入目标。
+			var targetId = (props && props.targetId) || null;
 			var imgRef = useRef(null);
 			var boxRef = useRef(null);
 			var srcState = useState(""); var src = srcState[0], setSrc = srcState[1];
@@ -323,6 +325,8 @@ window.__ModuleLoader__.load({
 			useEffect(function () {
 				var box = boxRef.current;
 				if (!box) return;
+				// 换了标签就要重新下发视口：画布尺寸没变，但目标页面变了。
+				sizeRef.current = { w: 0, h: 0 };
 				function sync() {
 					var r = box.getBoundingClientRect();
 					var w = Math.max(320, Math.round(r.width));
@@ -330,13 +334,13 @@ window.__ModuleLoader__.load({
 					if (Math.abs(w - sizeRef.current.w) < 8 && Math.abs(h - sizeRef.current.h) < 8) return;
 					sizeRef.current = { w: w, h: h };
 					var dpr = (typeof window !== "undefined" && window.devicePixelRatio) ? window.devicePixelRatio : 2;
-					postJson(LIVE_PATH + "/viewport", { width: w, height: h, dpr: dpr });
+					postJson(LIVE_PATH + "/viewport", { width: w, height: h, dpr: dpr, target: targetId });
 				}
 				sync();
 				var ro = new ResizeObserver(sync);
 				ro.observe(box);
 				return function () { ro.disconnect(); };
-			}, []);
+			}, [targetId]);
 
 			// Frames arrive PUSHED, over Server-Sent Events. Chrome emits one only
 			// when the page actually repaints, so an idle page costs nothing and a
@@ -348,7 +352,7 @@ window.__ModuleLoader__.load({
 			useEffect(function () {
 				var es = null, alive = true, lastUrl = null;
 				try {
-					es = new EventSource(LIVE_PATH + "/stream");
+					es = new EventSource(LIVE_PATH + "/stream" + (targetId ? "?target=" + encodeURIComponent(targetId) : ""));
 				} catch (e) {
 					return;
 				}
@@ -365,7 +369,7 @@ window.__ModuleLoader__.load({
 					try { es.close(); } catch (e) { /* ignore */ }
 					if (lastUrl) URL.revokeObjectURL(lastUrl);
 				};
-			}, []);
+			}, [targetId]);
 
 			/** Pane pixel -> page pixel. */
 			function at(e) {
@@ -378,7 +382,8 @@ window.__ModuleLoader__.load({
 			}
 
 			function send(kind, extra) {
-				postJson(LIVE_PATH + "/input", Object.assign({ kind: kind }, extra));
+				// 输入落到面板正在显示的那个标签，而不是"浏览器当前恰好活动的标签"。
+				postJson(LIVE_PATH + "/input", Object.assign({ kind: kind, target: targetId }, extra));
 			}
 
 			return h("div", {
@@ -422,6 +427,11 @@ window.__ModuleLoader__.load({
 			var busyState = useState(false); var busy = busyState[0], setBusy = busyState[1];
 			var addrState = useState(""); var addr = addrState[0], setAddr = addrState[1];
 			var editingState = useState(false); var editing = editingState[0], setEditing = editingState[1];
+			// 浏览器里的真实标签（含 Agent 自己开出来的标签），与面板自己的文件预览标签并存。
+			var targetsState = useState([]); var targets = targetsState[0], setTargets = targetsState[1];
+			var activeTargetState = useState(null); var activeTargetId = activeTargetState[0], setActiveTargetId = activeTargetState[1];
+			// 视口当前显示浏览器标签还是本地文件：两者走不同的渲染路径。
+			var kindState = useState("browser"); var viewKind = kindState[0], setViewKind = kindState[1];
 
 			var frameRef = useRef(null);
 			var addrRef = useRef(null);
@@ -434,6 +444,9 @@ window.__ModuleLoader__.load({
 			// see the tab it just created.
 			var tabsRef = useRef(tabs);
 			var activeRef = useRef(activeId);
+			var targetsRef = useRef(targets);
+			var activeTargetRef = useRef(activeTargetId);
+			var viewKindRef = useRef(viewKind);
 			var openRef = useRef(open);
 			// So a page navigating itself does not overwrite a url the human is
 			// halfway through typing.
@@ -444,15 +457,58 @@ window.__ModuleLoader__.load({
 
 			useEffect(function () { tabsRef.current = tabs; }, [tabs]);
 			useEffect(function () { activeRef.current = activeId; }, [activeId]);
+			useEffect(function () { targetsRef.current = targets; }, [targets]);
+			useEffect(function () { activeTargetRef.current = activeTargetId; }, [activeTargetId]);
+			useEffect(function () { viewKindRef.current = viewKind; }, [viewKind]);
 			useEffect(function () { openRef.current = open; }, [open]);
 			useEffect(function () { editingRef.current = editing; }, [editing]);
+
+			/**
+			 * 轮询浏览器里的真实标签列表。
+			 *
+			 * 这是「人机共用同一个浏览器」的关键：Agent 用官方 browser-use 工具在同一个
+			 * 浏览器里开标签、导航，面板本身无从得知；定期拉一次标签列表，人就能看到它
+			 * 在哪个标签上干活并切过去旁观，两边的页面互不打断。
+			 */
+			useEffect(function () {
+				if (!open) return undefined;
+				var alive = true;
+				function pull() {
+					fetch(LIVE_PATH + "/targets", { cache: "no-store" })
+						.then(function (r) { return r.json(); })
+						.then(function (d) {
+							if (!alive || !d || !Array.isArray(d.targets)) return;
+							setTargets(d.targets);
+							setActiveTargetId(function (current) {
+								// 选中的标签被关掉时，退回到浏览器当前活动的那个。
+								if (current && d.targets.some(function (t) { return t.id === current; })) return current;
+								var act = d.targets.filter(function (t) { return t.active; })[0] || d.targets[0];
+								return act ? act.id : null;
+							});
+						})
+						.catch(function () { /* 宿主可能正在重启，下一轮再试 */ });
+				}
+				pull();
+				var timer = setInterval(pull, 1500);
+				return function () { alive = false; clearInterval(timer); };
+			}, [open]);
+
+			var activeTarget = null;
+			for (var ti = 0; ti < targets.length; ti++) {
+				if (targets[ti].id === activeTargetId) { activeTarget = targets[ti]; break; }
+			}
 
 			// Keep the address bar in step unless the user is typing in it.
 			useEffect(function () {
 				if (editing) return;
-				var t = (tabsRef.current || []).find(function (x) { return x.id === activeId; });
-				setAddr(displayUrl(t));
-			}, [activeId, tabs, editing]);
+				if (viewKind === "file") {
+					var t = (tabsRef.current || []).find(function (x) { return x.id === activeId; });
+					setAddr(displayUrl(t));
+					return;
+				}
+				var cur = (targetsRef.current || []).filter(function (x) { return x.id === activeTargetId; })[0];
+				setAddr(cur ? (cur.url || "") : "");
+			}, [activeId, tabs, editing, activeTargetId, targets, viewKind]);
 
 			var tabOf = useCallback(function (id) {
 				return (tabsRef.current || []).find(function (t) { return t.id === id; }) || null;
@@ -513,6 +569,25 @@ window.__ModuleLoader__.load({
 			}, []);
 
 			var pushState = useCallback(function (force) {
+				var tid = activeTargetRef.current;
+				// 面板显示真浏览器标签时，文本与地址以宿主侧 CDP 为准：那是浏览器里的事实，
+				// 而不是面板对它的镜像，read_preview 因此读到的就是人眼前这一页。
+				if (openRef.current && viewKindRef.current === "browser") {
+					if (!tid) { postJson(STATE_PATH, { opened: true }); return; }
+					var q = "?target=" + encodeURIComponent(tid);
+					Promise.all([
+						fetch(LIVE_PATH + "/text" + q, { cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; }),
+						fetch(LIVE_PATH + "/state" + q, { cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; }),
+					]).then(function (out) {
+						var st = out[1] || {};
+						postJson(STATE_PATH, {
+							tabId: tid, url: st.url || "", title: st.title || "",
+							text: (out[0] && out[0].text) || "", opened: true, mode: "stream"
+						});
+						setBusy(false);
+					});
+					return;
+				}
 				var tab = tabOf(activeRef.current);
 				if (!tab || !openRef.current) { postJson(STATE_PATH, { opened: openRef.current }); return; }
 				readTabText(tab, force).then(function (out) {
@@ -586,11 +661,16 @@ window.__ModuleLoader__.load({
 						// no separate Chrome to launch -- hand the url straight to
 						// the webview.
 						if (IS_SHELL) { navigateLive(cmd.siteUrl, cmd.label || cmd.siteUrl, cmd.tabId); return; }
-						postJson(LIVE_PATH + "/open", { url: cmd.siteUrl }).then(function (st) {
-							if (st && st.ok) navigateLive(cmd.siteUrl, st.title);
-							else navigate(cmd.url, cmd.tabId, cmd.label, cmd.filePath, cmd.siteUrl);
+						// Agent 让面板打开网页：落在面板当前显示的标签上，并把视图切回浏览器，
+						// 这样人正在看文件时也能立刻看到它开了哪一页。
+						var q = activeTargetRef.current ? ("?target=" + encodeURIComponent(activeTargetRef.current)) : "";
+						postJson(LIVE_PATH + "/open" + q, { url: cmd.siteUrl }).then(function (st) {
+							if (st && st.ok) { setViewKind("browser"); return; }
+							setViewKind("file");
+							navigate(cmd.url, cmd.tabId, cmd.label, cmd.filePath, cmd.siteUrl);
 						});
 					} else {
+						setViewKind("file");
 						navigate(cmd.url, cmd.tabId, cmd.label, cmd.filePath, cmd.siteUrl);
 					}
 				}
@@ -755,13 +835,18 @@ window.__ModuleLoader__.load({
 					if (r.siteUrl) {
 						if (IS_SHELL) { navigateLive(r.siteUrl, r.label || r.siteUrl, r.tabId); return; }
 						setBusy(true);
-						postJson(LIVE_PATH + "/open", { url: r.siteUrl }).then(function (st) {
+						// 落在面板当前显示的那个标签上，而不是"浏览器碰巧活动的标签"。
+						var q = activeTargetRef.current ? ("?target=" + encodeURIComponent(activeTargetRef.current)) : "";
+						postJson(LIVE_PATH + "/open" + q, { url: r.siteUrl }).then(function (st) {
 							setBusy(false);
-							if (st && st.ok) navigateLive(r.siteUrl, st.title);
-							else navigate(r.url, r.tabId, r.label, r.filePath, r.siteUrl);  // fall back to the proxy
+							if (st && st.ok) { setViewKind("browser"); return; }
+							// 真浏览器不可用时退回代理路径，至少让人看见这页。
+							setViewKind("file");
+							navigate(r.url, r.tabId, r.label, r.filePath, r.siteUrl);
 						});
 						return;
 					}
+					setViewKind("file");
 					navigate(r.url, r.tabId, r.label, r.filePath, r.siteUrl);
 				});
 			}, [navigate]);
@@ -802,20 +887,55 @@ window.__ModuleLoader__.load({
 			}
 
 			/**
-			 * Open an empty tab and put the cursor in the address bar.
-			 * The tab carries no url, so the viewport shows the empty state until
-			 * something is typed -- and navigating from here replaces this blank
-			 * placeholder rather than leaving it stranded in the strip.
+			 * 切换面板显示的真实标签。
+			 *
+			 * 先本地切换让画面立刻跟上，再通知宿主把该标签设为浏览器活动标签：后台标签
+			 * 会被 Chrome 节流渲染，不激活的话帧流看起来就像卡住了。
 			 */
-			var newTab = useCallback(function () {
-				var id = "blank-" + Date.now();
-				setTabs(function (prev) { return prev.concat([{ id: id, url: "", title: "新标签页", blank: true }]); });
-				setActiveId(id);
-				setOpen(true);
-				setAddr("");
-				setEditing(false);
-				setTimeout(function () { if (addrRef.current) addrRef.current.focus(); }, 60);
-			}, []);
+			function activateTarget(id) {
+				setViewKind("browser");
+				setActiveTargetId(id);
+				postJson(LIVE_PATH + "/activate", { targetId: id }).catch(function () { /* 下一轮轮询会纠正 */ });
+			}
+
+			/** 新建一个真实标签页（浏览器里的标签，不是面板的记录）。 */
+			function newBrowserTab() {
+				postJson(LIVE_PATH + "/newtab", {}).then(function (r) {
+					var t = r && r.target;
+					if (!t || !t.id) return;
+					setTargets(function (prev) {
+						return prev.concat([{ id: t.id, title: t.title || "", url: t.url || "", active: true }]);
+					});
+					setViewKind("browser");
+					setActiveTargetId(t.id);
+					setTimeout(function () { if (addrRef.current) addrRef.current.focus(); }, 60);
+				});
+			}
+
+			/** 关闭一个真实标签页。 */
+			function closeBrowserTab(id) {
+				postJson(LIVE_PATH + "/closetab", { targetId: id }).then(function () {
+					setTargets(function (prev) { return prev.filter(function (t) { return t.id !== id; }); });
+				});
+			}
+
+			/** 标签条上的显示名：优先主机名，退回标题。 */
+			function labelForTarget(t) {
+				try {
+					var host = new URL(t.url || "").hostname;
+					if (host) return host;
+				} catch (e) { /* about:blank 之类没有主机名 */ }
+				return t.title || "新标签页";
+			}
+
+			/** 空态：面板打开着，但还没有任何可显示的内容。 */
+			function emptyPane() {
+				return h("div", { style: emptyStyle },
+					h("div", { style: { fontSize: 26, opacity: .25, marginBottom: 10 } }, "▦"),
+					h("div", { style: { fontWeight: 600, marginBottom: 6, color: "#c7ccd4" } }, "还没有打开任何页面"),
+					h("div", null, "在上方输入网址或文件路径，或用 + 新建标签页。")
+				);
+			}
 
 			/**
 			 * Save the file on screen to the machine the human is sitting at.
@@ -845,6 +965,13 @@ window.__ModuleLoader__.load({
 			}
 
 			function reload() {
+				if (viewKind === "browser") {
+					// 重载面板正在显示的那个标签；它未必是浏览器当前活动的标签。
+					setBusy(true);
+					var q = activeTargetId ? ("?target=" + encodeURIComponent(activeTargetId)) : "";
+					postJson(LIVE_PATH + "/reload" + q, {}).then(function () { setBusy(false); });
+					return;
+				}
 				var tab = tabOf(activeId);
 				if (!tab) return;
 				if (tab.live && IS_SHELL && webviewRef.current) {
@@ -927,26 +1054,42 @@ window.__ModuleLoader__.load({
 					busy ? h("span", { style: spinnerStyle, title: "加载中" }, "●") : null
 				),
 
-				// tabs
+				// tabs：浏览器真实标签（含 Agent 自己开的）+ 面板自己的文件预览标签
 				h("div", { style: tabStripStyle },
-					tabs.map(function (tab) {
-						var active = tab.id === activeId;
+					targets.map(function (t) {
+						var active = viewKind === "browser" && t.id === activeTargetId;
 						return h("div", {
-							key: tab.id, title: displayUrl(tab) || "新标签页",
-							onClick: function () { setActiveId(tab.id); },
+							key: "target-" + t.id,
+							title: t.url || t.title || "标签页",
+							onClick: function () { activateTarget(t.id); },
 							style: Object.assign({}, tabStyle, active ? tabActiveStyle : {})
 						},
-							h("span", { style: tabLabelStyle }, shortLabel(tab)),
+							h("span", { style: tabLabelStyle }, labelForTarget(t)),
 							h("button", {
-								onClick: function (e) { e.stopPropagation(); closeTab(tab.id); },
+								onClick: function (e) { e.stopPropagation(); closeBrowserTab(t.id); },
 								style: closeXStyle, title: "关闭标签页"
 							}, "×")
 						);
-					}).concat([
+					}).concat(
+						tabs.filter(function (tab) { return !tab.live && !!tab.url; }).map(function (tab) {
+							var active = viewKind === "file" && tab.id === activeId;
+							return h("div", {
+								key: "file-" + tab.id, title: displayUrl(tab) || tab.title,
+								onClick: function () { setViewKind("file"); setActiveId(tab.id); },
+								style: Object.assign({}, tabStyle, active ? tabActiveStyle : {})
+							},
+								h("span", { style: tabLabelStyle }, shortLabel(tab)),
+								h("button", {
+									onClick: function (e) { e.stopPropagation(); closeTab(tab.id); },
+									style: closeXStyle, title: "关闭标签页"
+								}, "×")
+							);
+						})
+					).concat([
 						h("button", {
 							key: "new-tab",
-							onClick: newTab,
-							title: "新标签页",
+							onClick: newBrowserTab,
+							title: "新建标签页",
 							style: newTabStyle
 						}, "+")
 					])
@@ -954,11 +1097,10 @@ window.__ModuleLoader__.load({
 
 				// viewport
 				h("div", { style: { flex: 1, position: "relative", minHeight: 0, background: "#fff" } },
-					(activeTab && activeTab.live)
-						// Inside the shell this is a real embedded browser; in a
-						// plain tab it is a mirror of one. Same tab, same tools,
-						// same address bar -- only the surface differs.
-						? (IS_SHELL
+					IS_SHELL
+						// 桌面壳里 live 标签是一个真 <webview>；本次多标签改造只覆盖 Web 模式，
+						// 壳这条路保持原行为。
+						? ((activeTab && activeTab.live)
 							? h(ShellView, {
 								key: "shell",
 								url: activeTab.url,
@@ -974,20 +1116,20 @@ window.__ModuleLoader__.load({
 									if (!editingRef.current) setAddr(u);
 								}
 							})
-							: h(LiveView, { key: "live" }))
-						: (activeTab && activeTab.url)
-						? h("iframe", Object.assign({
-							ref: frameRef,
-							src: activeTab.url,
-							style: frameStyle,
-							onLoad: function () { setTimeout(function () { pushState(true); }, 350); }
-						}, frameSandbox(activeTab)))
-						: h("div", { style: emptyStyle },
-							h("div", { style: { fontSize: 26, opacity: .25, marginBottom: 10 } }, "▦"),
-							h("div", { style: { fontWeight: 600, marginBottom: 6, color: "#c7ccd4" } }, "还没有打开任何页面"),
-							h("div", null, "在上方输入网址或文件路径，或让 Agent 调用 ",
-								h("code", { style: codeStyle }, "open_preview"), " 打开。")
-						)
+							: emptyPane())
+						: (viewKind === "browser"
+							? (activeTargetId
+								// key 带上 target：换标签就是换帧流与输入目标，让 React 整块重建视图。
+								? h(LiveView, { key: "live-" + activeTargetId, targetId: activeTargetId })
+								: emptyPane())
+							: ((activeTab && activeTab.url)
+								? h("iframe", Object.assign({
+									ref: frameRef,
+									src: activeTab.url,
+									style: frameStyle,
+									onLoad: function () { setTimeout(function () { pushState(true); }, 350); }
+								}, frameSandbox(activeTab)))
+								: emptyPane()))
 				)
 			));
 		}
