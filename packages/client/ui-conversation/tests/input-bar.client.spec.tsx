@@ -1195,7 +1195,7 @@ describe('running and lock semantics', () => {
   })
 
   it('a touch device keeps the draft unfocused across a session switch', () => {
-    // jsdom 不实现 matchMedia：先装一个只对 hover 查询为真的替身，测后移除。
+    // jsdom 不实现 matchMedia：装一个只对 hover 查询为真的替身，测后移除。
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -1216,6 +1216,35 @@ describe('running and lock semantics', () => {
     textarea.focus = (options?: FocusOptions) => { focused.push(options?.preventScroll) }
     act(() => { view.rerender(<InputBar {...props} sessionId={'s2' as SessionId} />) })
     // 不抢焦点：手机上由聚焦引起的软键盘会盖住刚切过来的会话。
+    expect(focused).toEqual([])
+  })
+
+  it('a desktop-mode browser on a touchscreen keeps the draft unfocused', () => {
+    // 桌面模式会把指针媒体查询报成鼠标式，但 maxTouchPoints 仍报告硬件触摸点。
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes('(hover: hover) and (pointer: fine)'),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    })
+    const touchPoints = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints')
+    Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 5 })
+    onTestFinished(() => {
+      Reflect.deleteProperty(window, 'matchMedia')
+      if (touchPoints !== undefined) Object.defineProperty(Navigator.prototype, 'maxTouchPoints', touchPoints)
+    })
+    const { view, textarea, props } = bench({ draft: 'line one' })
+    const focused: (boolean | undefined)[] = []
+    textarea.focus = (options?: FocusOptions) => { focused.push(options?.preventScroll) }
+    act(() => { view.rerender(<InputBar {...props} sessionId={'s2' as SessionId} />) })
     expect(focused).toEqual([])
   })
 
