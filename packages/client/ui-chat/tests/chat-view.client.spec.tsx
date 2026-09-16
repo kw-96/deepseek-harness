@@ -397,7 +397,6 @@ function makeHarness(
     viewRequest: null,
     openView,
     completeViewRequest: () => {},
-    openDetails: () => {},
     openFile,
     openSkill,
     loadOlder,

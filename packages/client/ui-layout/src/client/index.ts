@@ -86,10 +86,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'main': { kind: 'keyed'; scope: 'root' }
     /**
-     * The right details column, shown when the layout opens it. OCCUPIED by
-     * ui-conversation's DetailsPanel, which declares the tool-details seat
-     * inside it — registering here replaces the column and takes that seat
-     * with it. Absent an occupant the column renders nothing.
+     * The right details column, shown when the layout opens it. No shipped
+     * occupant: registering here replaces the column. Absent an occupant the
+     * column renders nothing.
      *
      * No owner props: the framework injects the session id and hooks for the
      * `session` scope, and `ctx.layout` owns whether the column is open.
