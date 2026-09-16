@@ -388,7 +388,7 @@ export function apply(ctx, config) {
             // more than a reading pane needs and costs real bandwidth (~46KB a
             // frame), so forward at most ~25fps and drop the rest. Coalescing
             // here rather than in the client keeps the wire quiet too.
-            const MIN_FRAME_GAP_MS = 40
+            const MIN_FRAME_GAP_MS = 33
             let lastSent = 0
 
             try {
@@ -400,7 +400,7 @@ export function apply(ctx, config) {
                 // One frame per SSE message. Base64 costs ~33% but avoids
                 // hand-rolling a WebSocket frame writer on a raw socket.
                 res.write('data: ' + b64 + '\n\n')
-              }, { targetId })
+              }, { targetId, quality: Number(liveUrl.searchParams.get('quality')) || undefined })
             } catch (error) {
               res.write('event: error'+'\n'+'data: ' + JSON.stringify(String(error)) + '\n\n')
               res.end()

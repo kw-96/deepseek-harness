@@ -331,7 +331,8 @@ window.__ModuleLoader__.load({
 					var r = box.getBoundingClientRect();
 					var w = Math.max(320, Math.round(r.width));
 					var h = Math.max(240, Math.round(r.height));
-					if (Math.abs(w - sizeRef.current.w) < 8 && Math.abs(h - sizeRef.current.h) < 8) return;
+					// 阈值越小，远端视口与面板越严格 1:1，文字越不容易被二次重采样。
+					if (Math.abs(w - sizeRef.current.w) < 2 && Math.abs(h - sizeRef.current.h) < 2) return;
 					sizeRef.current = { w: w, h: h };
 					var dpr = (typeof window !== "undefined" && window.devicePixelRatio) ? window.devicePixelRatio : 2;
 					postJson(LIVE_PATH + "/viewport", { width: w, height: h, dpr: dpr, target: targetId });
@@ -352,7 +353,11 @@ window.__ModuleLoader__.load({
 			useEffect(function () {
 				var es = null, alive = true, lastUrl = null;
 				try {
-					es = new EventSource(LIVE_PATH + "/stream" + (targetId ? "?target=" + encodeURIComponent(targetId) : ""));
+					// 画质：JPEG 质量越高文字越锐利，代价是每帧字节数——远程链路上要权衡。
+					var qs = [];
+					if (targetId) qs.push("target=" + encodeURIComponent(targetId));
+					qs.push("quality=92");
+					es = new EventSource(LIVE_PATH + "/stream?" + qs.join("&"));
 				} catch (e) {
 					return;
 				}
