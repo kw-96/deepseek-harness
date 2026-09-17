@@ -66,7 +66,15 @@ export function createFileResourceProvider(
       // on the file, so a write can still bring the file live.
       let current: WorkspaceFileStat | undefined
       try {
-        if (!await notices.ready || aborted()) return
+        const subscribed = await notices.ready
+        if (aborted()) return
+        if (!subscribed) {
+          // A session whose change subscription never opened must fail the
+          // address: ending here without a frame would leave the resource
+          // loading forever, which reads as an unexplained unavailable service.
+          yield { ok: false, error: unknownWorkspace(address) }
+          return
+        }
         const first = await stat()
         if (aborted()) return
         if (first.ok) {
