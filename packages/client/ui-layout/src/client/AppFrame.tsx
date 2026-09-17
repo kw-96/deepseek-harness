@@ -17,7 +17,7 @@ import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { computeColumns, DETAILS_DEFAULT, MOBILE_DRAWER_MAX, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
+import { computeColumns, DETAILS_DEFAULT, MOBILE_DRAWER_MAX, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
 import { isDesktopShell } from './desktop/detect.ts'
 import { DesktopTitleBar } from './desktop/DesktopTitleBar.tsx'
 import { DocumentTitle } from './DocumentTitle.tsx'
@@ -49,10 +49,10 @@ export type AppFrameProps =
   & PropsLocale<'common'>
   & InjectFace<AppFrameInjected>
 
-/** The left inset a phone conversation header must leave for the floating
- * sidebar entry, in px: button left inset 8 + button 44 (AppFrame.module.css
- * `.railFab`) + gap 8. Published as `--dsh-rail-entry-clearance`. */
-const RAIL_ENTRY_CLEARANCE = 60
+/** The left inset a phone conversation header must leave for the sidebar entry,
+ * in px: button left inset 12 + button 28 (AppFrame.module.css `.railFab`) + gap
+ * 8. Published as `--dsh-rail-entry-clearance`. */
+const RAIL_ENTRY_CLEARANCE = 48
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -226,7 +226,6 @@ export function AppFrame({
   // own width because there is no track to read one from.
   const drawer = !sidebarCollapsed && (railOverlay || viewport < MOBILE_DRAWER_MAX)
   const drawerWidth = Math.min(Math.round(viewport * 0.84), 320)
-  const overlay = drawer || (railOverlay && panels.railOpen)
   const cols = drawer || railOverlay
     ? { sidebar: 0, center: Math.max(0, viewport - solved.details), details: solved.details }
     : solved
@@ -293,14 +292,8 @@ export function AppFrame({
       <div
         className={css.sidebarCol}
         data-drawer={drawer || undefined}
-        data-rail={railOverlay && !drawer || undefined}
-        data-shown={overlay || undefined}
-        style={railOverlay || drawer ? { width: drawer ? drawerWidth : SIDEBAR_COLLAPSED } : undefined}
-        /* Any press inside the out rail closes it: the column is a temporary
-           menu over the content, and the one control that wants to stay open
-           (expand to the full sidebar) writes narrowExpanded, which keeps the
-           column out on its own. */
-        onClickCapture={railOverlay && !drawer ? () => { actions.closeRail() } : undefined}
+        data-shown={drawer || undefined}
+        style={drawer ? { width: drawerWidth } : undefined}
       >
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
@@ -310,32 +303,30 @@ export function AppFrame({
             because its grid track is zero. */}
         {renderSlot('sidebar', {
           collapsed: sidebarCollapsed,
-          width: drawer ? drawerWidth : railOverlay ? SIDEBAR_COLLAPSED : cols.sidebar,
+          width: drawer ? drawerWidth : cols.sidebar,
         })}
       </div>
-      {!overlay && railOverlay && (
-        /* The phone entry to the sidebar: one floating button in place of the
-           permanent rail, so the content owns the full viewport until asked. */
+      {!drawer && railOverlay && (
+        /* The phone entry to the sidebar: one icon button in the conversation
+           header's leading corner, the left-hand twin of the right panel's own
+           entry in the trailing corner. It opens the full sidebar — the icon
+           column is a collapsed state, not a menu to walk through. It renders
+           even while the header is hidden (a blank or absent Session), which is
+           exactly when the session list is the way out. */
         <button
           type="button"
           className={css.railFab}
           aria-label={t('sidebar.open')}
           data-sidebar-rail-fab
-          onClick={() => { actions.openRail() }}
+          onClick={() => { actions.toggleSidebar() }}
         >
-          <IconPanelLeftOutline16 size={18} />
+          <IconPanelLeftOutline16 className={css.railFabIcon} />
         </button>
       )}
-      {overlay && (
-        /* Dismiss surface for a covering sidebar: it owns the left edge, so a
-           tap anywhere on the exposed content closes it. The full drawer closes
-           through the sidebar toggle; the rail overlay has its own switch, and
-           routing it through the toggle would expand the drawer instead. */
-        <div
-          className={css.drawerScrim}
-          aria-hidden="true"
-          onClick={() => { if (drawer) actions.toggleSidebar(); else actions.closeRail() }}
-        />
+      {drawer && (
+        /* Dismiss surface for the covering sidebar: it owns the left edge, so a
+           tap anywhere on the exposed content closes it. */
+        <div className={css.drawerScrim} aria-hidden="true" onClick={() => { actions.toggleSidebar() }} />
       )}
       <>
         {/* Both column occupants stay at fixed tree positions from first

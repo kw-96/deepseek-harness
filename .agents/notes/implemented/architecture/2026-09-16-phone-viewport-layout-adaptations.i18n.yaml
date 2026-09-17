@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-16-phone-viewport-layout-adaptations.md
-2026-09-16-phone-viewport-layout-adaptations.md: e0f9f98c359c5b0dc5d360a9253442e1ae768ca2
-2026-09-16-phone-viewport-layout-adaptations.zh.md: 19fd4dd18b697f3318f1abcabf243510df5fa0b4
+2026-09-16-phone-viewport-layout-adaptations.md: aef4b2ee989d5ec70ce23caef3c261b44c7fffad
+2026-09-16-phone-viewport-layout-adaptations.zh.md: 31b843541370cc9c28aeea338d019d409a3cecef

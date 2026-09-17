@@ -20,9 +20,6 @@ import {
  * (viewport < SIDEBAR_AUTO_COLLAPSE) so toggleSidebar can pick semantics, and
  * `narrowExpanded` is the manual override that re-expands the auto-collapsed
  * sidebar over the squeezed center without rewriting the width preference.
- * `railOpen` belongs to the touch rail overlay: where the collapsed sidebar is
- * reached through a floating button instead of a permanent 56px track, it holds
- * whether the icon column is currently out.
  */
 type LayoutState = {
   sidebar: number
@@ -30,7 +27,6 @@ type LayoutState = {
   bottom: number
   narrow: boolean
   narrowExpanded: boolean
-  railOpen: boolean
 }
 
 /**
@@ -48,8 +44,6 @@ type LayoutActions = {
   toggleDetails: (draft: LayoutState) => void
   openBottom: (draft: LayoutState) => void
   closeBottom: (draft: LayoutState) => void
-  openRail: (draft: LayoutState) => void
-  closeRail: (draft: LayoutState) => void
 }
 
 /**
@@ -65,21 +59,17 @@ type LayoutActions = {
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
     init: (): LayoutState => ({
-      sidebar: SIDEBAR_DEFAULT, details: 0, bottom: 0, narrow: false, narrowExpanded: false, railOpen: false,
+      sidebar: SIDEBAR_DEFAULT, details: 0, bottom: 0, narrow: false, narrowExpanded: false,
     }),
     actions: {
       setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
       setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
       setBottom: (d, px: number) => { d.bottom = clampWidth(px, BOTTOM_MIN, BOTTOM_MAX) },
       // Narrow toggles flip only the override: the width preference survives
-      // untouched, so re-widening restores the pre-squeeze layout. Closing the
-      // rail overlay rides along — the expanded sidebar replaces the icon
-      // column rather than stacking on it.
+      // untouched, so re-widening restores the pre-squeeze layout.
       toggleSidebar: (d) => {
-        if (d.narrow) {
-          d.narrowExpanded = !d.narrowExpanded
-          d.railOpen = false
-        } else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
+        if (d.narrow) d.narrowExpanded = !d.narrowExpanded
+        else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
       },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
@@ -87,7 +77,6 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         if (d.narrow === narrow) return
         d.narrow = narrow
         d.narrowExpanded = false
-        d.railOpen = false
       },
       openDetails: (d) => { if (d.details === 0) d.details = DETAILS_DEFAULT },
       closeDetails: (d) => { d.details = 0 },
@@ -96,8 +85,6 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       toggleDetails: (d) => { d.details = d.details === 0 ? DETAILS_DEFAULT : 0 },
       openBottom: (d) => { if (d.bottom === 0) d.bottom = BOTTOM_DEFAULT },
       closeBottom: (d) => { d.bottom = 0 },
-      openRail: (d) => { d.railOpen = true },
-      closeRail: (d) => { d.railOpen = false },
     },
   })
   return handle
