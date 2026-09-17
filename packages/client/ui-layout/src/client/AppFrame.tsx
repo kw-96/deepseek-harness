@@ -16,7 +16,8 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { computeColumns, DETAILS_DEFAULT, MOBILE_DRAWER_MAX, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { computeColumns, DETAILS_DEFAULT, MOBILE_DRAWER_MAX, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
 import { isDesktopShell } from './desktop/detect.ts'
 import { DesktopTitleBar } from './desktop/DesktopTitleBar.tsx'
 import { DocumentTitle } from './DocumentTitle.tsx'
@@ -210,13 +211,19 @@ export function AppFrame({
     ? 0
     : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
   const solved = computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
-  // Phone re-expand (below MOBILE_DRAWER_MAX): the sidebar leaves the grid and
-  // covers the center, so the content keeps the full viewport width instead of
-  // being squeezed to a sliver. The component owns the width because the
-  // covering column has no track to read it from.
-  const drawer = viewport < MOBILE_DRAWER_MAX && !sidebarCollapsed
+  // A touch device does not keep the 56px rail: on a phone the collapsed
+  // sidebar is reached through a floating button that brings the icon column
+  // out over the content, so the conversation keeps the whole viewport. The
+  // reading is the touch point count rather than a pointer media query,
+  // because a browser in desktop mode reports a mouse-like pointer type on a
+  // touchscreen while maxTouchPoints keeps reporting the hardware.
+  const railOverlay = narrow && navigator.maxTouchPoints > 0
+  // Either overlay leaves the grid track at zero: the covering column owns its
+  // own width because there is no track to read one from.
+  const drawer = !sidebarCollapsed && (railOverlay || viewport < MOBILE_DRAWER_MAX)
   const drawerWidth = Math.min(Math.round(viewport * 0.84), 320)
-  const cols = drawer
+  const overlay = drawer || (railOverlay && panels.railOpen)
+  const cols = drawer || railOverlay
     ? { sidebar: 0, center: Math.max(0, viewport - solved.details), details: solved.details }
     : solved
   // 'rightbar' 别名槽的 owner 几何：官方语义要求"正常宽度"（打开时的解析
@@ -273,22 +280,52 @@ export function AppFrame({
         useSessions={useSessions}
         usePanelInfo={usePanelInfo}
       />
-      <div className={css.sidebarCol} data-drawer={drawer || undefined} style={drawer ? { width: drawerWidth } : undefined}>
+      <div
+        className={css.sidebarCol}
+        data-drawer={drawer || undefined}
+        data-rail={railOverlay && !drawer || undefined}
+        data-shown={overlay || undefined}
+        style={railOverlay || drawer ? { width: drawer ? drawerWidth : SIDEBAR_COLLAPSED } : undefined}
+        /* Any press inside the out rail closes it: the column is a temporary
+           menu over the content, and the one control that wants to stay open
+           (expand to the full sidebar) writes narrowExpanded, which keeps the
+           column out on its own. */
+        onClickCapture={railOverlay && !drawer ? () => { actions.closeRail() } : undefined}
+      >
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
             component sees its rendered state as owner params decided here
             (collapsed follows the resolved rail, so a derived auto-collapse
-            renders the rail UI too). A phone drawer reports its own covering
-            width because its grid track is zero. */}
+            renders the rail UI too). A covering column reports its own width
+            because its grid track is zero. */}
         {renderSlot('sidebar', {
           collapsed: sidebarCollapsed,
-          width: drawer ? drawerWidth : cols.sidebar,
+          width: drawer ? drawerWidth : railOverlay ? SIDEBAR_COLLAPSED : cols.sidebar,
         })}
       </div>
-      {drawer && (
-        /* Dismiss surface for the phone drawer: the covering sidebar owns the
-           left edge, so a tap anywhere on the exposed content closes it. */
-        <div className={css.drawerScrim} aria-hidden="true" onClick={() => { actions.toggleSidebar() }} />
+      {!overlay && railOverlay && (
+        /* The phone entry to the sidebar: one floating button in place of the
+           permanent rail, so the content owns the full viewport until asked. */
+        <button
+          type="button"
+          className={css.railFab}
+          aria-label={t('sidebar.open')}
+          data-sidebar-rail-fab
+          onClick={() => { actions.openRail() }}
+        >
+          <IconPanelLeftOutline16 size={18} />
+        </button>
+      )}
+      {overlay && (
+        /* Dismiss surface for a covering sidebar: it owns the left edge, so a
+           tap anywhere on the exposed content closes it. The full drawer closes
+           through the sidebar toggle; the rail overlay has its own switch, and
+           routing it through the toggle would expand the drawer instead. */
+        <div
+          className={css.drawerScrim}
+          aria-hidden="true"
+          onClick={() => { if (drawer) actions.toggleSidebar(); else actions.closeRail() }}
+        />
       )}
       <>
         {/* Both column occupants stay at fixed tree positions from first

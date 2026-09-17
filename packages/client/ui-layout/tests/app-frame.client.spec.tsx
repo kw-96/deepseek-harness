@@ -160,6 +160,73 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  if (touchPointsDescriptor === undefined) Reflect.deleteProperty(Navigator.prototype, 'maxTouchPoints')
+  else Object.defineProperty(Navigator.prototype, 'maxTouchPoints', touchPointsDescriptor)
+})
+
+/**
+ * jsdom 的 maxTouchPoints 恒为 0；触摸用例临时改写原型读取，afterEach 还原。
+ * @param points - 用例期间上报的触摸点数。
+ */
+function setTouchPoints(points: number): void {
+  Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { configurable: true, get: () => points })
+}
+
+/** 原型上的原始触摸点数描述符，afterEach 用它还原。 */
+const touchPointsDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints')
+
+describe('AppFrame — touch rail overlay', () => {
+  it('keeps no rail track on a touch device and offers a floating entry instead', () => {
+    setTouchPoints(5)
+    frameWidth = 980
+    const { frame } = mountFrame()
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).not.toBeNull()
+    expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(0)
+  })
+
+  it('brings the rail out on the floating button and parks it again on close', () => {
+    setTouchPoints(5)
+    frameWidth = 980
+    const { frame, instance } = mountFrame()
+    act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
+    const col = frame.querySelector('[class*="sidebarCol"]') as HTMLElement
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(col.hasAttribute('data-rail')).toBe(true)
+    expect(col.hasAttribute('data-shown')).toBe(true)
+    expect(col.style.width).toBe('56px')
+    expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(1)
+    // 浮层期间悬浮按钮让位（它被浮层盖住，收起后才回来）。
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).toBeNull()
+    act(() => { fireEvent.click(frame.querySelector('[class*="drawerScrim"]')!) })
+    expect(instance.getSnapshot().railOpen).toBe(false)
+    expect(col.hasAttribute('data-shown')).toBe(false)
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).not.toBeNull()
+  })
+
+  it('a press inside the rail retires it, and expanding swaps it for the full drawer', () => {
+    setTouchPoints(5)
+    frameWidth = 980
+    const { frame, instance } = mountFrame()
+    act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
+    act(() => { fireEvent.click(frame.querySelector('[class*="sidebarCol"]')!) })
+    expect(instance.getSnapshot().railOpen).toBe(false)
+    act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
+    act(() => { instance.actions.toggleSidebar() })
+    const col = frame.querySelector('[class*="sidebarCol"]') as HTMLElement
+    expect(instance.getSnapshot()).toMatchObject({ narrowExpanded: true, railOpen: false })
+    expect(col.hasAttribute('data-drawer')).toBe(true)
+    expect(col.hasAttribute('data-shown')).toBe(true)
+    expect(col.style.width).toBe('320px')
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).toBeNull()
+  })
+
+  it('a pointer device keeps the resident rail below the auto-collapse breakpoint', () => {
+    frameWidth = 980
+    const { frame } = mountFrame()
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).toBeNull()
+  })
 })
 
 describe('AppFrame', () => {
