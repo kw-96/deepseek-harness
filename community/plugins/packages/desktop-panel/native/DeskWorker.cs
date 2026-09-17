@@ -44,6 +44,19 @@ class DeskWorker
     [StructLayout(LayoutKind.Explicit)] struct INPUTUNION { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
     [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public INPUTUNION u; }
 
+    /** 发送安全注意序列（Ctrl+Alt+Del）。无返回值，失败信息取自 GetLastError。 */
+    [DllImport("sas.dll", SetLastError = true)] static extern void SendSAS(bool asUser);
+    [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr h, uint acc, out IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)] static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TOKEN_PRIVILEGES newState, int len, IntPtr prev, IntPtr retLen);
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool LookupPrivilegeValue(string system, string name, out long luid);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [StructLayout(LayoutKind.Sequential)] struct LUID_AND_ATTRIBUTES { public long Luid; public int Attributes; }
+    [StructLayout(LayoutKind.Sequential)] struct TOKEN_PRIVILEGES { public int PrivilegeCount; public LUID_AND_ATTRIBUTES Privileges; }
+
     const uint WINSTA_ALL_ACCESS = 0x37F;
     const uint DESKTOP_ALL = 0x01FF;
     const uint GENERIC_ALL = 0x10000000;
@@ -64,6 +77,23 @@ class DeskWorker
     static long FrameSeq = 0;
     static volatile bool Running = true;
     static volatile Stream Pipe = null;
+    /** HandleInput 写日志用的目录，Main 启动时设置为自身所在目录。 */
+    static string LogDirectory = @"C:\ProgramData\dsh-desktop-panel";
+
+    /** 启用指定特权（SendSAS 要求 SeTcbPrivilege）。 */
+    static void EnablePrivilege(string name)
+    {
+        IntPtr token;
+        if (!OpenProcessToken(GetCurrentProcess(), 0x0020 | 0x0008, out token)) return;
+        long luid;
+        if (!LookupPrivilegeValue(null, name, out luid)) { CloseHandle(token); return; }
+        TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES();
+        tp.PrivilegeCount = 1;
+        tp.Privileges.Luid = luid;
+        tp.Privileges.Attributes = 0x00000002;   // SE_PRIVILEGE_ENABLED
+        AdjustTokenPrivileges(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+        CloseHandle(token);
+    }
 
     static void LogTo(string outDir, string line)
     {
@@ -215,6 +245,30 @@ class DeskWorker
                 Thread.Sleep(12);
             }
         }
+        else if (t == "cad")
+        {
+            // 发送安全注意序列（Ctrl+Alt+Del）。前提：进程具备 SeTcbPrivilege（已在上方启用）或位于 Winlogon 桌面，
+            // 且 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\SoftwareSASGeneration
+            // 允许对应身份（1=应用，2=服务，3=两者）。服务身份与用户身份各发一次，尽量命中策略。
+            SendSAS(false);
+            int errService = Marshal.GetLastWin32Error();
+            SendSAS(true);
+            int errUser = Marshal.GetLastWin32Error();
+            // SAS 可能切到新的安全桌面（桌面名相同但对象不同），强制重新附着后再抓帧
+            Thread.Sleep(300);
+            AttachInputDesktop(LogDirectory, true);
+            LogTo(LogDirectory, "发送 Ctrl+Alt+Del：服务身份 err=" + errService + "，用户身份 err=" + errUser + "，已重新附着桌面=" + CurrentDesktopName);
+            SendStatus("Ctrl+Alt+Del 已发送（服务 err=" + errService + " / 用户 err=" + errUser + "），当前桌面=" + CurrentDesktopName);
+        }
+        else if (t == "diag")
+        {
+            IntPtr fg = GetForegroundWindow();
+            StringBuilder cls = new StringBuilder(256);
+            GetClassName(fg, cls, cls.Capacity);
+            string info = "前台窗口 class=" + cls.ToString() + " hwnd=" + fg + " 桌面=" + CurrentDesktopName;
+            LogTo(LogDirectory, "诊断：" + info);
+            SendStatus(info);
+        }
     }
 
     static string Field(string json, string key)
@@ -245,6 +299,8 @@ class DeskWorker
         // 日志与自身同目录（安装脚本部署到 %ProgramData%\dsh-desktop-panel）
         string outDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
         Directory.CreateDirectory(outDir);
+        LogDirectory = outDir;
+        EnablePrivilege("SeTcbPrivilege");
         LogTo(outDir, "worker 启动 pid=" + Process.GetCurrentProcess().Id + " 会话=" + Process.GetCurrentProcess().SessionId + " 管道=" + pipeName);
 
         IntPtr hwinsta = OpenWindowStation("WinSta0", false, WINSTA_ALL_ACCESS);
