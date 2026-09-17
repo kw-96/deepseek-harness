@@ -185,12 +185,24 @@ importers:
       '@deepseek-ai/dsh-agent-tool-presentation':
         specifier: workspace:^
         version: link:../../packages/core/agent-tool-presentation
+      '@deepseek-ai/dsh-api-terminal-controller':
+        specifier: workspace:^
+        version: link:../../packages/api/terminal-controller
+      '@deepseek-ai/dsh-api-workspace-files':
+        specifier: workspace:^
+        version: link:../../packages/api/workspace-files
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:^
         version: link:../../packages/boot/app-boot
       '@deepseek-ai/dsh-base':
         specifier: workspace:^
         version: link:../../packages/bundle/base
+      '@deepseek-ai/dsh-client-file-upload':
+        specifier: workspace:^
+        version: link:../../packages/client/file-upload
+      '@deepseek-ai/dsh-client-resources':
+        specifier: workspace:^
+        version: link:../../packages/client/resources
       '@deepseek-ai/dsh-client-ui-agent-preset':
         specifier: workspace:^
         version: link:../../packages/client/ui-agent-preset
@@ -257,6 +269,9 @@ importers:
       '@deepseek-ai/dsh-hooks-codex':
         specifier: workspace:^
         version: link:../../packages/hooks/hooks-codex
+      '@deepseek-ai/dsh-host-open-in-app':
+        specifier: workspace:^
+        version: link:../../packages/host/open-in-app
       '@deepseek-ai/dsh-http-proxy':
         specifier: workspace:^
         version: link:../../packages/util/http-proxy
