@@ -21,7 +21,7 @@ describe('createLayoutStore', () => {
   it('initializes the sidebar at its default width, details closed, wide viewport assumed', () => {
     const { store } = createLayoutStore().create()
     expect(store.getSnapshot()).toEqual({
-      sidebar: SIDEBAR_DEFAULT, details: 0, bottom: 0, narrow: false, narrowExpanded: false, railOpen: false,
+      sidebar: SIDEBAR_DEFAULT, details: 0, bottom: 0, narrow: false, narrowExpanded: false,
     })
   })
 
@@ -63,24 +63,11 @@ describe('createLayoutStore', () => {
     actions.setNarrow(true)
     actions.toggleSidebar()
     expect(store.getSnapshot()).toEqual({
-      sidebar: 400, details: 0, bottom: 0, narrow: true, narrowExpanded: true, railOpen: false,
+      sidebar: 400, details: 0, bottom: 0, narrow: true, narrowExpanded: true,
     })
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(false)
     expect(store.getSnapshot().sidebar).toBe(400)
-  })
-
-  it('the rail overlay opens and closes on its own, and any sidebar toggle retires it', () => {
-    const { store, actions } = createLayoutStore().create()
-    actions.setNarrow(true)
-    actions.openRail()
-    expect(store.getSnapshot().railOpen).toBe(true)
-    actions.closeRail()
-    expect(store.getSnapshot().railOpen).toBe(false)
-    // 展开完整侧栏时浮层让位：抽屉取代图标列，而不是叠在它上面。
-    actions.openRail()
-    actions.toggleSidebar()
-    expect(store.getSnapshot()).toMatchObject({ narrowExpanded: true, railOpen: false })
   })
 
   it('crossing the breakpoint drops the override; a same-value setNarrow keeps it', () => {
@@ -142,7 +129,6 @@ describe('createLayoutStore', () => {
       bottom: 0,
       narrow: false,
       narrowExpanded: false,
-      railOpen: false,
     })
   })
 })

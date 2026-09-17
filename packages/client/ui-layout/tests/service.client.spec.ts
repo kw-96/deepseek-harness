@@ -14,8 +14,6 @@ function fakePanels(): PanelActions {
     toggleDetails: vi.fn(),
     openBottom: vi.fn(),
     closeBottom: vi.fn(),
-    openRail: vi.fn(),
-    closeRail: vi.fn(),
   }
 }
 

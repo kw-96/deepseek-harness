@@ -59,6 +59,12 @@
   align-items: center;
   gap: 0;
   min-height: 30px;
+  /* A floating sidebar entry over this corner publishes the width to keep free
+     (AppFrame sets the variable; absent means no entry and no inset). It is a
+     base rule, not a phone-breakpoint one: the entry follows touch input, which
+     is not tied to the viewport width — a phone browser in desktop mode is wide
+     and still gets the button. */
+  margin-left: var(--dsh-rail-entry-clearance, 0px);
 }
 
 .titleCluster {

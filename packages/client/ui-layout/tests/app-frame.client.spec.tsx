@@ -175,8 +175,8 @@ function setTouchPoints(points: number): void {
 /** 原型上的原始触摸点数描述符，afterEach 用它还原。 */
 const touchPointsDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints')
 
-describe('AppFrame — touch rail overlay', () => {
-  it('keeps no rail track on a touch device and offers a floating entry instead', () => {
+describe('AppFrame — touch sidebar entry', () => {
+  it('keeps no rail track on a touch device and offers a header entry instead', () => {
     setTouchPoints(5)
     frameWidth = 980
     const { frame } = mountFrame()
@@ -185,40 +185,35 @@ describe('AppFrame — touch rail overlay', () => {
     expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(0)
   })
 
-  it('brings the rail out on the floating button and parks it again on close', () => {
+  it('opens the full sidebar from the entry, and the scrim closes it again', () => {
     setTouchPoints(5)
     frameWidth = 980
     const { frame, instance } = mountFrame()
     act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
     const col = frame.querySelector('[class*="sidebarCol"]') as HTMLElement
+    // 直接展开完整侧栏：图标列只是收起态，不是要先走一遍的菜单。
+    expect(instance.getSnapshot().narrowExpanded).toBe(true)
     expect(tracks(frame)).toEqual([0, 0])
-    expect(col.hasAttribute('data-rail')).toBe(true)
+    expect(col.hasAttribute('data-drawer')).toBe(true)
     expect(col.hasAttribute('data-shown')).toBe(true)
-    expect(col.style.width).toBe('56px')
+    expect(col.style.width).toBe('320px')
     expect(frame.querySelectorAll('[class*="drawerScrim"]')).toHaveLength(1)
-    // 浮层期间悬浮按钮让位（它被浮层盖住，收起后才回来）。
+    // 抽屉自身有关闭控件，此时入口让位。
     expect(frame.querySelector('[data-sidebar-rail-fab]')).toBeNull()
     act(() => { fireEvent.click(frame.querySelector('[class*="drawerScrim"]')!) })
-    expect(instance.getSnapshot().railOpen).toBe(false)
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
     expect(col.hasAttribute('data-shown')).toBe(false)
     expect(frame.querySelector('[data-sidebar-rail-fab]')).not.toBeNull()
   })
 
-  it('a press inside the rail retires it, and expanding swaps it for the full drawer', () => {
+  it('keeps the entry while no Session is current (the header is hidden)', () => {
     setTouchPoints(5)
     frameWidth = 980
-    const { frame, instance } = mountFrame()
-    act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
-    act(() => { fireEvent.click(frame.querySelector('[class*="sidebarCol"]')!) })
-    expect(instance.getSnapshot().railOpen).toBe(false)
-    act(() => { fireEvent.click(frame.querySelector('[data-sidebar-rail-fab]')!) })
-    act(() => { instance.actions.toggleSidebar() })
-    const col = frame.querySelector('[class*="sidebarCol"]') as HTMLElement
-    expect(instance.getSnapshot()).toMatchObject({ narrowExpanded: true, railOpen: false })
-    expect(col.hasAttribute('data-drawer')).toBe(true)
-    expect(col.hasAttribute('data-shown')).toBe(true)
-    expect(col.style.width).toBe('320px')
-    expect(frame.querySelector('[data-sidebar-rail-fab]')).toBeNull()
+    selectedSession.current = undefined
+    const { frame } = mountFrame()
+    // 空白/无会话时刷新会落在 Hero：此时侧边栏入口是回到已有会话的唯一出口。
+    expect(frame.querySelector('[data-sidebar-rail-fab]')).not.toBeNull()
+    expect(tracks(frame)).toEqual([0, 0])
   })
 
   it('a pointer device keeps the resident rail below the auto-collapse breakpoint', () => {

@@ -41,11 +41,10 @@
   border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
-/* A covering sidebar — the phone drawer, or the touch rail overlay — leaves the
-   zero-width track and slides over the center, which keeps the full viewport
-   width. Width is inline (the track no longer supplies it). */
-.sidebarCol[data-drawer],
-.sidebarCol[data-rail] {
+/* A covering sidebar — the phone drawer — leaves the zero-width track and
+   slides over the center, which keeps the full viewport width. Width is inline
+   (the track no longer supplies it). */
+.sidebarCol[data-drawer] {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -58,40 +57,44 @@
 
 /* Parked off-screen until asked for: a touch device's collapsed sidebar is a
    menu, not a resident column, so it must not sit behind the scrim either. */
-.sidebarCol[data-drawer]:not([data-shown]),
-.sidebarCol[data-rail]:not([data-shown]) {
+.sidebarCol[data-drawer]:not([data-shown]) {
   transform: translateX(-100%);
   visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebarCol[data-drawer],
-  .sidebarCol[data-rail] {
+  .sidebarCol[data-drawer] {
     transition: none;
   }
 }
 
-/* The phone entry to the sidebar: one floating control in place of the
-   permanent rail. It sits above the content and above the scrim that appears
-   while the rail is out (the rail covers it then, so it re-emerges on close). */
+/* The touch device's way into the sidebar: the trailing entry's twin, in the
+   header's leading corner. Same 28px circle around a 15px glyph as the right
+   panel's own entry (ui-sidebar-right's ExpandButton), so the two read as one
+   pair instead of one of them floating over the header. `top`/`left` mirror
+   that entry's inset on the other side. */
 .railFab {
   position: absolute;
   top: 8px;
-  left: 8px;
+  left: 12px;
   z-index: 26;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-elevation-prominent);
-  color: var(--dsw-alias-label-primary);
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 28px;
   cursor: pointer;
+}
+
+.railFabIcon {
+  width: 15px;
+  height: 15px;
 }
 
 .railFab:hover {
