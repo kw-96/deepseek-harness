@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { MainPanelId, UsePanelInfo } from './service.ts'
 import type { PanelActions } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
+import { installExternalLinkHandler } from './desktop/external-links.ts'
 import { installDesktopTray } from './desktop/tray.ts'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
@@ -243,4 +244,11 @@ export function apply(ctx: ClientContext): void {
 
   // 桌面壳托盘：窗口关闭后常驻，菜单随工作区与语言刷新；浏览器里是空操作。
   ctx.effect(() => installDesktopTray(ctx), 'ui-layout: desktop tray')
+
+  // 外链出口：壳里点击 http(s) 外链交给系统默认浏览器；浏览器标签页里是空操作。
+  // 拦截器在非壳环境返回 undefined，这里统一收敛成确定的可释放函数。
+  ctx.effect(() => {
+    const disposeExternalLinks = installExternalLinkHandler()
+    return () => { disposeExternalLinks?.() }
+  }, 'ui-layout: desktop external links')
 }
