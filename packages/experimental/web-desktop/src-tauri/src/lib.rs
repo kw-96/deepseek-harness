@@ -12,7 +12,8 @@ use child::ChildSlot;
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{Emitter, Manager, RunEvent, WindowEvent};
+use tauri::webview::NewWindowResponse;
+use tauri::{Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 type BootLogs = Arc<Mutex<Vec<String>>>;
 
@@ -65,6 +66,26 @@ pub fn run() {
         }
         let _ = app.handle().emit("boot-log", line);
       }
+      // 主窗口在这里创建而不是交给 tauri.conf.json：只有 builder 能挂
+      // `on_new_window`，而外链点击走的正是新窗口请求路径。
+      WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("DeepSeek Harness")
+        .inner_size(1280.0, 800.0)
+        .resizable(true)
+        .fullscreen(false)
+        .decorations(false)
+        .shadow(true)
+        .on_new_window(|url, _features| {
+          // 壳内地址留在壳里新建窗口；外链交给系统浏览器，而不是被默认拒绝。
+          if external_links::handle_new_window(&url) {
+            NewWindowResponse::Allow
+          } else {
+            NewWindowResponse::Deny
+          }
+        })
+        .build()
+        .map_err(|error| format!("failed to create the main window: {error}"))?;
+
       let boot_logs = Arc::clone(&logs);
       thread::spawn(move || {
         let result = (|| -> Result<(), String> {
