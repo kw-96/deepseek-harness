@@ -76,7 +76,7 @@ Web 客户端需要从一个未必在 Host 机器上的浏览器查看会话工�
 | `workspace-file/not-regular-file` | 对非普通文件执行 `read`、`readBytes`、`readAll`、`readRelated` 或 `stat` | `{ path, kind: 'directory' \| 'symlink' \| 'other' }` |
 | `workspace-file/not-directory` | 对非目录执行 `list` | `{ path, kind: 'file' \| 'symlink' \| 'other' }` |
 | `workspace-file/unsupported-address` | Client 铸出：本提供者无法服务的资源地址 | `{ address }` |
-| `workspace-file/unknown-workspace` | Client 铸出：不携带 Session 的 `absolute` 地址 | `{ address }` |
+| `workspace-file/unknown-workspace` | Client 铸出：不携带 Session 的 `absolute` 地址，或变更订阅在 Host 确认之前就已关闭的 `session` 地址 | `{ address }` |
 | `gateway/bad-request` | 空路径，或不是范围内整数的 `offset`、`limit`、`length` | `{}` |
 
 这个集合只增不改不删：可以新增代码，但不重命名、不移除任何一个，因为消费方跨线路按这些字符串分支。
@@ -104,7 +104,7 @@ Client 导出向 `ctx.resources` 注册一个 `ResourceProvider<'file'>`，存�
 - **值是元数据**，`WorkspaceFileStat { absolutePath, version, bytes? }`；内容从不进入流，因为内容可以任意大，而流是用来推送变更而不是载荷的。消费者用 `read` 读页（或用 `readBytes` 开窗），并比较版本判断它们是否过时；新鲜度判断和刷新属于各消费方，不属于共享观察。
 - **地址命名文件，作用域决定读取会话。** `session` 地址携带的相对或绝对路径原样交给 Host；工作区根为相对路径提供基准，Session 文件系统后端决定读取权限。Client 不需要持有 cwd。`absolute` 地址不带 Session，以 `workspace-file/unknown-workspace` 失败，不借用当前或 tab 所属 Session。不支持的语法产生 `workspace-file/unsupported-address`。这两种 Client 错误会结束流。
 - **帧。** 第一帧是 `stat`或其失败的 `ok: false` 帧；提供者不抛也不接，因为 Remote 面从不 reject，而提供者流里的抛错只可能是编程错误，任其浮出。携带值尚未持有的版本的 Host 写入产生该版本、保留字节数、不做 stat；携带已持有版本的帧被丢弃。报告的消失会再 stat 一次——仍在则是新元数据，不在则是保留上一个值供展示的 `not-found` 帧。跟随的是地址而不是文件：stat 失败后流继续，因此 agent 创建该文件会让资源恢复正常。中止 signal 则流静默结束。
-- **每会话一条 `changes` 订阅。** 首位跟随者打开 `remote.$stream`，最后一位离开时释放，后继流和插件拆除等待关闭完成。Client 接受 Host 的 `ready` 后才开始首次 `stat`；本地发出 WebSocket 请求不是 Host 确认。跟随者先按地址注册，缓冲路径未知期间的变更，成功 stat 后按返回的 `absolutePath` 过滤排队与实时帧，反斜杠归一为斜杠。尚未成功绑定时，Session 内任何写入均可触发重新 stat。载体掉线由 Gateway 监督器重连；Host 结束或终态失败会结束跟随者，并保留最近元数据，直到重新打开。
+- **每会话一条 `changes` 订阅。** 首位跟随者打开 `remote.$stream`，最后一位离开时释放，后继流和插件拆除等待关闭完成。Client 接受 Host 的 `ready` 后才开始首次 `stat`；本地发出 WebSocket 请求不是 Host 确认。跟随者先按地址注册，缓冲路径未知期间的变更，成功 stat 后按返回的 `absolutePath` 过滤排队与实时帧，反斜杠归一为斜杠。尚未成功绑定时，Session 内任何写入均可触发重新 stat。载体掉线由 Gateway 监督器重连；Host 结束或终态失败会结束跟随者，并保留最近元数据，直到重新打开。若跟随者在 Host 确认订阅之前就随流结束而从未取得 `stat`，它报告 `workspace-file/unknown-workspace`，而不是不产出任何帧就结束：此后不会有 `stat`，而永远停在加载中的地址会被读成无法解释的服务不可用。
 - **导航参数。** `SidebarRightResourceParamsMap.file` 是 `WorkspaceFileParams { line?: number }`，即要显露的 1 起算行号。行号作为导航参数而不是地址的一部分传递，因为不论从顶部还是第 400 行打开，文件都是同一份内容。
 
 ### 相关记录
