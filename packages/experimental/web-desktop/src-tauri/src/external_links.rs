@@ -1,9 +1,9 @@
 //! 外链出口：WebView 里的 http(s) 链接交给系统默认浏览器打开。
 //!
 //! 桌面壳只服务本机 harness 页面。外部链接若留在 WebView 内导航会把壳页面
-//! 顶掉，而 `target="_blank"` 的新窗口请求又会被 Tauri 默认拒绝，所以两条
-//! 路径都要接管：前端把新窗口点击转成 `open_external` 命令，导航钩子兜住
-//! 同窗口导航。
+//! 顶掉，而 `target="_blank"` 的新窗口请求又会被 Tauri 默认拒绝，所以三条
+//! 路径都要接管：前端把点击转成 `open_external` 命令或同窗口导航，导航钩子
+//! 兜住同窗口路径，新窗口钩子兜住 `target="_blank"` 与 `window.open`。
 
 use std::process::Command;
 
@@ -53,6 +53,21 @@ fn is_shell_internal(url: &Url) -> bool {
 pub fn open_external(url: String) -> Result<(), String> {
     let parsed = Url::parse(&url).map_err(|error| format!("invalid URL {url}: {error}"))?;
     open_in_default_browser(&parsed)
+}
+
+/// 新窗口请求出口：壳内地址留在壳里新建窗口，外链交给系统默认浏览器。
+///
+/// `target="_blank"` 与 `window.open` 走的是新窗口请求而不是同窗口导航，
+/// `on_navigation` 看不到它们；Tauri 默认拒绝新窗口，点击因此毫无反应。
+/// 前端拦截器失效时，这里是唯一的出口。
+/// @param url - 新窗口请求的目标地址。
+/// @returns 是否允许由壳打开该窗口。
+pub fn handle_new_window(url: &Url) -> bool {
+    if is_shell_internal(url) {
+        return true;
+    }
+    let _ = open_in_default_browser(url);
+    false
 }
 
 /// 同窗口导航兜底：外部地址一律改走默认浏览器，壳内导航放行。
