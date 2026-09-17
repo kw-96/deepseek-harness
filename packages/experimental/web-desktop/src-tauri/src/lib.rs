@@ -3,7 +3,6 @@
 
 mod alert;
 mod backend;
-mod browser_view;
 mod child;
 mod external_links;
 mod resolve;
@@ -45,14 +44,11 @@ pub fn run() {
       tray::reveal_main(app);
     }))
     .plugin(external_links::navigation_plugin())
-    .manage(browser_view::BrowserViewSlot::default())
     .invoke_handler(tauri::generate_handler![
       get_boot_logs,
       external_links::open_external,
       tray::set_desktop_tray,
-      tray::quit_desktop_app,
-      browser_view::browser_view_sync,
-      browser_view::browser_view_close
+      tray::quit_desktop_app
     ])
     .setup(move |app| {
       let handle = app.handle().clone();
