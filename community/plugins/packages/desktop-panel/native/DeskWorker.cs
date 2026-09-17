@@ -175,12 +175,17 @@ class DeskWorker
         }
         else if (t == "down" || t == "up")
         {
-            INPUT[] i = new INPUT[1];
+            // 先绝对定位到目标坐标再按下/抬起：否则点击会落在光标当前位置，而不是用户点的位置
+            INPUT[] i = new INPUT[2];
             i[0].type = INPUT_MOUSE;
+            i[0].u.mi.dx = XtoAbs(Int(Field(json, "x")));
+            i[0].u.mi.dy = YtoAbs(Int(Field(json, "y")));
+            i[0].u.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+            i[1].type = INPUT_MOUSE;
             string button = Field(json, "button");
-            if (t == "down") i[0].u.mi.dwFlags = button == "right" ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
-            else i[0].u.mi.dwFlags = button == "right" ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
-            SendInput(1, i, Marshal.SizeOf(typeof(INPUT)));
+            if (t == "down") i[1].u.mi.dwFlags = button == "right" ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
+            else i[1].u.mi.dwFlags = button == "right" ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
+            SendInput(2, i, Marshal.SizeOf(typeof(INPUT)));
         }
         else if (t == "scroll")
         {
@@ -256,13 +261,14 @@ class DeskWorker
             {
                 try
                 {
-                    if (Pipe != null)
+                    Stream pipe = Pipe;   // 取局部快照：主线程可能在写帧期间把连接置空
+                    if (pipe != null)
                     {
                         AttachInputDesktop(outDir, false);
                         byte[] jpeg = CaptureJpeg(quality);
                         if (jpeg != null && jpeg.Length > 0)
                         {
-                            WritePacket(Pipe, FRAME_TYPE, jpeg);
+                            WritePacket(pipe, FRAME_TYPE, jpeg);
                             FrameSeq++;
                             if (FrameSeq % 10 == 0) LogTo(outDir, "已发送帧 " + FrameSeq + " 桌面=" + CurrentDesktopName + " 大小=" + (jpeg.Length / 1024) + "KB 尺寸=" + ScreenWidth + "x" + ScreenHeight);
                         }
