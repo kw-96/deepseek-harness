@@ -61,19 +61,46 @@ describe('Host-resolved file paths', () => {
     await expect(first).resolves.toEqual({ done: false, value: { ok: true, value: { absolutePath: CANONICAL, version: 'v0' } } })
   })
 
-  it.each(['abort', 'end', 'failure'] as const)('settles %s before Host ready without sending a stat or leaving a stream', async (ending) => {
+  it('settles an abort before Host ready without sending a stat or leaving a stream', async () => {
     const { remote, changes, open } = harness()
     remote.autoReady = false
     const { iterator, controller } = open()
     const first = iterator.next()
     const { source } = await remote.waitForChanges(0)
+    controller.abort()
+    await expect(first).resolves.toEqual({ done: true, value: undefined })
+    await changes.settle()
+    expect(remote.calls).toEqual(['changes'])
+    expect(remote.stats).toEqual([])
+    expect(remote.disposed).toEqual([`workspace file changes of ${SESSION}`])
+    expect(source.aborted).toBe(true)
+  })
+
+  it.each(['end', 'failure'] as const)('reports %s before Host ready as a failure rather than loading forever', async (ending) => {
+    const { remote, changes, open } = harness()
+    remote.autoReady = false
+    const { iterator } = open()
+    const first = iterator.next()
+    const { source } = await remote.waitForChanges(0)
     switch (ending) {
-      case 'abort': controller.abort(); break
       case 'end': source.end(); break
       case 'failure': source.fail(new Error('workspace root unavailable')); break
       default: throw new Error(`Unexpected stream ending: ${ending satisfies never}`)
     }
-    await expect(first).resolves.toEqual({ done: true, value: undefined })
+    // The address named a Session whose change subscription never opened, so no
+    // stat can follow. The resource must learn that, not wait forever.
+    await expect(first).resolves.toEqual({
+      done: false,
+      value: {
+        ok: false,
+        error: new RemoteError(
+          'workspace-file/unknown-workspace',
+          `${ADDRESS} requires a dsh-resource://file/session/<sessionId>/<path> address`,
+          { address: ADDRESS },
+        ),
+      },
+    })
+    await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined })
     await changes.settle()
     expect(remote.calls).toEqual(['changes'])
     expect(remote.stats).toEqual([])

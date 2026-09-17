@@ -131,7 +131,15 @@ export function apply(ctx: Context): void {
           // its top or at line 400, so the same tab is revealed and told where
           // to land.
           openFile: async (path, options) => {
-            const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+            const list = ctx.sessions.list.getSnapshot()
+            // The viewed session may be absent from the list snapshot while that
+            // list is still loading, and an address built without the root keeps
+            // its absolute spelling — which the file resource provider cannot
+            // turn into a workspace-relative read. Fall back to the active
+            // session's root: a file opened from the conversation on screen
+            // belongs to the session that conversation shows.
+            const cwd = list.byId[sessionId]?.cwd
+              ?? (list.current === undefined ? undefined : list.byId[list.current]?.cwd)
             const url = fileAddressFor(sessionId, cwd, path)
             if (options?.line === undefined) ctx.sidebarRight.openResource(url)
             else ctx.sidebarRight.openResource(url, { params: { line: options.line } })
