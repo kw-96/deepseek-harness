@@ -41,10 +41,11 @@
   border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
-/* Phone drawer (AppFrame re-expands the sidebar below MOBILE_DRAWER_MAX): the
-   column leaves the zero-width track and slides over the center, which keeps
-   the full viewport width. Width is inline (the track no longer supplies it). */
-.sidebarCol[data-drawer] {
+/* A covering sidebar — the phone drawer, or the touch rail overlay — leaves the
+   zero-width track and slides over the center, which keeps the full viewport
+   width. Width is inline (the track no longer supplies it). */
+.sidebarCol[data-drawer],
+.sidebarCol[data-rail] {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -52,23 +53,58 @@
   z-index: 30;
   border-right: none;
   box-shadow: var(--dsw-elevation-prominent);
-  animation: drawer-in 180ms var(--ds-ease-in-out);
+  transition: transform 180ms var(--ds-ease-in-out);
 }
 
-@keyframes drawer-in {
-  from {
-    transform: translateX(-100%);
-  }
+/* Parked off-screen until asked for: a touch device's collapsed sidebar is a
+   menu, not a resident column, so it must not sit behind the scrim either. */
+.sidebarCol[data-drawer]:not([data-shown]),
+.sidebarCol[data-rail]:not([data-shown]) {
+  transform: translateX(-100%);
+  visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebarCol[data-drawer] {
-    animation: none;
+  .sidebarCol[data-drawer],
+  .sidebarCol[data-rail] {
+    transition: none;
   }
 }
 
-/* Tap-outside dismissal for the phone drawer: below the covering column, above
-   the content it covers. */
+/* The phone entry to the sidebar: one floating control in place of the
+   permanent rail. It sits above the content and above the scrim that appears
+   while the rail is out (the rail covers it then, so it re-emerges on close). */
+.railFab {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 26;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-elevation-prominent);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.railFab:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.railFab:focus-visible {
+  outline: 1.5px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+/* Tap-outside dismissal for a covering sidebar: below the covering column,
+   above the content it covers. */
 .drawerScrim {
   position: absolute;
   inset: 0;

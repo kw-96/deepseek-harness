@@ -263,6 +263,7 @@ function bench(options: BenchOptions = {}) {
     toggleSidebar: vi.fn(), setNarrow: vi.fn(),
     openDetails: vi.fn(), closeDetails: vi.fn(), toggleDetails: vi.fn(),
     openBottom: vi.fn(), closeBottom: vi.fn(),
+    openRail: vi.fn(), closeRail: vi.fn(),
   }, () => true)
   const selectPanel = vi.spyOn(layout, 'selectPanel')
   ctx.provide('layout', layout)
