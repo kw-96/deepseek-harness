@@ -1,0 +1,35 @@
+{
+  "name": "dsh-desktop-panel",
+  "version": "0.1.0",
+  "description": "DSH 桌面面板：在浏览器里查看并操作当前控制台桌面（含锁屏界面），基于跨会话 SYSTEM worker",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "remote-desktop",
+    "desktop-panel",
+    "web-ui"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

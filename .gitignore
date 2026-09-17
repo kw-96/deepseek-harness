@@ -7,6 +7,8 @@ node_modules/
 lib/
 # Source trees may contain a directory named `lib` (e.g. `src/client/lib`); re-include those.
 !**/src/**/lib/
+# 免构建的纯 JS 社区插件把运行时源码直接放在 lib/（dsh-desktop-panel 无构建步骤），需要被跟踪。
+!community/plugins/packages/desktop-panel/lib/
 *.tsbuildinfo
 pnpm-debug.log
 .pnpm-store/
