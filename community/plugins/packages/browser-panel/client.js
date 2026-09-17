@@ -275,6 +275,8 @@ window.__ModuleLoader__.load({
 			var imgRef = useRef(null);
 			var boxRef = useRef(null);
 			var srcState = useState(""); var src = srcState[0], setSrc = srcState[1];
+			// 帧格式：png 无损、文字锐利；jpeg 省带宽但文字边缘会发虚。默认清晰优先。
+			var fmtState = useState("png"); var fmt = fmtState[0], setFmt = fmtState[1];
 			// 帧流是否还连着：断开时界面上要看得见，否则用户只会以为页面卡住了。
 			var connState = useState("live"); var conn = connState[0], setConn = connState[1];
 			var sizeRef = useRef({ w: 900, h: 700 });
@@ -347,10 +349,11 @@ window.__ModuleLoader__.load({
 			useEffect(function () {
 				var es = null, alive = true, lastUrl = null;
 				try {
-					// 画质：JPEG 质量越高文字越锐利，代价是每帧字节数——远程链路上要权衡。
+					// 画质：PNG 无损但每帧更大，JPEG 省带宽但文字发虚；切换即重连。
 					var qs = [];
 					if (targetId) qs.push("target=" + encodeURIComponent(targetId));
 					qs.push("quality=92");
+					qs.push("format=" + fmt);
 					es = new EventSource(LIVE_PATH + "/stream?" + qs.join("&"));
 				} catch (e) {
 					return;
@@ -359,7 +362,7 @@ window.__ModuleLoader__.load({
 					if (!alive || !ev.data) return;
 					setConn("live");
 					// A data: URL avoids a blob allocation per frame at this rate.
-					setSrc("data:image/jpeg;base64," + ev.data);
+					setSrc("data:image/" + (fmt === "png" ? "png" : "jpeg") + ";base64," + ev.data);
 				};
 				es.onopen = function () { setConn("live"); };
 				es.onerror = function () {
@@ -371,7 +374,7 @@ window.__ModuleLoader__.load({
 					try { es.close(); } catch (e) { /* ignore */ }
 					if (lastUrl) URL.revokeObjectURL(lastUrl);
 				};
-			}, [targetId]);
+			}, [targetId, fmt]);
 
 			/** Pane pixel -> page pixel. */
 			function at(e) {
@@ -1036,6 +1039,11 @@ window.__ModuleLoader__.load({
 								style: iconBtn
 							}, "↓")
 							: null,
+						h("button", {
+							onClick: function () { setFmt(fmt === "png" ? "jpeg" : "png"); },
+							title: fmt === "png" ? "当前：清晰（PNG）—— 点击切换为流畅" : "当前：流畅（JPEG）—— 点击切换为清晰",
+							style: iconBtn
+						}, fmt === "png" ? "清" : "畅"),
 						h("button", { onClick: function () { goStep("back"); }, title: "后退", style: iconBtn }, "←"),
 						h("button", { onClick: function () { goStep("forward"); }, title: "前进", style: iconBtn }, "→"),
 						h("button", { onClick: reload, title: "重新载入", style: iconBtn }, "↻"),

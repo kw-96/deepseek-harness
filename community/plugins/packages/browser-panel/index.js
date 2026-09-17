@@ -400,7 +400,7 @@ export function apply(ctx, config) {
                 // One frame per SSE message. Base64 costs ~33% but avoids
                 // hand-rolling a WebSocket frame writer on a raw socket.
                 res.write('data: ' + b64 + '\n\n')
-              }, { targetId, quality: Number(liveUrl.searchParams.get('quality')) || undefined })
+              }, { targetId, quality: Number(liveUrl.searchParams.get('quality')) || undefined, format: liveUrl.searchParams.get('format') || undefined })
             } catch (error) {
               res.write('event: error'+'\n'+'data: ' + JSON.stringify(String(error)) + '\n\n')
               res.end()

@@ -304,7 +304,8 @@ export async function startScreencast(onFrame, opts = {}) {
     try { onFrame(params.data, params.metadata || {}) } catch { /* keep streaming */ }
   })
   await s.send('Page.startScreencast', {
-    format: 'jpeg',
+    // PNG 无损、文字锐利，代价是每帧体积数倍；JPEG 省带宽但色彩子采样会让文字发虚。
+    format: opts.format === 'png' ? 'png' : 'jpeg',
     quality: opts.quality ?? 92,
     maxWidth: opts.maxWidth ?? Math.round(view.width * view.dpr),
     maxHeight: opts.maxHeight ?? Math.round(view.height * view.dpr),
