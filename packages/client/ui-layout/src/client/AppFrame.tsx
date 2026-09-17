@@ -11,7 +11,7 @@
  * zero self-made hooks.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
@@ -49,11 +49,15 @@ export type AppFrameProps =
   & PropsLocale<'common'>
   & InjectFace<AppFrameInjected>
 
+/** The left inset a phone conversation header must leave for the floating
+ * sidebar entry, in px: button left inset 8 + button 44 (AppFrame.module.css
+ * `.railFab`) + gap 8. Published as `--dsh-rail-entry-clearance`. */
+const RAIL_ENTRY_CLEARANCE = 60
+
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
   return <div className={css.centerCol}>{props.children}</div>
 }
-
 /** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
 function DetailsColumn(props: { children?: ReactNode }) {
   return <div className={css.detailsCol}>{props.children}</div>
@@ -267,7 +271,13 @@ export function AppFrame({
     <div
       ref={frameRef}
       className={css.frame}
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px`, gridTemplateRows: `minmax(0, 1fr) ${detailsSession === undefined ? 0 : panels.bottom}px` }}
+      style={{
+        gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px`,
+        gridTemplateRows: `minmax(0, 1fr) ${detailsSession === undefined ? 0 : panels.bottom}px`,
+        /* 悬浮入口占住会话头左上角：发布让位宽度，让会话语头把标题条带右移
+           （ui-conversation 的 767px 断点读取该变量）。非浮层状态不发布。 */
+        ...(railOverlay ? { '--dsh-rail-entry-clearance': `${RAIL_ENTRY_CLEARANCE}px` } : {}),
+      } as CSSProperties}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-sidebar-drawer={drawer || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
