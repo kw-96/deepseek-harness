@@ -73,7 +73,8 @@ DeskWorker.exe（SYSTEM，活动控制台会话的输入桌面）
 ## 已知限制
 
 - **整屏语义**：捕获的是整个桌面，不是单个窗口
-- **Ctrl+Alt+Del**：`SendSAS` 需要 worker 侧实现并在策略允许时才能生效，当前按钮会发送 `cad` 指令但 worker 尚未处理
+- **Ctrl+Alt+Del**：worker 已实现 `SendSAS`（服务身份与用户身份各发一次），并把 `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\SoftwareSASGeneration` 设为 3。但**本机实测未产生可见效果**：`SendSAS` 返回成功（err=0）、前台窗口仍是 `LogonUI Logon Window`、画面无变化——SAS 在该环境下未真正触发。
+- **锁屏界面的输入**：实测合成输入（鼠标点击、空格、回车）不会让 LogonUI 唤出凭据输入框，画面只有时间在刷新。Windows 的安全桌面会忽略合成输入；**解锁后的普通桌面不受此限制**（待实测确认）。
 - **帧率**：当前约 6 fps（抓屏 + JPEG 编码 + 管道传输），静止画面不变化时仍按固定节奏发送
 - **中文输入**：走 `type_text`（`KEYEVENTF_UNICODE`）注入，不依赖远端输入法
 - **显示输出关闭时**：若显示器因省电完全关闭，抓到的可能是黑屏；唤醒显示后可恢复
