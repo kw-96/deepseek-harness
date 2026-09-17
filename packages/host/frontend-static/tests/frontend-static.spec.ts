@@ -209,14 +209,15 @@ describe('real Loader composition', () => {
 })
 
 describe('构建产物的缓存策略', () => {
-  it('带内容 hash 的 assets 发 immutable 长缓存，其余路径不发缓存头', { timeout: 60_000 }, async () => {
+  it('带内容 hash 的 assets 发 immutable 长缓存，其余路径必须重新验证', { timeout: 60_000 }, async () => {
     const loaded = await loadComposition()
     const port = loaded.webServer.port
     const cacheControlOf = async (path: string): Promise<string | null> =>
       (await fetch(`http://127.0.0.1:${String(port)}${path}`)).headers.get('cache-control')
     expect(await cacheControlOf('/assets/index-C04Zg7TP.js')).toBe('public, max-age=31536000, immutable')
-    // 无 hash 的普通静态文件与 index 都不缓存：升级或改动后浏览器必须重新取。
-    expect(await cacheControlOf('/assets/plain.js')).toBeNull()
-    expect(await cacheControlOf('/app.js')).toBeNull()
+    // 无 hash 的普通静态文件与 index 都带 no-cache：留空不代表不缓存，浏览器会启发式
+    // 缓存 index.html，升级后旧页面请求的插件 rev 已失效，插件会整批 404。
+    expect(await cacheControlOf('/assets/plain.js')).toBe('no-cache')
+    expect(await cacheControlOf('/app.js')).toBe('no-cache')
   })
 })

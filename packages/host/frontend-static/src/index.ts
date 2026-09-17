@@ -69,6 +69,13 @@ const IMMUTABLE_ASSET = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/
 const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 /**
+ * 非不可变资源（index、无 hash 的静态文件）的 Cache-Control 值：每次使用前必须
+ * 重新验证。留空并不等于不缓存——浏览器可以启发式缓存 index.html，于是升级后仍
+ * 加载旧页面，而旧页面的插件 URL 带着已经失效的 rev，插件会整批 404。
+ */
+const REVALIDATE_CACHE_CONTROL = 'no-cache'
+
+/**
  * Serve one GET/HEAD static request from the dist root.
  * @param pathname - decoded URL pathname of the request.
  * @param res - the node:http response to write.
@@ -113,7 +120,7 @@ export async function serveStatic(
   }
   res.writeHead(200, {
     'content-type': type,
-    ...IMMUTABLE_ASSET.test(pathname) ? { 'cache-control': IMMUTABLE_CACHE_CONTROL } : {},
+    'cache-control': IMMUTABLE_ASSET.test(pathname) ? IMMUTABLE_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
   })
   res.end(body)
 }
