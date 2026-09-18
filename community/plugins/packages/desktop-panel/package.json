@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-panel",
-  "version": "0.1.0",
-  "description": "DSH 桌面面板：在浏览器里查看并操作当前控制台桌面（含锁屏界面），基于跨会话 SYSTEM worker",
+  "version": "0.2.0",
+  "description": "DSH 桌面面板：在浏览器里查看并操作当前控制台桌面（含锁屏界面），设置页提供启停开关与访问地址",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -15,14 +15,18 @@
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/**/*.js",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/ws.js",
+    "lib/panel.js",
     "cordis.patch.yml",
-    "README.md",
-    "LICENSE"
+    "README.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -30,6 +34,18 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
+  },
+  "scripts": {
+    "build:client": "tsc -p tsconfig.client.json && tsdown --config tsdown.client.config.ts"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28",
+    "react": "^18.3.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3"
   }
 }
