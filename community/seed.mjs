@@ -17,10 +17,11 @@
  * - profile: writes $DSH_HOME/profiles/web when it is absent; otherwise converges
  *            it on the template — tarball paths left by another checkout, bundles
  *            this host cannot install, bundles the template retired
- *            (profiles/web/retired.json), and template bundles, dependencies and
- *            `allowBuilds` entries this profile is missing — while leaving
- *            bundles the user added beyond the template untouched. Pass --force
- *            to rewrite the whole profile from the template instead.
+ *            (profiles/web/retired.json), and template bundles, dependencies,
+ *            `allowBuilds` and `minimumReleaseAgeExclude` entries this profile is
+ *            missing — while leaving bundles the user added beyond the template
+ *            untouched. Pass --force to rewrite the whole profile from the
+ *            template instead.
  *
  * A bundle the local network or the CPU architecture cannot support is dropped
  * with a printed reason, so a seeded profile always installs.
@@ -41,7 +42,8 @@ import { spawnSync } from 'node:child_process'
 import { probe } from './preflight.mjs'
 import {
   absorbManagedBlock, bundleAnchors, droppedBundles, materializeProfile, mergeAllowBuilds, mergeMappingEntries,
-  renderProfile, repairProfile, retireHoistPatterns, retirePatchRows, unavailablePinned, unresolvableBundles,
+  mergeReleaseAgeExcludes, renderProfile, repairProfile, retireHoistPatterns, retirePatchRows, unavailablePinned,
+  unresolvableBundles,
 } from './profile.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -159,6 +161,11 @@ async function convergeProfileFiles(retired) {
     if (patched !== undefined) {
       await writeFile(workspacePath, patched, 'utf8')
       changes.push('合并模板新增的依赖补丁 patchedDependencies')
+    }
+    const released = mergeReleaseAgeExcludes(await readFile(workspacePath, 'utf8'), templateWorkspace)
+    if (released !== undefined) {
+      await writeFile(workspacePath, released, 'utf8')
+      changes.push('合并模板新增的版本等待期豁免 minimumReleaseAgeExclude')
     }
     const hoist = retireHoistPatterns(await readFile(workspacePath, 'utf8'), retired)
     if (hoist.removed.length > 0) {
