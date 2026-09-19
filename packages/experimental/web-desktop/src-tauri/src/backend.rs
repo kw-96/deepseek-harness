@@ -77,11 +77,14 @@ pub(crate) fn run_backend(
   }
 }
 
-/// 把主窗口导航到 harness 的认证地址。
+/// 把主窗口导航到 harness 的认证地址，并把它的 origin 登记为壳内地址。
 fn navigate_main(handle: &tauri::AppHandle, url: &str) -> Result<(), String> {
   let parsed = url
     .parse::<url::Url>()
     .map_err(|error| format!("invalid harness URL {url}: {error}"))?;
+  // 外链出口按 origin 判定壳内地址，必须先登记：登记缺失时 harness 页面自身
+  // 会被当成外链弹到系统浏览器。
+  crate::external_links::remember_harness_origin(&parsed);
   handle
     .get_webview_window("main")
     .ok_or_else(|| "main webview window missing".to_string())?
