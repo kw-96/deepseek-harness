@@ -380,13 +380,14 @@ export function findRootArrayClose(text) {
 
 /**
  * Fold a plugin's trailing block-style patch rows back into the profile patch
- * array. `remote-web-ui`'s LAN-bind toggle appends a managed block sequence
- * after the file's flow array, which leaves the document invalid YAML and costs
- * the profile its entire user patch layer at the next boot. The rows are
- * re-emitted as single-line flow rows inside the array — replacing an existing
- * row with the same id, so re-absorbing a rewritten block never leaves two rows
- * competing — and the same cleanup rules (`retirePatchRows`) still recognise
- * them.
+ * array. The retired `remote-web-ui` wrote its LAN-bind block sequence after the
+ * file's flow array, which leaves the document invalid YAML and costs the
+ * profile its entire user patch layer at the next boot. The plugin is gone, but
+ * a profile it once ran on still carries that block, so the repair stays. The
+ * rows are re-emitted as single-line flow rows inside the array — replacing an
+ * existing row with the same id, so re-absorbing a rewritten block never leaves
+ * two rows competing — and the same cleanup rules (`retirePatchRows`) still
+ * recognise them.
  * @param text - the profile's cordis.patch.yml text.
  * @returns the repaired text and the number of absorbed rows.
  */
