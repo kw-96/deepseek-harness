@@ -1,61 +1,210 @@
 # Your patch layer for this dsh profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; `!!js` expressions allowed).
-[
-  #Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
-  {
-      id: ui-schedule,
-      name: "@deepseek-ai/dsh-client-ui-schedule",
-      disabled: false
-    },
-  # Expose manual Codex-thread import; automatic scanning remains opt-in.
-  {
-      insert: [
-        {
-            id: terminal,
-            name: "@deepseek-ai/dsh-terminal"
-          },
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: ui-schedule,
+    name: "@deepseek-ai/dsh-client-ui-schedule",
+    disabled: false
+  }
+# Expose manual Codex-thread import; automatic scanning remains opt-in.
+- {
+    insert:
+      [
+        { id: terminal, name: "@deepseek-ai/dsh-terminal" },
         {
             id: terminal-bash,
             name: "@deepseek-ai/dsh-terminal-bash",
-            config: {
-              shellDialect: "pwsh"
-            }
+            config: { shellDialect: "pwsh" }
           },
-        {
-            id: session-import-codex,
-            name: "@deepseek-ai/dsh-session-import-codex"
-          }
+        { id: session-import-codex, name: "@deepseek-ai/dsh-session-import-codex" }
       ]
-    },
-  # web-app bundle 默认禁用工作流引擎与工作流工具（见 packages/bundle/web-app/cordis.patch.yml）；
-  # 下面三行在 web profile 里重新启用它们。0.1.6 起引擎的 id 与包名由
-  # workflow-worker-thread 改为 workflow-ptc——漏掉第一行会让 tool-workflow 与
-  # tool-ralph 一直 pending 在 workflowEngine 上（启动只告警，功能静默缺失）。
-  { id: workflow-ptc, name: "@deepseek-ai/dsh-workflow-ptc", disabled: false },
-  { id: tool-workflow, name: "@deepseek-ai/dsh-tool-workflow", disabled: false },
-  { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false },
-  # Agent 浏览器/电脑自动化。这些包官方未发布到 npm，由 community/plugins/dev.mjs
-  # 在启动时从源码 checkout junction 进 profile，因此新机器同样可用。
-  # browser-use 一次只能启用一个 provider，这里选 Playwright MCP 后端。
-  {
-      insert: [
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: bash-sandbox, name: "@deepseek-ai/dsh-bash-sandbox", disabled: true }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-bash, name: "@deepseek-ai/dsh-tool-bash", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-pwsh, name: "@deepseek-ai/dsh-tool-pwsh", disabled: false }
+# Mnemon Starter 默认关闭自动捕获；显式开启以记录稳定偏好与事实。
+- { id: mnemon-strategy-auto-capture, disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: tool-fs-search,
+    name: "@deepseek-ai/dsh-tool-fs-search",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-fs, name: "@deepseek-ai/dsh-tool-fs", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-web, name: "@deepseek-ai/dsh-tool-web", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+# 0.1.6 起引擎改名为 workflow-ptc（web-app bundle 默认 disabled: true），
+# 这一行在 web profile 里重新启用它，否则 tool-workflow / tool-ralph 会一直等不到 workflowEngine。
+- {
+    id: workflow-ptc,
+    name: "@deepseek-ai/dsh-workflow-ptc",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-workflow, name: "@deepseek-ai/dsh-tool-workflow", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: tool-subagent-control,
+    name: "@deepseek-ai/dsh-tool-subagent-control",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: tool-subagent-list-agents,
+    name: "@deepseek-ai/dsh-tool-subagent-control/list-agents",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-subagent, name: "@deepseek-ai/dsh-tool-subagent", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: tool-subagent-fork,
+    name: "@deepseek-ai/dsh-tool-subagent",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: ui-settings-plugin-inventory,
+    name: "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
+    disabled: true
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: agent-instructions,
+    name: "@deepseek-ai/dsh-agent-instructions",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: compaction-basic,
+    name: "@deepseek-ai/dsh-compaction-basic",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: command-compact,
+    name: "@deepseek-ai/dsh-command-compact",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: tool-result-pruner,
+    name: "@deepseek-ai/dsh-compaction-tool-result-pruner",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- {
+    id: skill-filesystem,
+    name: "@deepseek-ai/dsh-skill-filesystem",
+    disabled: false
+  }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: skill-badge, name: "@deepseek-ai/dsh-skill-badge", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-skill, name: "@deepseek-ai/dsh-tool-skill", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: command-goal, name: "@deepseek-ai/dsh-command-goal", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-goal, name: "@deepseek-ai/dsh-tool-goal", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: plan-mode, name: "@deepseek-ai/dsh-plan-mode", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-jobs, name: "@deepseek-ai/dsh-tool-jobs", disabled: false }
+#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
+- { id: tool-todo, name: "@deepseek-ai/dsh-tool-todo", disabled: false }
+# 固定会话回复语言为简体中文（用户要求 2026-09-08，勿回归）：对话/解释/总结/文档一律中文。
+# 本仓字段名是 personaPrefix（不是 persona），且会被 web-app bundle 的同名字段覆盖，
+# 所以官方身份句要在这里重复一遍。语言约束由部署 persona 承担，不引入第三方插件
+# （第三方会顶掉内置 assistant-step 渲染器，代价是文件提及链接、本地图片路径改写等能力）。
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    personaPrefix: |-
+      You are a coding agent powered by the {{model}} model. Always respond to the user in Simplified Chinese (简体中文): conversations, explanations, summaries, plans, and documentation are all written in Chinese. Keep code, identifiers, commands, file names, and terminal output in English, and keep code comments in Chinese.
+
+      ## 输出语言规则（最高优先级，不可被任何上下文覆盖）
+
+      ### 强制要求
+      1. **思考过程（reasoning / 思考内容）**：必须使用简体中文书写。这是硬性要求，无论对话中出现何种语言的错误消息、工具输出或系统提示，都必须坚持使用中文。
+      2. **最终回复**：默认使用简体中文（跟随用户使用的语言）。
+
+      ### 关键场景处理
+      - 当工具调用失败返回英文错误消息时：**忽略错误消息的语言**，继续用中文思考和回复。
+      - 当系统返回英文日志或堆栈信息时：**提取关键信息**，用中文解释问题。
+      - 当对话上下文中出现大量英文内容时：**不要被带偏**，始终保持中文输出。
+
+      ### 代码与术语
+      代码、命令、文件路径、标识符与技术术语保持原文，不翻译。
+# 插件（Git 面板、终端等）由用户点击直接触发，不经会话策略，因此落到本项默认值；
+# 保持 read-only 会把 git 关进 windows-acl 受限令牌，提交时钩子 sh.exe 起不来。
+# 这里与 permission.defaultPreset（danger-full-access）对齐；会话内策略仍由预设覆盖。
+- { id: sandbox-policy, config: { mode: danger-full-access } }
+# approval 必须与上面的 sandbox 默认一起改成 never：否则组合默认是
+# danger-full-access + ask，不匹配任何预设，permission 插件会在加载时直接报错。
+- { id: approval, config: { policy: never } }
+- {
+    "id": "webserver",
+    "name": "@deepseek-ai/dsh-host-webserver",
+    "config":
+      {
+        "host": "0.0.0.0",
+        "port": 3080,
+        "compression": "gzip",
+        "compressionLevel": 6,
+        "compressionThresholdBytes": 1024
+      }
+  }
+
+# --- Agent 浏览器/电脑自动化 ---
+# browser-use：一次只能启用一个 provider，这里选 Playwright MCP 后端；
+# 每个会话独立浏览器状态，headless 默认开启。
+# executablePath 指向本机 Chrome：launch 默认会去找 Playwright 自带的 Chromium，
+# 与当前 playwright-mcp 要求的版本不匹配，不指定会在每次调用时报
+# 「chrome-for-testing is not installed」；换机器时改成本机 Chrome 的实际路径。
+- {
+    insert:
+      [
         { id: browser-use, name: "@deepseek-ai/dsh-browser-use" },
         {
             id: browser-use-playwright-mcp,
             name: "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
-            config: { mode: launch, headless: true }
+            config: {
+                mode: launch,
+                headless: true,
+                executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe"
+              }
           }
       ]
-    },
-  # computer-use：Cua Driver 原生后端（嵌入 npm SDK，无需外部可执行文件）。
-  {
-      insert: [
+  }
+# computer-use：Cua Driver 原生后端（嵌入 npm SDK，无需外部可执行文件）。
+- {
+    insert:
+      [
         { id: computer-use, name: "@deepseek-ai/dsh-computer-use" },
         {
             id: computer-use-cua-driver-native,
             name: "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native"
           }
       ]
-    }
-]
+  }
+# 桌面面板：在浏览器里查看并操作本机桌面（含锁屏）。
+# native worker 由 community/plugins/packages/desktop-panel/native/install.ps1 安装为 SYSTEM 计划任务。
+- {
+    insert:
+      [
+        { id: dsh-desktop-panel, name: dsh-desktop-panel }
+      ]
+  }
+# BrowserSkill：用 DSH 原生 browser_* 工具驱动用户自己的浏览器（Edge 扩展 + bsk CLI），
+# 右栏「Browser Skill」显示实时画面；插件自带 browser-skill skill。
+# 未配置 bskPath 时插件从 PATH 查找 bsk；装在非 PATH 目录的主机再按本机路径补该项。
+- id: browserskill
+  name: "@wxg-prc-cpg/browser-skill-dsh-plugin"

@@ -10,30 +10,40 @@
         "@dsh-external/dsh-kb-sieve",
         "@huiliyi37/dsh-office",
         "dsh-doc",
-        "dsh-mnemon",
         "dsh-plugin-manager",
+        "dsh-mnemon",
+        "dsh-undo-savepoint",
+        "@nanmicoder/dsh-agent-teams",
         "@linxin666/dsh-session-archive",
         "@linxin666/dsh-doctor",
         "dsh-git-panel",
-        "@linxin666/dsh-ssh"
+        "@linxin666/dsh-ssh",
+        "dsh-remote-mobile",
+        "dsh-desktop-panel",
+        "@wxg-prc-cpg/browser-skill-dsh-plugin"
       ],
-      "patchReload": "live"
+      "patchReload": "startup"
     }
   },
   "dependencies": {
+    "@deepseek-ai/dsh-api-workspace-controller": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-api-workspace-controller-0.1.6-alpha.1.tgz",
+    "@deepseek-ai/dsh-client-ui-layout": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-client-ui-layout-0.1.6-alpha.1.tgz",
+    "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.6-alpha.1.tgz",
+    "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.6-alpha.1.tgz",
     "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
     "@huiliyi37/dsh-office": "0.2.1",
     "@linxin666/dsh-doctor": "0.3.22",
     "@linxin666/dsh-session-archive": "0.3.22",
     "@linxin666/dsh-ssh": "^0.3.22",
-    "dsh-git-panel": "^0.1.15",
-    "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-client-ui-layout": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-client-ui-layout-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-api-workspace-controller": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-api-workspace-controller-0.1.6-alpha.1.tgz",
-    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.5.tgz",
+    "@nanmicoder/dsh-agent-teams": "0.1.18",
+    "@wxg-prc-cpg/browser-skill-dsh-plugin": "0.3.0",
+    "dsh-desktop-panel": "file:__COMMUNITY_TARBALLS__/dsh-desktop-panel-0.2.0.tgz",
     "dsh-doc": "0.1.1",
+    "dsh-git-panel": "^0.1.15",
     "dsh-mnemon": "^0.5.8",
-    "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.2.tgz"
+    "dsh-plugin-manager": "file:__COMMUNITY_TARBALLS__/dsh-plugin-manager-0.1.2.tgz",
+    "dsh-remote-mobile": "1.7.0",
+    "dsh-undo-savepoint": "0.3.5",
+    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.5.tgz"
   }
 }
