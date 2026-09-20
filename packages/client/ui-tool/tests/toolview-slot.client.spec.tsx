@@ -207,16 +207,16 @@ describe('keyed toolview hole through the real machinery', () => {
     await b.runtime.dispose()
   })
 
-  it('file-path clicks travel owner openFile → chat inject → the Host opener', async () => {
+  it('file-path clicks travel owner openFile → chat inject → the right Sidebar preview', async () => {
     const b = await bench([toolResult(3, 'c1', 'read', '{"path":"src/a.ts"}')])
     const view = b.runtime.renderRoot()
     view.getByText('src/a.ts').click()
     await vi.waitFor(() => {
-      expect(b.openWorkspacePath).toHaveBeenCalledWith({ path: '/w/src/a.ts' })
+      expect(b.sidebarRight.openResource).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
     })
-    // This fork's openFile hands the path to the Host, which opens it with the
-    // OS default application; the official right Sidebar is not involved.
-    expect(b.sidebarRight.openResource).not.toHaveBeenCalled()
+    // openFile hands the resource address to the official right Sidebar preview;
+    // the Host OS opener is not involved.
+    expect(b.openWorkspacePath).not.toHaveBeenCalled()
     await b.runtime.dispose()
   })
 

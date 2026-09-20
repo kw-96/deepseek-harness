@@ -12,8 +12,8 @@
  * the panel. A fullscreen opening reserves its underlying track only after
  * the panel covers the frame, without animating those hidden columns.
  *
- * The panel has no header of its own: its two controls 鈥?presentation switch
- * and collapse 鈥?ride the docking kit's chrome seat at the end of the top-right
+ * The panel has no header of its own: its two controls —presentation switch
+ * and collapse —ride the docking kit's chrome seat at the end of the top-right
  * pane's tab strip, so the strip is the panel's whole top edge. The way back in
  * while collapsed is not here either: it is one button in the conversation
  * header (`ExpandButton.tsx`), because it exists only while this panel is
@@ -23,8 +23,8 @@
  * Tab bodies do not live here. Each one is a registration under its type's kind,
  * dispatched through the keyed `sidebar.right.pane.tab` seat (and a live chip
  * title through `sidebar.right.pane.tab.title`), so a new tab type needs no edit
- * to this file. What a body receives beyond the record 鈥?navigation, lifetime
- * signal, actions 鈥?is read through the slot-owned useTabInfo hook. The Tab
+ * to this file. What a body receives beyond the record —navigation, lifetime
+ * signal, actions —is read through the slot-owned useTabInfo hook. The Tab
  * domain follows each session's store commits, including sessions off screen.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
