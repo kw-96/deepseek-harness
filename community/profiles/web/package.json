@@ -43,6 +43,6 @@
     "dsh-mnemon": "0.5.8",
     "dsh-remote-mobile": "1.7.0",
     "dsh-undo-savepoint": "0.3.5",
-    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.5.tgz"
+    "workorder-agent": "file:__COMMUNITY_TARBALLS__/workorder-agent-0.1.6.tgz"
   }
 }
