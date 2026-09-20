@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-harness-plugin-manager-workspace",
+  "name": "deepseek-harness-community-plugins-workspace",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",

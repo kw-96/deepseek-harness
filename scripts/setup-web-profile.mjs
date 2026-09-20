@@ -26,7 +26,6 @@ const PLUGIN_SPECS = [
   'dsh-doc@^0.1.1',
   'dsh-ocr-local@^0.2.7',
   '@dsh-external/dsh-kb-sieve@github:omdsh-dev/dsh-kb-sieve',
-  'dsh-plugin-manager@^0.1.0',
 ]
 
 const LEGACY_MARKETPLACE_PACKAGE = 'ntes-dsh-market'

@@ -1,8 +1,12 @@
-# DeepSeek Harness Plugin Manager
+# DeepSeek Harness Community Plugins
 
 English | [中文](README.zh.md)
 
-This repository contains the community plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): [`dsh-plugin-manager`](packages/manager) hot-loads already installed plugins through Cordis HMR in a running profile and manages their enablement and runtime state.
+Community-maintained plugin sources for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Every package under `packages/` is an installable `dsh` bundle:
+
+- [`dsh-desktop-panel`](packages/desktop-panel) — view and operate the local desktop, including the lock screen, from the browser.
+- [`dsh-mode-router`](packages/mode-router) — classify each user turn and inject the verification focus as agent context.
+- [`workorder-agent`](packages/workorder-agent) — EasyWork workorder inspection, field review, POPO notification, and a control panel.
 
 ## Development
 
@@ -14,7 +18,7 @@ pnpm run build
 pnpm run pack:check
 ```
 
-Package releases use tags in the form `dsh-plugin-manager@<version>`.
+Package releases use tags in the form `<package-name>@<version>`.
 
 ## License
 
