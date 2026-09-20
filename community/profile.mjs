@@ -196,13 +196,40 @@ export function repairProfile(pkg, { tarballsUrl, dropped, template, retired = [
  * @returns the merged text, or undefined when nothing is missing.
  */
 export function mergeMappingEntries(profileText, templateText, key) {
-  const templateBlock = mappingBlock(templateText, key)
+  return mergeBlockEntries(profileText, templateText, key, mappingBlock)
+}
+
+/**
+ * Copy the template's `minimumReleaseAgeExclude` entries this profile is
+ * missing. The key holds a block sequence rather than a mapping, so entries are
+ * matched by their scalar text.
+ * @param profileText - the profile's pnpm-workspace.yaml text.
+ * @param templateText - the template's pnpm-workspace.yaml text.
+ * @returns the merged text, or undefined when nothing is missing.
+ */
+export function mergeReleaseAgeExcludes(profileText, templateText) {
+  return mergeBlockEntries(profileText, templateText, 'minimumReleaseAgeExclude', sequenceBlock)
+}
+
+/**
+ * Copy the template entries one top-level block is missing, leaving the
+ * profile's own entries and their order untouched. Comment lines directly above
+ * a copied entry travel with it; existing entries are never overwritten. A
+ * profile without the block gains it at the end of the file.
+ * @param profileText - the profile's pnpm-workspace.yaml text.
+ * @param templateText - the template's pnpm-workspace.yaml text.
+ * @param key - the top-level key to converge.
+ * @param locate - reader for this key's entry form.
+ * @returns the merged text, or undefined when nothing is missing.
+ */
+function mergeBlockEntries(profileText, templateText, key, locate) {
+  const templateBlock = locate(templateText, key)
   if (templateBlock === undefined) return undefined
-  const present = new Set((mappingBlock(profileText, key)?.entries ?? []).map(entry => entry.key))
+  const present = new Set((locate(profileText, key)?.entries ?? []).map(entry => entry.key))
   const missing = templateBlock.entries.filter(entry => !present.has(entry.key))
   if (missing.length === 0) return undefined
   const lines = profileText.split(/\r?\n/)
-  const block = mappingBlock(profileText, key)
+  const block = locate(profileText, key)
   if (block === undefined) {
     const appended = [...lines, `${key}:`, ...missing.flatMap(entry => entry.lines)]
     return `${appended.join('\n').replace(/\n*$/u, '')}\n`
@@ -353,13 +380,14 @@ export function findRootArrayClose(text) {
 
 /**
  * Fold a plugin's trailing block-style patch rows back into the profile patch
- * array. `remote-web-ui`'s LAN-bind toggle appends a managed block sequence
- * after the file's flow array, which leaves the document invalid YAML and costs
- * the profile its entire user patch layer at the next boot. The rows are
- * re-emitted as single-line flow rows inside the array — replacing an existing
- * row with the same id, so re-absorbing a rewritten block never leaves two rows
- * competing — and the same cleanup rules (`retirePatchRows`) still recognise
- * them.
+ * array. The retired `remote-web-ui` wrote its LAN-bind block sequence after the
+ * file's flow array, which leaves the document invalid YAML and costs the
+ * profile its entire user patch layer at the next boot. The plugin is gone, but
+ * a profile it once ran on still carries that block, so the repair stays. The
+ * rows are re-emitted as single-line flow rows inside the array — replacing an
+ * existing row with the same id, so re-absorbing a rewritten block never leaves
+ * two rows competing — and the same cleanup rules (`retirePatchRows`) still
+ * recognise them.
  * @param text - the profile's cordis.patch.yml text.
  * @returns the repaired text and the number of absorbed rows.
  */
@@ -441,8 +469,7 @@ function mappingBlock(text, key) {
   const lines = text.split(/\r?\n/)
   const start = lines.findIndex(line => line.trim() === `${key}:`)
   if (start === -1) return undefined
-  let end = start + 1
-  while (end < lines.length && (lines[end].trim() === '' || /^\s/u.test(lines[end]))) end += 1
+  const end = blockEnd(lines, start)
   const entries = []
   for (let index = start + 1; index < end; index += 1) {
     const match = /^\s+['"]?([^'":]+)['"]?:\s*\S/u.exec(lines[index])
@@ -454,6 +481,43 @@ function mappingBlock(text, key) {
     entries.push({ key: match[1], lines: lines0 })
   }
   return { start, end, entries }
+}
+
+/**
+ * Locate a top-level block sequence and read its entries.
+ * @param text - pnpm-workspace.yaml text.
+ * @param key - the top-level key to locate (`minimumReleaseAgeExclude`).
+ * @returns the block's end index and entries, or undefined without the block.
+ */
+function sequenceBlock(text, key) {
+  const lines = text.split(/\r?\n/)
+  const start = lines.findIndex(line => line.trim() === `${key}:`)
+  if (start === -1) return undefined
+  const end = blockEnd(lines, start)
+  const entries = []
+  for (let index = start + 1; index < end; index += 1) {
+    const match = /^\s*-\s*(.+?)\s*$/u.exec(lines[index])
+    if (match === null) continue
+    const previous = lines[index - 1]
+    const lines0 = previous !== undefined && /^\s*#/u.test(previous) && index - 1 > start
+      ? [previous, lines[index]]
+      : [lines[index]]
+    entries.push({ key: match[1].replace(/^['"]|['"]$/gu, ''), lines: lines0 })
+  }
+  return { start, end, entries }
+}
+
+/**
+ * Find the last line of a top-level block: its entries stop at the first line
+ * that is neither blank nor indented.
+ * @param lines - the file's lines.
+ * @param start - the key line's index.
+ * @returns the index after the block's last line.
+ */
+function blockEnd(lines, start) {
+  let end = start + 1
+  while (end < lines.length && (lines[end].trim() === '' || /^\s/u.test(lines[end]))) end += 1
+  return end
 }
 
 /**

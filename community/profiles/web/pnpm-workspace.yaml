@@ -10,8 +10,8 @@ allowBuilds:
   # better-sqlite3 自带预编译二进制（prebuilds/win32-x64.node），无需源码编译；
   # 显式拒绝 node-gyp 构建，避免无 Visual Studio 的机器安装失败。
   better-sqlite3: false
-  # cloudflared 仅用于 remote-web-ui 的公网隧道；本部署用局域网直连 + 扫码配对，
-  # 不需要它，显式拒绝以免每台主机都下载二进制。要开公网隧道时改为 true 并重跑安装。
+  # cloudflared 只用于 remote-web-ui 的公网隧道，而该插件已整体下线（见 retired.json）；
+  # 显式拒绝，以免每台主机都下载一份用不到的二进制。
   cloudflared: false
   # better-sidebar 的真实终端依赖 node-pty 的原生二进制；pnpm 11 默认拦截
   # 构建脚本会导致「node-pty 加载失败」，这里显式放行。
@@ -38,3 +38,8 @@ patchedDependencies:
   # 严格 JSON 解析（profile 加载 bundle 清单）会直接抛错使整个 profile 起不来。
   # 补丁只删掉这个 BOM 字节，不改任何字段。
   dsh-git-panel@0.1.15: patches/dsh-git-panel@0.1.15.patch
+
+# 放宽新版本等待期：tool-terminal 0.1.6-alpha.1 发布不满 pnpm 的 minimumReleaseAge
+# 窗口时会被拦下，而补丁层要 insert 这一行，装不上会让整棵插件树起不来。
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-tool-terminal@0.1.6-alpha.1'

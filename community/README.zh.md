@@ -33,7 +33,7 @@ pnpm run build
 pnpm dsh web
 ```
 
-仓库的 `dsh` 脚本会先运行 `community/seed.mjs`。首次启动时，它依据 `community/profiles/web/` 写出 `$DSH_HOME/profiles/web`（把三个 `file:` 依赖解析到本检出目录的 `community/plugins/tarballs/`），把各个 skill 复制到 `$DSH_HOME/skills/`，把全局 home 文件（用户全局的 `AGENTS.md`）复制到 `$DSH_HOME/`，然后对 profile 执行 `pnpm install`。之后的启动会把已有 profile 收敛到模板：由别的检出目录写下的 tarball 路径、本机装不上的组合包、`profiles/web/retired.json` 列出的已下线组合包，以及模板有而该 profile 缺失的组合包、依赖与 `allowBuilds` 条目。模板之外由你自己添加的组合包永远不会被删除。可以用 `DSH_HOME=/path` 覆盖 home，用 `node community/seed.mjs --force` 重写整个 manifest，或用 `DSH_SEED_SKIP_INSTALL=1` 跳过 profile 安装。
+仓库的 `dsh` 脚本会先运行 `community/seed.mjs`。首次启动时，它依据 `community/profiles/web/` 写出 `$DSH_HOME/profiles/web`（把三个 `file:` 依赖解析到本检出目录的 `community/plugins/tarballs/`），把各个 skill 复制到 `$DSH_HOME/skills/`，把全局 home 文件（用户全局的 `AGENTS.md`）复制到 `$DSH_HOME/`，然后对 profile 执行 `pnpm install`。之后的启动会把已有 profile 收敛到模板：由别的检出目录写下的 tarball 路径、本机装不上的组合包、`profiles/web/retired.json` 列出的已下线组合包，以及模板有而该 profile 缺失的组合包、依赖、`allowBuilds` 与 `minimumReleaseAgeExclude` 条目。模板之外由你自己添加的组合包永远不会被删除。可以用 `DSH_HOME=/path` 覆盖 home，用 `node community/seed.mjs --force` 重写整个 manifest，或用 `DSH_SEED_SKIP_INSTALL=1` 跳过 profile 安装。
 
 ## 部署前先做主机自检
 

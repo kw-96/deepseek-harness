@@ -20,6 +20,28 @@
         { id: session-import-codex, name: "@deepseek-ai/dsh-session-import-codex" }
       ]
   }
+# 原生终端的模型工具面（terminal_open/send/read/signal/close/list）：注册在宿主层，
+# 任何 preset 的会话都能用；内置 preset 不注册 terminal_* 这些名字，不会被遮蔽。
+- {
+    insert:
+      [ { id: tool-terminal, name: "@deepseek-ai/dsh-tool-terminal" } ]
+  }
+# 跨会话搜索/读取工具：为 Agent 注册 session_search / session_event_* 工具。
+# 两个包随 harness 检出目录提供，所以只写补丁行，不写 profile 依赖。
+- {
+    insert:
+      [
+        {
+            id: tool-session-query,
+            name: "@deepseek-ai/dsh-tool-session-query"
+          }
+      ]
+  }
+# 会话检索默认 openAt: never，这里改为首次搜索时打开内存索引（不落盘）。
+- {
+    id: session-query-sqlite,
+    config: { path: ':memory:', openAt: first-search }
+  }
 #Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: bash-sandbox, name: "@deepseek-ai/dsh-bash-sandbox", disabled: true }
 #Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.

@@ -8,5 +8,6 @@
   "dsh-browser-agent",
   "ntes-dsh-market",
   "@ruihuahe/dsh-plugin-marketplace",
-  "@dap-dsh-plugins/netease-auth"
+  "@dap-dsh-plugins/netease-auth",
+  "@linxin666/dsh-remote-web-ui"
 ]
