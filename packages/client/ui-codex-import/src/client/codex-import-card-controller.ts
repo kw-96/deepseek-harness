@@ -9,6 +9,8 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: 拉入 ui-workspace 的 Context 合并（ctx.uiWorkspace），会话打开改走该导航面。
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session-import-codex/remote'
 import type { CodexImportRun, CodexImportScanValue } from '@deepseek-ai/dsh-session-import-codex/types'
@@ -156,6 +158,8 @@ export class CodexImportCardController {
   }
 
   private openSession(sessionId: SessionId): void {
-    this.ctx.sessions.open(sessionId)
+    // 官方 v0.1.6-alpha.2 起，会话选择由 ui-workspace 的导航面统一承担
+    // （ISessions 不再暴露 open）。
+    this.ctx.uiWorkspace.openSession(sessionId)
   }
 }

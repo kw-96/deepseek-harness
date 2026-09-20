@@ -1,18 +1,8 @@
-.shell {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-}
-
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 0;
+  grid-template-rows: 100%;
   height: 100%;
-  min-height: 0;
-  flex: 1;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve
@@ -26,6 +16,38 @@
   transition: none;
 }
 
+/* The Windows caption row remains outside every conversation and file panel. */
+:global([data-windows-titlebar]) .frame {
+  --dsh-windows-content-radius: 16px;
+  box-sizing: border-box;
+  padding-top: var(--dsh-windows-titlebar-height);
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--dsw-specific-sidebar-fill);
+}
+
+:global([data-windows-titlebar]) .centerCol {
+  background: var(--dsw-alias-bg-base);
+  border-radius: var(--dsh-windows-content-radius) 0 0 0;
+  corner-shape: round;
+}
+
+:global([data-windows-titlebar]) .frame::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--dsh-windows-titlebar-height);
+  background: var(--dsw-specific-sidebar-fill);
+  -webkit-app-region: drag;
+}
+
+:global([data-windows-titlebar]) .sidebarCol {
+  border-right: none;
+}
+
+:global([data-windows-titlebar]) .handle {
+  top: var(--dsh-windows-titlebar-height);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .frame {
     transition: none;
@@ -33,142 +55,50 @@
 }
 
 .sidebarCol {
-  grid-column: 1;
-  grid-row: 1 / span 2;
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
-/* A covering sidebar — the phone drawer — leaves the zero-width track and
-   slides over the center, which keeps the full viewport width. Width is inline
-   (the track no longer supplies it). */
-.sidebarCol[data-drawer] {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  border-right: none;
-  box-shadow: var(--dsw-elevation-prominent);
-  transition: transform 180ms var(--ds-ease-in-out);
-}
-
-/* Parked off-screen until asked for: a touch device's collapsed sidebar is a
-   menu, not a resident column, so it must not sit behind the scrim either. */
-.sidebarCol[data-drawer]:not([data-shown]) {
-  transform: translateX(-100%);
-  visibility: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sidebarCol[data-drawer] {
-    transition: none;
-  }
-}
-
-/* The touch device's way into the sidebar: the trailing entry's twin, in the
-   header's leading corner. Same 28px circle around a 15px glyph as the right
-   panel's own entry (ui-sidebar-right's ExpandButton), so the two read as one
-   pair instead of one of them floating over the header. `top`/`left` mirror
-   that entry's inset on the other side. */
-.railFab {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  z-index: 26;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 6px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  border: none;
-  border-radius: 28px;
-  cursor: pointer;
-}
-
-.railFabIcon {
-  width: 15px;
-  height: 15px;
-}
-
-.railFab:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.railFab:focus-visible {
-  outline: 1.5px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 2px;
-}
-
-/* Tap-outside dismissal for a covering sidebar: below the covering column,
-   above the content it covers. */
-.drawerScrim {
-  position: absolute;
-  inset: 0;
-  z-index: 25;
-  background: var(--dsw-alias-bg-mask-drop);
-}
-
 .centerCol {
-  grid-column: 2;
-  grid-row: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.detailsCol {
-  grid-column: 3;
-  grid-row: 1;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
+/* macOS desktop: the frame goes transparent so window vibrancy reaches the
+   sidebar column, which keeps only a translucent tint; the centre paints the
+   base background itself to stay opaque. The sidebar/centre separator moves
+   to the opaque centre: on the translucent sidebar the alpha border mixes
+   with the wallpaper and reads as a dark seam. */
+:global([data-platform='darwin']) .frame {
+  background: transparent;
+}
+
+:global([data-platform='darwin']) .sidebarCol {
+  background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 60%, transparent);
+  border-right: none;
+}
+
+:global([data-platform='darwin']) .centerCol {
+  background: var(--dsw-alias-bg-base);
   border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
 
-.bottomCol {
-  position: relative;
-  grid-column: 2 / 4;
-  grid-row: 2;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
-}
-
-.frame[data-bottom-collapsed] .bottomCol {
-  border-top: none;
-}
-
-.bottomHandle {
-  position: absolute;
-  top: -4px;
-  left: 0;
-  z-index: 3;
-  width: 100%;
-  height: 8px;
-  cursor: row-resize;
-  touch-action: none;
-}
-
-/* The details subtree stays mounted at zero width, so its border must not paint
-   a 1px seam. The collapsed sidebar instead retains a bordered compact rail. */
-.frame[data-details-collapsed] .detailsCol {
+/* The darwin closed sidebar has no rail: the centre reaches the window edge,
+   where a separator would draw a seam against nothing. */
+:global([data-platform='darwin']) [data-sidebar-collapsed] .centerCol {
   border-left: none;
 }
 
 /* Drag handles are frame children (columns clip overflow): an 8px hit strip
-   centered on the column border via inline left, above column content. Details
-   adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
+   centered on the column border via inline left, above column content. No
+   handle draws a visible pill: the details column was the only one that did,
+   and the right column never had one. The right handle sits above the right
+   panel (which states z-index 10) so it stays grabbable when the panel hangs
+   over the centre. */
 .handle {
   position: absolute;
   top: 0;
@@ -176,7 +106,7 @@
   width: 8px;
   margin-left: -4px;
   cursor: col-resize;
-  z-index: 2;
+  z-index: 11;
   touch-action: none;
   /* Rides the same curve as the tracks so the pill stays on the moving
      border during collapse/expand; paused while dragging (frame rule). */
@@ -187,42 +117,31 @@
   transition: none;
 }
 
+/* Fullscreen covers the frame while its underlying columns enter or exit. */
+.frame[data-rightbar-fullscreen],
+.frame[data-rightbar-fullscreen] .handle,
+.frame[data-rightbar-instant],
+.frame[data-rightbar-instant] .handle {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .handle {
     transition: none;
   }
 }
 
-.handle[data-side='details']::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 32px;
-  border-radius: 10px;
-  box-sizing: border-box;
-  background: var(--dsw-alias-button-floating-fill);
-  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
-  /* Hover affordance: the details pill hides until the pointer is over its
-     column, the strip itself, or a drag. */
-  opacity: 0;
-  transition:
-    opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-}
-
-.detailsCol:hover ~ .handle[data-side='details']::after,
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
-  opacity: 1;
-}
-
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
-  background: var(--dsw-alias-button-floating-hover);
-  border-color: var(--dsw-alias-border-l3);
+/*
+ * The right column never clips: its occupant anchors a fixed-width panel to the
+ * column's right edge (the frame's edge, which never moves) and lets the track
+ * decide whether the centre makes room. With no track the panel hangs over the
+ * centre from a zero-width column, and while the track animates the panel stays
+ * where it is. The occupant draws its own left border.
+ */
+.rightbarCol {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
 }
 
 .overlayLayer {

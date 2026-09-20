@@ -2,9 +2,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent/types'
-import type {} from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-file-upload/client'
-import { createSessionControlStream, type SessionControlStream } from './transport.ts'
+import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
+import { createSessionControlStream } from './transport.ts'
 import { ClientSessions } from './sessions/service.ts'
 import type { SessionRemotes } from './sessions/remotes.ts'
 import type {} from '../remote-events.ts'
@@ -48,7 +49,9 @@ export type {
   SessionFace,
   SubmissionHandle,
 } from './contract/session.ts'
-export type { ISessions } from './contract/sessions.ts'
+export type {
+  ISessions, SessionReference, SessionRetainInfo, SessionRetainOptions, SessionTarget,
+} from './contract/sessions.ts'
 export { MutableSessionEventSource } from './contract/events.ts'
 export type {
   AssistantLiveChunkEvent,
@@ -70,9 +73,19 @@ export type {
   PendingSubmissionImageAttachment,
   PendingSubmissionPlacement,
   PromptError,
-  QueuedMessage,
   SessionSnapshot,
 } from './contract/snapshot.ts'
+
+/** Consumer-owned reference labels; extend this map through the package's canonical /client entry. */
+export interface SessionReferenceSourceMap {
+  /** Temporary Client Controller work, including fork-title preparation. */
+  controllerOperation: unknown
+  /** A Client Gateway invocation's synchronous Context ownership. */
+  gateway: unknown
+}
+
+/** Declaration-merge-extensible labels carried by independent Client references. */
+export type SessionReferenceSource = Extract<keyof SessionReferenceSourceMap, string>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -93,27 +106,12 @@ export const inject = [
 ]
 
 /**
- * Delay before a terminally failed control stream is replaced. Reaching this
- * path means the stream's own retry budget is spent, and every mirror it feeds
- * — Session queues, background jobs, projections — has no second source, so the
- * replacement is what keeps a tab converging instead of frozen until its next
- * page load.
- */
-const CONTROL_RESTART_DELAY_MS = 1_000
-
-/**
- * Ceiling for the replacement delay. Consecutive terminal failures double it,
- * so a Host that keeps refusing the stream is retried at a bounded rate rather
- * than once per base delay; an accepted baseline restores the base delay.
- */
-const CONTROL_RESTART_MAX_DELAY_MS = 30_000
-
-/**
  * Install Client Session state and its reconnecting control stream.
  * @param ctx - Client Cordis context.
  */
 export function apply(ctx: Context): void {
   const remotes = ctx.remote as unknown as SessionRemotes
+  const connection = ctx.get('connection') as ConnectionHandle
   const sessions = new ClientSessions(ctx, remotes)
   ctx.remote.$on('api-session/added', (summary) => { sessions.handleSessionAdded(summary) })
   ctx.remote.$on('api-session/removed', (sessionId) => { sessions.handleSessionRemoved(sessionId) })
@@ -127,58 +125,25 @@ export function apply(ctx: Context): void {
     sessions.handleSessionError(sessionId, message)
   })
 
-  let control: SessionControlStream | undefined
-  let restartDelay = CONTROL_RESTART_DELAY_MS
-  let restartTimer: ReturnType<typeof setTimeout> | undefined
-  let disposed = false
-
-  /** Open one control generation; a terminal failure schedules its successor. */
-  const openControl = (): void => {
-    if (disposed) return
-    const stream = createSessionControlStream(remotes, {
-      accept: (frame) => {
-        if (frame.type === 'baseline') restartDelay = CONTROL_RESTART_DELAY_MS
-        sessions.handleControlFrame(frame)
-      },
-      failed: (error) => {
-        // A failed generation never revives on its own, so without a successor
-        // every later queue, job, and projection frame is lost for the rest of
-        // the page lifetime.
-        console.error('[session-controller] control stream failed; reopening:', error)
-        // A replacement may already own the mirror: only the live stream
-        // schedules its own successor.
-        if (control !== stream) return
-        control = undefined
-        void stream.dispose()
-        const delay = restartDelay
-        restartDelay = Math.min(restartDelay * 2, CONTROL_RESTART_MAX_DELAY_MS)
-        restartTimer = setTimeout(() => {
-          restartTimer = undefined
-          openControl()
-        }, delay)
-      },
-    })
-    control = stream
-    stream.start()
-  }
-  openControl()
-
-  ctx.on('connection/reset', () => {
+  const control = createSessionControlStream(remotes, {
+    accept: (frame) => { sessions.handleControlFrame(frame) },
+    failed: (error) => { console.error('[session-controller] control stream failed:', error) },
+  })
+  const connected = (): void => {
+    if (connection.generation.getSnapshot() === undefined) return
+    // A ready control baseline may arrive before Cordis delivers connection/reset.
     sessions.handleConnected()
-    // A new Host generation republishes every baseline, so the mirror is
-    // resynced rather than left describing the generation that just ended.
-    control?.restart()
-  })
-  if (ctx.remote.$host.home !== undefined) sessions.handleConnected()
+    control.restart()
+    control.start()
+  }
+  ctx.effect(() => connection.generation.subscribe(connected), 'session-controller.client.generation')
+  connected()
   ctx.typert.contexts.registerClient('agent', {
-    identity: candidate => sessions.scopeOf(candidate),
-    resolve: sessionId => sessions.resolveAgentScope(sessionId),
+    identity: candidate => sessions.sessionOf(candidate)?.sessionId,
+    resolve: (sessionId) => {
+      const reference = sessions.retainAgentScope(sessionId)
+      return typertOwnedValue(reference.binding.ctx, () => { reference.release() })
+    },
   })
-  ctx.effect(() => async () => {
-    disposed = true
-    if (restartTimer !== undefined) clearTimeout(restartTimer)
-    restartTimer = undefined
-    await control?.dispose()
-    control = undefined
-  }, 'session-controller.client.control')
+  ctx.effect(() => async () => { await control.dispose() }, 'session-controller.client.control')
 }

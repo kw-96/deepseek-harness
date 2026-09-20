@@ -27,11 +27,11 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/dsh-api-workspace-controller": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-api-workspace-controller-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-client-ui-layout": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-client-ui-layout-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.6-alpha.1.tgz",
-    "@deepseek-ai/dsh-tool-terminal": "0.1.6-alpha.1",
+    "@deepseek-ai/dsh-api-workspace-controller": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-api-workspace-controller-0.1.6-alpha.2.tgz",
+    "@deepseek-ai/dsh-client-ui-layout": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-client-ui-layout-0.1.6-alpha.2.tgz",
+    "@deepseek-ai/dsh-terminal": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-0.1.6-alpha.2.tgz",
+    "@deepseek-ai/dsh-terminal-bash": "file:__COMMUNITY_TARBALLS__/deepseek-ai-dsh-terminal-bash-0.1.6-alpha.2.tgz",
+    "@deepseek-ai/dsh-tool-terminal": "0.1.6-alpha.2",
     "@dsh-external/dsh-kb-sieve": "github:omdsh-dev/dsh-kb-sieve",
     "@huiliyi37/dsh-office": "0.2.1",
     "@linxin666/dsh-doctor": "0.3.22",

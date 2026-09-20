@@ -67,11 +67,11 @@ function makeContext() {
     value: { at: 200, undone: false, changed: 1, failed: 0 },
   }))
   const remote = { codexImport: { run, history, scan, undo, restore } }
-  const sessions = { open: vi.fn() }
+  const uiWorkspace = { openSession: vi.fn() }
   const ctx = new Context()
   ctx.provide('remote', remote)
-  ctx.provide('sessions', sessions)
-  return { ctx, remote, sessions, undo }
+  ctx.provide('uiWorkspace', uiWorkspace)
+  return { ctx, remote, uiWorkspace, undo }
 }
 
 describe('CodexImportCardController', () => {
@@ -174,12 +174,12 @@ describe('CodexImportCardController', () => {
     controller.dispose()
   })
 
-  it('opens an imported session through the sessions service', () => {
-    const { ctx, sessions } = makeContext()
+  it('opens an imported session through the workspace navigation', () => {
+    const { ctx, uiWorkspace } = makeContext()
     const controller = new CodexImportCardController(ctx, makeScope(true).scope)
     const id = SessionId('codex-t1')
     controller.inject().openSession(id)
-    expect(sessions.open).toHaveBeenCalledWith(id)
+    expect(uiWorkspace.openSession).toHaveBeenCalledWith(id)
     controller.dispose()
   })
 

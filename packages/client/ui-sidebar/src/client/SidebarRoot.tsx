@@ -19,23 +19,13 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  FishLogo, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
+  FishLogo, IconNewChatOutline16, IconPanelLeftOutline16, isDarwinDesktop, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   SidebarPanelMetadata, SidebarRootComponentProps, SidebarRootInjected, SidebarSectionOwnerProps,
 } from './contract/slots.ts'
 import css from './SidebarRoot.module.css'
-
-/** Window event name mirrored from ui-layout desktop commands (no runtime import). */
-const DESKTOP_COMMAND_EVENT = 'dsh-desktop:command'
-
-/** Whether the page runs inside the Tauri desktop shell. */
-function isDesktopShell(): boolean {
-  if (typeof window === 'undefined') return false
-  const candidate = window as Window & { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown }
-  return candidate.__TAURI_INTERNALS__ !== undefined || candidate.__TAURI__ !== undefined
-}
 
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
 const COLLAPSE_SETTLE_MS = 150
@@ -115,7 +105,8 @@ export function SidebarRoot({
     const timer = window.setTimeout(() => { setSettled(true) }, COLLAPSE_SETTLE_MS)
     return () => { window.clearTimeout(timer) }
   }, [collapsed])
-  const wide = !collapsed || !settled
+  const windowsTitlebar = document.documentElement.hasAttribute('data-windows-titlebar')
+  const wide = windowsTitlebar ? !collapsed : !collapsed || !settled
 
   // Freeze the content at its expanded width while it fades out (collapsed
   // && wide): the sliding column then clips it instead of reflowing it. The
@@ -172,17 +163,30 @@ export function SidebarRoot({
   }, [pointerInside])
 
   const buildVersion = localBuildVersion()
-  const desktop = isDesktopShell()
 
-  // Desktop title bar owns New Session (File menu); keep the sidebar button in sync.
-  useEffect(() => {
-    const onCommand = (event: Event): void => {
-      const detail = (event as CustomEvent<{ command?: string }>).detail
-      if (detail?.command === 'new-session') startSession()
-    }
-    window.addEventListener(DESKTOP_COMMAND_EVENT, onCommand)
-    return () => { window.removeEventListener(DESKTOP_COMMAND_EVENT, onCommand) }
-  }, [startSession])
+  const darwinDesktop = isDarwinDesktop()
+  // Rail resting state is the whale mark; hovering swaps in the panel icon
+  // (the expand affordance, figma sidebar-hover flow). Expanded it is a plain
+  // panel icon.
+  const toggle = (
+    <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
+      <button
+        type="button"
+        className={clsx(css.iconButton, css.toggle)}
+        aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
+        onClick={() => { toggleSidebar() }}
+      >
+        {!wide && !windowsTitlebar && (
+          <span className={css.railMark} aria-hidden="true">
+            {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+          </span>
+        )}
+        {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
+        <IconPanelLeftOutline16 className={css.panelIcon} size={wide || windowsTitlebar ? 16 : 18} />
+        {!wide && renderSlot('sidebar.toggle.badge', {})}
+      </button>
+    </Tooltip>
+  )
 
   return (
     <div
@@ -198,6 +202,9 @@ export function SidebarRoot({
       }}
       onPointerLeave={() => { armLinger() }}
     >
+      {/* macOS hiddenInset titlebar: the strip shares the row with the
+          traffic lights and keeps the toggle at the sidebar's top-right. */}
+      {darwinDesktop && <div className={css.topStrip}>{toggle}</div>}
       <div className={css.logoRow}>
         {/* Expanded, the brand doubles as a New Session shortcut; the
             collapsed rail's logo is the expand toggle below instead. */}
@@ -227,26 +234,7 @@ export function SidebarRoot({
             </span>
           </button>
         )}
-        {/* Desktop title bar owns the sidebar toggle while expanded; the
-            collapsed rail still needs this control for the brand/expand affordance. */}
-        {!(desktop && wide) && (
-          <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
-            <button
-              type="button"
-              className={clsx(css.iconButton, css.toggle)}
-              aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
-              onClick={() => { toggleSidebar() }}
-            >
-              {!wide && (
-                <span className={css.railMark} aria-hidden="true">
-                  {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
-                </span>
-              )}
-              {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
-              <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
-            </button>
-          </Tooltip>
-        )}
+        {!darwinDesktop && toggle}
       </div>
 
       {/* Expanded, the button carries its own label — tooltip only on the rail. */}
@@ -257,7 +245,7 @@ export function SidebarRoot({
           aria-label={t('session.new.label')}
           onClick={() => { startSession() }}
         >
-          <IconNewChatOutline16 size={wide ? 14 : 18} />
+          <IconNewChatOutline16 size={wide ? 14 : windowsTitlebar ? 16 : 18} />
           {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
         </button>
       </Tooltip>

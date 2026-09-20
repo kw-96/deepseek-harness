@@ -19,7 +19,6 @@ export type { DesktopTitleBarT }
 /** Props for the desktop title bar. */
 export type DesktopTitleBarProps = {
   t: DesktopTitleBarT
-  sidebarCollapsed: boolean
   toggleSidebar: () => void
   /** 右侧面板开合（官方右栏；组合里无右栏包时由装配层回落到 details 列）。 */
   toggleRightbar: () => void
@@ -27,6 +26,8 @@ export type DesktopTitleBarProps = {
   openBottom: () => void
   openSession: (id: SessionId) => void
   useSessions: <S>(sel: (s: SessionListState) => S) => S
+  /** 侧栏收起态：装配层经 inject 的 hooks 注入，标题栏随布局变化重渲染。 */
+  useSidebarCollapsed: <S>(sel: (collapsed: boolean) => S) => S
 }
 
 /**
@@ -35,13 +36,19 @@ export type DesktopTitleBarProps = {
  * @returns the title bar element tree.
  */
 export function DesktopTitleBar(props: DesktopTitleBarProps) {
-  const { t, sidebarCollapsed, toggleSidebar, toggleRightbar, toggleBottom, openBottom, openSession, useSessions } = props
+  const {
+    t, toggleSidebar, toggleRightbar, toggleBottom, openBottom, openSession, useSessions, useSidebarCollapsed,
+  } = props
+  const sidebarCollapsed = useSidebarCollapsed(collapsed => collapsed)
   const [menu, setMenu] = useState<MenuId | null>(null)
   const [maximized, setMaximized] = useState(false)
   const historyRef = useRef(createSessionHistory())
   const navigating = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
-  const current = useSessions(s => s.current)
+  // 官方 v0.1.6-alpha.2 移除了 SessionListState.current：当前会话改由"主视图
+  // 持有着的会话"派生（同 ui-workspace 的 mainSessionId 判据）。
+  const current = useSessions(s => Object.values(s.byId)
+    .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id)
   const sessionIds = useSessions(s => s.ids)
   const [, setTick] = useState(0)
   const refreshHistory = useCallback(() => { setTick(n => n + 1) }, [])
