@@ -36,9 +36,6 @@
       "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": ["./packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts"],
       "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": ["./packages/experimental/browser-use-stagehand-native/src/index.ts"],
       "@deepseek-ai/dsh-experimental-browser-use-runtime/mcp": ["./packages/experimental/browser-use-runtime/src/mcp.ts"],
-      // 本地自研 Tauri 桌面壳（experimental/web-desktop）：包名无法由目录推导，
-      // 生成器要求手写别名，否则 verify-tsconfig-paths 会失败。
-      "@deepseek-ai/dsh-experimental-web-desktop": ["./packages/experimental/web-desktop/src/index.ts"],
 
       "@deepseek-ai/dsh-office-to-pdf/types": ["./packages/document/office-to-pdf/src/types.ts"],
       "@deepseek-ai/dsh-api-terminal-controller": ["./packages/api/terminal-controller/src/index.ts"],

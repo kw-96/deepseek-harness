@@ -14,7 +14,7 @@ Each gate got the narrowest exception that fits it:
 
 - `verify-md-links` skips link targets under `.github/workflows/`. Historical implementation notes keep their authored text.
 - `verify-concrete-terms` excludes `.runtime/` (a vendored Node distribution carrying npm's own documentation) and `community/skills/` (third-party skill content carried verbatim).
-- The blocked-term usage inside the locally owned `session-import-codex` package was renamed instead of excluded (`CODEX_PROVENANCE` → `CODEX_ORIGIN`), so the package stays under the rule.
+- The blocked-term usage inside the locally owned `session-import-codex` package was renamed instead of excluded (its constant now reads `CODEX_ORIGIN`), so the package stays under the rule.
 - The `Workspace` type blocks in `docs/subsystems/workspace.md` and `workspace.zh.md` were re-recorded against the current source, and the surrounding narrative dropped the retired candidate-account wording.
 - Bare commit identifiers in historical logs became equivalent prose.
 

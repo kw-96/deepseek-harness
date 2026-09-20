@@ -14,7 +14,7 @@ Status: implemented
 
 - `verify-md-links` 跳过 `.github/workflows/` 下的链接目标。历史实现笔记保留原文。
 - `verify-concrete-terms` 排除 `.runtime/`（内置的 Node 分发物，携带 npm 自带文档）与 `community/skills/`（原样引入的第三方 skill 内容）。
-- 本仓自有的 `session-import-codex` 包中的禁用词改为更名而非排除（`CODEX_PROVENANCE` → `CODEX_ORIGIN`），使该包仍受规则约束。
+- 本仓自有的 `session-import-codex` 包中的禁用词改为更名而非排除（其常量现名 `CODEX_ORIGIN`），使该包仍受规则约束。
 - `docs/subsystems/workspace.md` 与 `workspace.zh.md` 中的 `Workspace` 类型块按当前源码重新记录，周边叙述也去掉了已退役的候选账本措辞。
 - 历史日志中的裸提交标识改为等价文字描述。
 

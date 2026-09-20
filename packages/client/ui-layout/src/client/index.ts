@@ -13,15 +13,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import { ThemePresenter } from './theme-presenter.ts'
-import { DesktopTitleBar, type DesktopTitleBarT } from './desktop/DesktopTitleBar.tsx'
-import { isDesktopShell } from './desktop/detect.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -161,44 +157,9 @@ export function apply(ctx: ClientContext): void {
     }, AppFrame)
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
-    // 桌面壳（Tauri 窗口）：官方 UI 不含标题栏面，这里把本包自带的 DesktopTitleBar
-    // 注册为 root overlay。sessions/uiWorkspace 惰性获取——ui-workspace 反向依赖本包，
-    // 声明依赖会形成循环；浏览器标签页里 isDesktopShell() 为 false，不注册。
-    const sessions = ctx.get('sessions') as { list: HostObservable<SessionListState> } | undefined
-    const disposeShell = isDesktopShell() && sessions !== undefined
-      ? ctx.slots.inject('shell.overlay', () => {
-        const sidebarCollapsed: HostObservable<boolean> = {
-          getSnapshot: () => instance.getSnapshot().layoutInfo.sidebar === 0,
-          subscribe: listener => instance.subscribe(listener),
-        }
-        return ctx.slots.register({
-          name: 'shell.overlay',
-          id: 'desktop-title-bar',
-          order: 100,
-          inject: () => ({
-            t: ctx.locale.bind('common') as unknown as DesktopTitleBarT,
-            toggleSidebar: () => { instance.actions.toggleSidebar() },
-            // 组合优先：官方右栏包在场时驱动它，缺席时本次点击无副作用。
-            toggleRightbar: () => {
-              const rightbar = ctx.get('sidebarRight') as { toggleExpanded?: () => void } | undefined
-              rightbar?.toggleExpanded?.()
-            },
-            // 外部底部工作台优先（会话头注册的 data-dsh-bottom-toggle 锚点）。
-            toggleBottom: () => { document.querySelector<HTMLElement>('[data-dsh-bottom-toggle]')?.click() },
-            openBottom: () => { document.querySelector<HTMLElement>('[data-dsh-bottom-toggle]')?.click() },
-            openSession: (id: SessionId) => {
-              const workspace = ctx.get('uiWorkspace') as { openSession?: (target: SessionId) => void } | undefined
-              workspace?.openSession?.(id)
-            },
-            hooks: { sessions: sessions.list, sidebarCollapsed },
-          }),
-        }, DesktopTitleBar)
-      })
-      : () => {}
     return () => {
       layout.dispose()
       disposePanels()
-      disposeShell()
       disposeRegistration()
       disposePanelInfo()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
