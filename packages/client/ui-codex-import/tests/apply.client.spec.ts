@@ -31,20 +31,20 @@ describe('ui-codex-import apply', () => {
     const bindScope = vi.fn(() => makeScope())
     const ctx = {
       effect: (fn: () => (() => void) | undefined) => fn(),
-      locale: { register: registerLocale },
+      locale: { register: registerLocale, bind: () => ((key: string) => key) },
       slots: { inject: injectSlot, register },
       settingsScope: { bind: bindScope },
       remote: { codexImport: { run: vi.fn(), history: vi.fn(async () => ({ ok: true, value: { runs: [] } })) } },
-      sessions: { open: vi.fn() },
+      uiWorkspace: { openSession: vi.fn() },
     } as unknown as ClientContext
 
     apply(ctx)
 
     expect(registerLocale).toHaveBeenCalledWith(NS, { zh, en })
-    expect(injectSlot).toHaveBeenCalledWith('settings.plugin.item', expect.any(Function))
+    expect(injectSlot).toHaveBeenCalledWith('settings.plugins.tab', expect.any(Function))
     expect(bindScope).toHaveBeenCalledWith({ namespace: CODEX_IMPORT_NS })
     expect(register).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'settings.plugin.item', key: CODEX_IMPORT_NS, locale: NS }),
+      expect.objectContaining({ name: 'settings.plugins.tab', id: CODEX_IMPORT_NS, locale: NS }),
       expect.any(Function),
     )
     if (injectedDisposer === undefined) throw new Error('missing injected disposer')

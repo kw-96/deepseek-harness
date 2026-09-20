@@ -60,7 +60,7 @@ function mountBar(win: DesktopAppWindow) {
   const tauri = installDesktopWindow(win)
   const t = ((key: string) => key) as DesktopTitleBarProps['t']
   const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
-    sel({ ids: [], current: undefined } as unknown as SessionListState))
+    sel({ ids: [], byId: {} } as unknown as SessionListState))
   return { ...render(
     <DesktopTitleBar
       t={t}
@@ -166,7 +166,7 @@ describe('DesktopTitleBar panel toggles', () => {
     installDesktopWindow(win.face)
     const t = ((key: string) => key) as DesktopTitleBarProps['t']
     const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
-      sel({ ids: [], current: undefined } as unknown as SessionListState))
+      sel({ ids: [], byId: {} } as unknown as SessionListState))
     const toggleBottom = vi.fn()
     const toggleRightbar = vi.fn()
     const { container } = render(

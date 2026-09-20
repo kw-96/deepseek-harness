@@ -61,23 +61,9 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
   }, { global: true })
 }
 
-function childEnvironment(
-  spec: TerminalBackendSpawnSpec,
-  dialect: ShellDialect,
-  interactive: boolean,
-): Record<string, string> {
+function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect): Record<string, string> {
   // The subprocess provider supplies its own scrubbed ambient base; these are
   // deliberate terminal-specific overrides layered after it.
-  if (interactive) {
-    return {
-      TERM: 'xterm-256color',
-      PAGER: 'cat',
-      GIT_PAGER: 'cat',
-      DSH_SHELL: '1',
-      DSH_SESSION_ID: spec.owner.id,
-      DSH_PTY_SESSION_ID: spec.sessionId,
-    }
-  }
   const common = {
     TERM: 'dumb',
     PAGER: 'cat',
@@ -120,32 +106,6 @@ async function spawnArgv(ctx: Context, config: ResolvedConfig, policy: SandboxEx
   }
   // Re-state the discriminant because object spread does not preserve its narrowed type.
   return (await sandbox.confine(argv, { ...policy, mode: policy.mode }, signal)).argv
-}
-
-/**
- * Resolve the effective config for one spawn. A per-session `shellDialect`
- * overrides the plugin dialect and resets path/args to that dialect's defaults.
- * @param base - plugin-resolved configuration.
- * @param dialectOverride - optional spawn-local dialect.
- * @returns configuration used for argv, env, and startup.
- */
-function configForSpawn(base: ResolvedConfig, dialectOverride: ShellDialect | undefined): ResolvedConfig {
-  if (dialectOverride === undefined || dialectOverride === base.shellDialect) return base
-  return resolveConfig({
-    backendType: base.backendType,
-    shellDialect: dialectOverride,
-    rows: base.rows,
-    cols: base.cols,
-    scrollbackLines: base.scrollbackLines,
-    scrollbackMaxBytes: base.scrollbackMaxBytes,
-    maxReadBytes: base.maxReadBytes,
-    pollIntervalMs: base.pollIntervalMs,
-    exactProbeAfterMs: base.exactProbeAfterMs,
-    idleSilenceMs: base.idleSilenceMs,
-    handoffGraceMs: base.handoffGraceMs,
-    timeoutMs: base.timeoutMs,
-    disposeGraceMs: base.disposeGraceMs,
-  })
 }
 
 // TODO(pty-initialize-race-home): Fold this outer abort race into
@@ -210,6 +170,16 @@ async function startupSession(
   }
 }
 
+/** Reject a failed startup only after its unpublished resources reach quiescence. */
+async function rejectAfterStartupCleanup(error: unknown, cleanup: () => Promise<void>): Promise<never> {
+  try {
+    await cleanup()
+  } catch (cleanupError: unknown) {
+    throw new TerminalBackendCleanupError(error, cleanupError)
+  }
+  throw error
+}
+
 /** Local shell backend registered under the configured type. */
 export class BashTerminalBackend implements TerminalBackend {
   readonly type: string
@@ -232,42 +202,30 @@ export class BashTerminalBackend implements TerminalBackend {
     spec.signal?.throwIfAborted()
     ensureSandboxModeFence(this.ctx, spec.owner)
     const policy = this.ctx.sandboxPolicy.resolve({ session: spec.owner.session })
-    const effective = configForSpawn(this.config, spec.shellDialect)
-    const argv = await spawnArgv(this.ctx, effective, policy, spec.signal)
+    const argv = await spawnArgv(this.ctx, this.config, policy, spec.signal)
     spec.signal?.throwIfAborted()
     if (argv[0] === undefined) throw new Error('terminal-bash: sandbox returned empty argv')
-    const interactive = spec.interaction === 'interactive'
-    const cols = spec.cols ?? effective.cols
-    const rows = spec.rows ?? effective.rows
     const terminal = await this.spawnTerminal({
       argv,
       cwd: spec.cwd ?? policy.workspaceRoot,
-      env: childEnvironment(spec, effective.shellDialect, interactive),
-      terminalType: interactive ? 'xterm-256color' : 'dumb',
-      rows,
-      cols,
-      graceMs: effective.disposeGraceMs,
+      env: childEnvironment(spec, this.config.shellDialect),
+      rows: this.config.rows,
+      cols: this.config.cols,
+      terminalType: 'dumb',
+      graceMs: this.config.disposeGraceMs,
       signal: spec.signal,
     })
-    const session = this.createSession(terminal, {
-      ...effective,
-      cols,
-      rows,
-    })
+    let session: LocalPtySession
     try {
-      if (interactive) {
-        session.motd = ''
-        return session
-      }
-      await startupSession(session, effective.shellDialect, effective.timeoutMs, spec.signal)
+      session = this.createSession(terminal, this.config)
+    } catch (error) {
+      return rejectAfterStartupCleanup(error, () => terminal.terminate())
+    }
+    try {
+      await startupSession(session, this.config.shellDialect, this.config.timeoutMs, spec.signal)
       return session
     } catch (error) {
-      try {
-        await session.close('PTY startup failed')
-      } catch (closeError: unknown) {
-        throw new TerminalBackendCleanupError(error, closeError)
-      }
-      throw error
+      return rejectAfterStartupCleanup(error, () => session.close('PTY startup failed'))
     }
   }
 }

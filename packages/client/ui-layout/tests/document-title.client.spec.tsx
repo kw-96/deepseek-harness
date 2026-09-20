@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import { useSyncExternalStore } from 'react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DocumentTitle } from '../src/client/DocumentTitle.tsx'
@@ -14,32 +14,19 @@ afterEach(() => {
   try { cleanup() } finally { document.title = originalTitle }
 })
 
-/**
- * Test-local selector hook over a framework-neutral snapshot source（与
- * app-frame spec 的 hookOf 同构）。测试运行时的公共包当前引用了尚未修复的
- * ui-chat 模块链，故不经过 test-runtime 的 bindSnapshotSelector。
- */
-function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapshot: () => T }) {
-  return function useSelector<S>(sel: (s: T) => S): S {
-    return sel(useSyncExternalStore(inst.subscribe, inst.getSnapshot))
-  }
-}
-
 function titleSources() {
   const sessionId = 'session-title' as SessionId
   const sessions = createSnapshotStore<SessionListState>({
     ids: [sessionId],
-    byId: { [sessionId]: { id: sessionId, displayTitle: 'Test', running: false, blank: false, updatedAt: 1 } },
-    current: sessionId,
+    byId: { [sessionId]: { id: sessionId, displayTitle: 'Test', running: false, retainedBy: { mainView: 1 }, blank: false, updatedAt: 1 } },
     phase: 'ready',
     subagentsByParent: {},
     jobsBySession: {},
-    currentAddress: undefined,
   })
   const panelInfo = createSnapshotStore<PanelInfo>({ activePanelId: null })
   return {
     sessionId, sessions, panelInfo,
-    props: { useSessions: hookOf(sessions), usePanelInfo: hookOf(panelInfo) },
+    props: { useSessions: bindSnapshotSelector(sessions), usePanelInfo: bindSnapshotSelector(panelInfo) },
   }
 }
 
@@ -53,7 +40,13 @@ describe('DocumentTitle', () => {
     expect(document.title).toBe('First title — DeepSeek Harness')
     act(() => { sessions.update((state) => { state.byId[sessionId]!.title = 'Revised title' }) })
     expect(document.title).toBe('Revised title — DeepSeek Harness')
-    act(() => { sessions.update((state) => { state.current = undefined }) })
+    act(() => {
+      const state = sessions.getSnapshot()
+      sessions.set({
+        ...state,
+        byId: { ...state.byId, [sessionId]: { ...state.byId[sessionId]!, retainedBy: {} } },
+      })
+    })
     expect(document.title).toBe('DeepSeek Harness')
     mounted.unmount()
     expect(document.title).toBe('DeepSeek Harness')
@@ -79,7 +72,7 @@ describe('DocumentTitle', () => {
     expect(document.title).toBe('Product')
     act(() => { panelInfo.set({ activePanelId: 'panel-b' as MainPanelId }) })
     expect(document.title).toBe('Product')
-    expect(sessions.getSnapshot().current).toBe(sessionId)
+    expect(sessions.getSnapshot().byId[sessionId]?.retainedBy.mainView).toBe(1)
     act(() => { panelInfo.set({ activePanelId: null }) })
     expect(document.title).toBe('Updated title — Product')
   })

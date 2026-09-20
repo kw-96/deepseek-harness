@@ -50,7 +50,6 @@ class FakeTerminal implements SubprocessTerminalHandle {
   pid = 123
   readonly output = new PassThrough()
   readonly writes: string[] = []
-  readonly resizes: Array<[number, number]> = []
   readonly kills: string[] = []
   readonly outcome = Promise.withResolvers<SubprocessOutcome>()
   readonly done = this.outcome.promise
@@ -87,14 +86,14 @@ class FakeTerminal implements SubprocessTerminalHandle {
     })
   }
 
+  async resize(_cols: number, _rows: number): Promise<void> {}
+
   async write(data: string): Promise<void> {
     if (this.throwWrite) throw new Error('write failed')
     this.writes.push(data)
   }
 
-  async resize(cols: number, rows: number): Promise<void> {
-    this.resizes.push([cols, rows])
-  }
+  async inspectActivity() { return { state: 'unknown' as const, revision: 0 } }
 
   async inspectForeground() {
     const processGroupId = this.inspector.foregroundPgid()
@@ -1629,39 +1628,4 @@ describe('LocalPtySession bounds, signals, and teardown', () => {
     expect((await operation.done).waitReason).toBe('session_exit')
   })
 
-})
-
-describe('LocalPtySession interactive UI bypass', () => {
-  it('write and followOutput deliver raw CSI text; resize reaches the provider', async () => {
-    const terminal = new FakeTerminal()
-    const session = makeSession(terminal, terminal.inspector, config())
-    const controller = new AbortController()
-    const frames: string[] = []
-    const consuming = (async () => {
-      for await (const frame of session.followOutput(controller.signal)) {
-        frames.push(frame.chunk)
-        if (frames.join('').includes('ready')) break
-      }
-    })()
-    terminal.emitData('\x1b[31mready\x1b[0m')
-    await consuming
-    controller.abort()
-    expect(frames.join('')).toContain('\x1b[31mready\x1b[0m')
-
-    await session.write('ls\r')
-    expect(terminal.writes).toContain('ls\r')
-    await session.resize(120, 40)
-    expect(terminal.resizes).toEqual([[120, 40]])
-  })
-
-  it('rejects interactive write while a line-mode send is active', async () => {
-    const terminal = new FakeTerminal()
-    terminal.inspector.waiting = true
-    const session = makeSession(terminal, terminal.inspector, config())
-    await initialize(session, terminal)
-    const operation = session.startSend({ text: 'sleep', submit: true })
-    await expect(session.write('x')).rejects.toMatchObject({ code: 'SEND_ACTIVE' })
-    operation.cancel()
-    await operation.done
-  })
 })

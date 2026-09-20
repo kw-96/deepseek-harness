@@ -11,7 +11,7 @@ import css from './CodexImportCard.module.css'
 
 /** Props the renderer binds for the Codex import card. */
 export type CodexImportCardProps =
-  PropsRuntime<'settings.plugin.item'>
+  PropsRuntime<'settings.plugins.tab'>
   & PropsLocale<typeof NS>
   & InjectFace<CodexImportCardFace>
 

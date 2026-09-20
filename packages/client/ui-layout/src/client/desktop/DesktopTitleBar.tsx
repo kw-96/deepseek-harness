@@ -41,7 +41,10 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
   const historyRef = useRef(createSessionHistory())
   const navigating = useRef(false)
   const rootRef = useRef<HTMLElement | null>(null)
-  const current = useSessions(s => s.current)
+  // 官方 v0.1.6-alpha.2 移除了 SessionListState.current：当前会话改由"主视图
+  // 持有着的会话"派生（同 ui-workspace 的 mainSessionId 判据）。
+  const current = useSessions(s => Object.values(s.byId)
+    .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id)
   const sessionIds = useSessions(s => s.ids)
   const [, setTick] = useState(0)
   const refreshHistory = useCallback(() => { setTick(n => n + 1) }, [])

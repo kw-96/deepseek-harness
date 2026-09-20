@@ -26,7 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Required services for the slot, locale, Remote, scope, and navigation. */
-export const inject = ['slots', 'locale', 'remote', 'remote.codexImport', 'settingsScope', 'sessions']
+export const inject = ['slots', 'locale', 'remote', 'remote.codexImport', 'settingsScope', 'uiWorkspace']
 
 /**
  * Register the dictionaries and the `codex-import` card in the Plugins tab.
@@ -34,15 +34,20 @@ export const inject = ['slots', 'locale', 'remote', 'remote.codexImport', 'setti
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-codex-import: dictionaries')
+  const t = ctx.locale.bind(NS)
 
-  ctx.slots.inject('settings.plugin.item', () => {
+  // 官方 v0.1.6-alpha.2 把插件设置条目从 `settings.plugin.item` 改为 list 槽
+  // `settings.plugins.tab`（同 ui-settings-plugin-inventory 的注册形态）。
+  ctx.slots.inject('settings.plugins.tab', () => {
     const controller = new CodexImportCardController(
       ctx,
       ctx.settingsScope.bind<CodexImportSettings>({ namespace: CODEX_IMPORT_NS }),
     )
     const dispose = ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: CODEX_IMPORT_NS,
+      name: 'settings.plugins.tab',
+      id: CODEX_IMPORT_NS,
+      order: 20,
+      label: () => t('title'),
       locale: NS,
       inject: () => controller.inject(),
     }, CodexImportCard)

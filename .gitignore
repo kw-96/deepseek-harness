@@ -1,5 +1,8 @@
 CLAUDE.local.md
 .env
+apps/desktop/.env.windows
+apps/desktop/.env.macos
+apps/desktop/*.p12
 node_modules/
 # Bundled peer-host Node under `.runtime` must keep its own node_modules
 # (corepack/npm); the desktop shell invokes those shims on every launch.
