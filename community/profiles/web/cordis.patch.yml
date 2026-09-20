@@ -1,7 +1,6 @@
 # Your patch layer for this dsh profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; `!!js` expressions allowed).
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: ui-schedule,
     name: "@deepseek-ai/dsh-client-ui-schedule",
@@ -45,25 +44,18 @@
     id: session-query-sqlite,
     config: { path: ':memory:', openAt: first-search }
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: bash-sandbox, name: "@deepseek-ai/dsh-bash-sandbox", disabled: true }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-bash, name: "@deepseek-ai/dsh-tool-bash", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-pwsh, name: "@deepseek-ai/dsh-tool-pwsh", disabled: false }
 # Mnemon Starter 默认关闭自动捕获；显式开启以记录稳定偏好与事实。
 - { id: mnemon-strategy-auto-capture, disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: tool-fs-search,
     name: "@deepseek-ai/dsh-tool-fs-search",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-fs, name: "@deepseek-ai/dsh-tool-fs", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-web, name: "@deepseek-ai/dsh-tool-web", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 # 0.1.6 起引擎改名为 workflow-ptc（web-app bundle 默认 disabled: true），
 # 这一行在 web profile 里重新启用它，否则 tool-workflow / tool-ralph 会一直等不到 workflowEngine。
 - {
@@ -71,79 +63,60 @@
     name: "@deepseek-ai/dsh-workflow-ptc",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-workflow, name: "@deepseek-ai/dsh-tool-workflow", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-ralph, name: "@deepseek-ai/dsh-tool-ralph", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: tool-subagent-control,
     name: "@deepseek-ai/dsh-tool-subagent-control",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: tool-subagent-list-agents,
     name: "@deepseek-ai/dsh-tool-subagent-control/list-agents",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-subagent, name: "@deepseek-ai/dsh-tool-subagent", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: tool-subagent-fork,
     name: "@deepseek-ai/dsh-tool-subagent",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: ui-settings-plugin-inventory,
     name: "@deepseek-ai/dsh-client-ui-settings-plugin-inventory",
     disabled: true
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: agent-instructions,
     name: "@deepseek-ai/dsh-agent-instructions",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: compaction-basic,
     name: "@deepseek-ai/dsh-compaction-basic",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: command-compact,
     name: "@deepseek-ai/dsh-command-compact",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: tool-result-pruner,
     name: "@deepseek-ai/dsh-compaction-tool-result-pruner",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - {
     id: skill-filesystem,
     name: "@deepseek-ai/dsh-skill-filesystem",
     disabled: false
   }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: skill-badge, name: "@deepseek-ai/dsh-skill-badge", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-skill, name: "@deepseek-ai/dsh-tool-skill", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: command-goal, name: "@deepseek-ai/dsh-command-goal", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-goal, name: "@deepseek-ai/dsh-tool-goal", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: plan-mode, name: "@deepseek-ai/dsh-plan-mode", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-jobs, name: "@deepseek-ai/dsh-tool-jobs", disabled: false }
-#Managed by dsh-plugin-manager. Remove this row to return control to higher-level configuration.
 - { id: tool-todo, name: "@deepseek-ai/dsh-tool-todo", disabled: false }
 # 固定会话回复语言为简体中文（用户要求 2026-09-08，勿回归）：对话/解释/总结/文档一律中文。
 # 本仓字段名是 personaPrefix（不是 persona），且会被 web-app bundle 的同名字段覆盖，

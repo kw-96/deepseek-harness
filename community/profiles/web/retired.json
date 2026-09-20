@@ -9,5 +9,7 @@
   "ntes-dsh-market",
   "@ruihuahe/dsh-plugin-marketplace",
   "@dap-dsh-plugins/netease-auth",
-  "@linxin666/dsh-remote-web-ui"
+  "@linxin666/dsh-remote-web-ui",
+  "dsh-plugin-manager",
+  "dsh-better-sidebar"
 ]
