@@ -139,7 +139,7 @@ Imported user, assistant, and tool messages sit in the stored session until an a
 - **Simplified fidelity** — Codex `reasoning`, `contextCompaction`, and raw file diffs are not transcribed; agent-message phase metadata is dropped, and each agent message becomes one DSH step rather than Codex's original grouping.
 - **Synthesized tool-call messages** — because Codex records a call and its output in one item, each tool item yields one additional assistant message holding only that item's call id, name, and arguments; the message carries no text of its own.
 - **Bounded tool results** — result text beyond `maxToolResultChars` is truncated to keep the durable log bounded.
-- **Continuation, not migration** — imported sessions resume with the deployment's default preset and model; the Codex model is recorded only as `codex` provenance on the assistant messages.
+- **Continuation, not migration** — imported sessions resume with the deployment's default preset and model; the Codex model is recorded only as `codex` origin on the assistant messages.
 
 <a id="dev-note"></a>
 ### Dev Note
