@@ -657,43 +657,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
-    key: 'codexImport',
-    summary: 'Remote business surface for the card: trigger a run and read history.',
-    description: 'Remote business surface for the card: trigger a run and read history. The controller owns the durable `codex_import` domain and never touches the session log beyond what the sweep already wrote.',
-    methods: [
-      {
-        signature: '@Remote(\'run\') async run(): Promise<CodexImportRun>',
-        description: 'Run one import sweep now and record its outcome as the newest history run.',
-        parameters: [],
-        returns: 'the recorded run.',
-      },
-      {
-        signature: '@Remote(\'scan\') async scan(): Promise<CodexImportScanValue>',
-        description: 'Preview the next sweep without writing: per-thread verdicts and counts in the sweep\'s own vocabulary. Nothing is persisted, no workspace or project is created, and no session is published.',
-        parameters: [],
-        returns: 'the preview.',
-      },
-      {
-        signature: '@Remote(\'history\') async history(): Promise<CodexImportHistoryValue>',
-        description: 'Read recorded import runs, newest first.',
-        parameters: [],
-        returns: 'the complete history list.',
-      },
-      {
-        signature: '@Remote(\'undo\') async undo(at: number): Promise<CodexImportUndoValue>',
-        description: 'Undo one recorded run by archiving the sessions it imported, then stamp the run. The sessions stay in DSH storage, so undo is reversible through restore and the evidence never disappears.',
-        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
-        returns: 'the outcome counts for the card.',
-      },
-      {
-        signature: '@Remote(\'restore\') async restore(at: number): Promise<CodexImportUndoValue>',
-        description: 'Restore the sessions of one undone run and clear its stamp.',
-        parameters: [{ name: 'at', description: 'run time identifying the run.' }],
-        returns: 'the outcome counts for the card.',
-      },
-    ],
-  },
-  {
     key: 'commands',
     summary: 'Human-command registry.',
     description: 'Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.',
@@ -4365,38 +4328,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ClientArtifactBaseline',
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly size: number;\n}',
-  },
-  {
-    name: 'CodexImportHistoryValue',
-    declaration: 'export interface CodexImportHistoryValue {\n    readonly runs: readonly CodexImportRun[];\n}',
-  },
-  {
-    name: 'CodexImportRun',
-    declaration: 'export interface CodexImportRun {\n    readonly at: number;\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n    readonly sessions: readonly CodexImportSession[];\n    readonly undoneAt: number;\n}',
-  },
-  {
-    name: 'CodexImportScanEntry',
-    declaration: 'export interface CodexImportScanEntry {\n    readonly threadId: string;\n    readonly sessionId: SessionId;\n    readonly title: string;\n    readonly cwd: string;\n    readonly kind: CodexImportScanVerdict;\n    readonly events: number;\n}',
-  },
-  {
-    name: 'CodexImportScanValue',
-    declaration: 'export interface CodexImportScanValue {\n    readonly summary: CodexImportSummary;\n    readonly entries: readonly CodexImportScanEntry[];\n}',
-  },
-  {
-    name: 'CodexImportScanVerdict',
-    declaration: 'export type CodexImportScanVerdict = \'imported\' | \'updated\' | \'unchanged\' | \'deferred-active\';',
-  },
-  {
-    name: 'CodexImportSession',
-    declaration: 'export interface CodexImportSession {\n    readonly id: SessionId;\n    readonly title: string;\n}',
-  },
-  {
-    name: 'CodexImportSummary',
-    declaration: 'export interface CodexImportSummary {\n    readonly imported: number;\n    readonly updated: number;\n    readonly skippedExisting: number;\n    readonly skippedEmpty: number;\n    readonly deferredActive: number;\n}',
-  },
-  {
-    name: 'CodexImportUndoValue',
-    declaration: 'export interface CodexImportUndoValue {\n    readonly at: number;\n    readonly undone: boolean;\n    readonly changed: number;\n    readonly failed: number;\n}',
   },
   {
     name: 'CollectedOutput',
