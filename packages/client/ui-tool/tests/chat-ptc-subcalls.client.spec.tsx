@@ -217,7 +217,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
     expect(nested).not.toBeNull()
   })
 
-  it('a file sub-row click opens through the Host opener; bash sub-rows open nothing', async () => {
+  it('a file sub-row click opens the right Sidebar preview; bash sub-rows open nothing', async () => {
     const parent = 'call-64'
     const subCalls = [
       subCall(11, parent, 1, 'read', { path: 'notes/demo.txt' }, 'ok'),
@@ -227,13 +227,13 @@ describe('run_code sub-calls through the real chat machinery', () => {
     const view = mountApp(b.runtime)
     view.getByText('notes/demo.txt').click()
     await vi.waitFor(() => {
-      expect(b.openWorkspacePath).toHaveBeenCalledWith({ path: '/w/notes/demo.txt' })
+      expect(b.sidebarRight.openResource).toHaveBeenCalledWith(expect.stringContaining('notes/demo.txt'))
     })
-    // This fork's openFile hands the path to the Host; the right Sidebar is not
-    // involved, and a bash sub-row opens nothing at all.
-    expect(b.sidebarRight.openResource).not.toHaveBeenCalled()
+    // openFile hands the resource address to the official right Sidebar preview,
+    // and a bash sub-row opens nothing at all.
+    expect(b.openWorkspacePath).not.toHaveBeenCalled()
     view.getByText('List notes').click()
-    expect(b.openWorkspacePath).toHaveBeenCalledTimes(1)
+    expect(b.sidebarRight.openResource).toHaveBeenCalledTimes(1)
   })
 
   it('a RUNNING run_code call nests its so-far dispatches under the spinner row', async () => {
