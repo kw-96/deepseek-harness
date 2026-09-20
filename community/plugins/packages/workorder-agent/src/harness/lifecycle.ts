@@ -1,12 +1,10 @@
 import { getRequestListener } from '@hono/node-server'
 import { Hono } from 'hono'
 import type { Context } from '@deepseek-ai/cordis'
-import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import { createApp, type AppRuntime } from '../app.js'
 import type { AppConfig } from '../config.js'
 import { HarnessWorkorderAgent } from './agent.js'
 import { bootstrapRoute, type BootstrapWrite } from './bootstrap.js'
-import { controlPanelNavigationScript } from './navigation.js'
 import { toAppConfig, type PluginConfig } from './pluginConfig.js'
 
 /** 工单插件运行时：启用时挂载控制面、调度与 Webhook，禁用时完整卸载。 */
@@ -23,12 +21,7 @@ export class WorkorderPluginLifecycle {
   /**
    * @param ctx 拥有 WebServer 的插件上下文
    */
-  constructor(private readonly ctx: Context) {
-    this.ctx.on('webserver/index-inject', (table: IndexInjection[]) => {
-      if (!this.active) return
-      table.push({ kind: 'script', placement: 'body', text: controlPanelNavigationScript() })
-    })
-  }
+  constructor(private readonly ctx: Context) {}
 
   /**
    * 按最新配置启停运行时；相同配置跳过。
