@@ -13,7 +13,6 @@
    title row, the tab strip's 10px margin, a 16px tab line, and its 9px bottom
    inset — so no row below may grow past its figure. */
 .header {
-  position: relative; /* anchors the phone-pinned corner seat (see the 767px block) */
   flex: none;
   box-sizing: border-box;
   min-height: 76px;
@@ -51,12 +50,6 @@
   align-items: center;
   gap: 0;
   min-height: 30px;
-  /* A floating sidebar entry over this corner publishes the width to keep free
-     (AppFrame sets the variable; absent means no entry and no inset). It is a
-     base rule, not a phone-breakpoint one: the entry follows touch input, which
-     is not tied to the viewport width — a phone browser in desktop mode is wide
-     and still gets the button. */
-  margin-left: var(--dsh-rail-entry-clearance, 0px);
 }
 
 .titleCluster {
@@ -523,64 +516,4 @@
 .root[data-phase='settling'] .composerSeat,
 .embeddedBody[data-content-phase='settling'] .composerSeat {
   visibility: hidden;
-}
-
-/* Phone (below 768px): the header seats do not fit the column — registrants
-   stack several controls inside the title cluster (mode router, undo/restore,
-   snapshot) and the row overflowed, covering the utility glyphs and clipping
-   its own buttons past the right edge. Below the breakpoint the row becomes a
-   single sideways-scrolling strip: every seat keeps its intrinsic width and
-   stays reachable by swiping, and the header keeps one row height. */
-@media (max-width: 767px) {
-  .header {
-    min-height: 0;
-    padding: 8px 12px 0;
-  }
-
-  .titleRow {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    min-height: 0;
-    /* Reserved for the pinned corner seat so the strip never scrolls under it. */
-    margin-right: 40px;
-  }
-
-  /* Natural widths are what make the strip scrollable; shrinking would squash
-     the seats back into the column instead. */
-  .titleCluster,
-  .headerActions,
-  .headerUtilities,
-  .headerCorner {
-    flex: 0 0 auto;
-  }
-
-  .headerUtilities {
-    margin-left: 16px;
-  }
-
-  /* The corner seat holds the only way into the right panel while it is
-     collapsed. In the scrolling strip it would sit at the far end of 800-odd
-     pixels of header — off-screen and unreachable by touch — so a phone pins it
-     to the header's trailing edge instead. */
-  .headerCorner {
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    margin: 0;
-    /* Above the sidebar drawer's scrim (AppFrame), below the drawer itself:
-       while the drawer is open this entry must still open the right panel on
-       the first tap instead of being read as a tap outside the drawer. */
-    z-index: 26;
-    background: var(--dsw-alias-bg-base);
-  }
-
-  .crumb {
-    max-width: 160px;
-  }
-
-  .tabs {
-    gap: 28px;
-    margin-top: 6px;
-  }
 }
