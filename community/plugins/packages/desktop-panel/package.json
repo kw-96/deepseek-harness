@@ -25,8 +25,10 @@
     "lib/client.js.map",
     "lib/ws.js",
     "lib/panel.js",
+    "native",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README.zh.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

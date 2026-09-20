@@ -62,7 +62,8 @@ window.__ModuleLoader__.load({
 			const [copied, setCopied] = (0, react.useState)(false);
 			const load = (0, react.useCallback)(async () => {
 				try {
-					setState(await (await fetch("/plugin/desktop/state", { cache: "no-store" })).json());
+					const response = await fetch("/plugin/desktop/state", { cache: "no-store" });
+					setState(await response.json());
 					setFailure("");
 				} catch {
 					setFailure(t("loadFailed"));
