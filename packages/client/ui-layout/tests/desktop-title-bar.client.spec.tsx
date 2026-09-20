@@ -164,20 +164,19 @@ describe('DesktopTitleBar maximize state', () => {
 })
 
 describe('DesktopTitleBar panel toggles', () => {
-  it('places bottom then right panel buttons before the window controls and wires them', () => {
+  it('places the right panel button before the window controls and wires it', () => {
     const win = makeDesktopWindow()
     installDesktopWindow(win.face)
     const t = ((key: string) => key) as DesktopTitleBarProps['t']
     const useSessions = (<S,>(sel: (s: SessionListState) => S): S =>
       sel({ ids: [], byId: {} } as unknown as SessionListState))
-    const toggleBottom = vi.fn()
     const toggleRightbar = vi.fn()
     const { container } = render(
       <DesktopTitleBar
         t={t}
         toggleSidebar={vi.fn()}
         toggleRightbar={toggleRightbar}
-        toggleBottom={toggleBottom}
+        toggleBottom={vi.fn()}
         openBottom={vi.fn()}
         openSession={vi.fn()}
         useSessions={useSessions}
@@ -186,15 +185,12 @@ describe('DesktopTitleBar panel toggles', () => {
     )
     const labels = [...container.querySelectorAll('header button')]
       .map(button => button.getAttribute('aria-label'))
-    expect(labels.slice(-5)).toEqual([
-      'desktop.menu.toggleBottom',
+    expect(labels.slice(-4)).toEqual([
       'desktop.menu.toggleDetails',
       'desktop.window.minimize',
       'desktop.window.maximize',
       'close',
     ])
-    fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleBottom' }))
-    expect(toggleBottom).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'desktop.menu.toggleDetails' }))
     expect(toggleRightbar).toHaveBeenCalledTimes(1)
   })

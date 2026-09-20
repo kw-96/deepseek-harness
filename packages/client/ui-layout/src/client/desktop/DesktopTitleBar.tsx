@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelBottomIcon, PanelIcon, PanelRightIcon, RestoreIcon } from './icons.tsx'
+import { CloseIcon, ChevronLeft, ChevronRight, MaxIcon, MinIcon, PanelIcon, PanelRightIcon, RestoreIcon } from './icons.tsx'
 import { installExternalLinkHandler } from './external-links.ts'
 import { buildMenus, navigateDropdownKey, tryRunMenuShortcut, type DesktopTitleBarT, type MenuId } from './menus.ts'
 import {
@@ -234,15 +234,6 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
         onDoubleClick={toggleMaximize}
       />
       <div className={css.controls}>
-        <button
-          type="button"
-          className={css.iconBtn}
-          aria-label={t('desktop.menu.toggleBottom')}
-          title={t('desktop.menu.toggleBottom')}
-          onClick={toggleBottom}
-        >
-          <PanelBottomIcon />
-        </button>
         <button
           type="button"
           className={css.iconBtn}
