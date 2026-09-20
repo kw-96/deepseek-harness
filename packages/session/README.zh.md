@@ -41,7 +41,6 @@ session 组让对话持久保存，恢复已发布的日志格式，并使已提
 
 | 包 | 职责 | ctx key |
 |---|---|---|
-| [`session-import-codex/`](session-import-codex/README.zh.md) | 主机启动时把本地 Codex 线程导入为持久、可列出的 DSH 会话 | 注册到 `ctx.sessions` + `ctx.sessionPersistence` |
 
 ### 投影
 

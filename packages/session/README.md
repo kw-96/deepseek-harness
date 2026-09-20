@@ -41,7 +41,6 @@ The group splits into five families: durable storage (persistence seam, backends
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`session-import-codex/`](session-import-codex/README.md) | Imports local Codex threads as durable, listed DSH sessions on host start | registers on `ctx.sessions` + `ctx.sessionPersistence` |
 
 ### Projection
 

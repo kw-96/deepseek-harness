@@ -60,9 +60,6 @@
       "path": "../../settings/settings"
     },
     {
-      "path": "../../session/session-import-codex"
-    },
-    {
       "path": "../../subagent/subagent"
     },
     {
