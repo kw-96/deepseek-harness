@@ -11,6 +11,9 @@ import { DesktopTitleBar } from '../src/client/desktop/DesktopTitleBar.tsx'
 import type { DesktopTitleBarProps } from '../src/client/desktop/DesktopTitleBar.tsx'
 import type { DesktopAppWindow } from '../src/client/desktop/window.ts'
 
+/** 侧栏收起态注入桩：真实装配层提供 observable，测试里固定为展开。 */
+const useCollapsed = <S,>(sel: (collapsed: boolean) => S): S => sel(false)
+
 /** Controllable Tauri window stub with a manual resize broadcast. */
 function makeDesktopWindow() {
   const resizeHandlers = new Set<() => void>()
@@ -64,13 +67,13 @@ function mountBar(win: DesktopAppWindow) {
   return { ...render(
     <DesktopTitleBar
       t={t}
-      sidebarCollapsed={false}
       toggleSidebar={vi.fn()}
       toggleRightbar={vi.fn()}
       toggleBottom={vi.fn()}
       openBottom={vi.fn()}
       openSession={vi.fn()}
       useSessions={useSessions}
+      useSidebarCollapsed={useCollapsed}
     />,
   ), ...tauri }
 }
@@ -172,13 +175,13 @@ describe('DesktopTitleBar panel toggles', () => {
     const { container } = render(
       <DesktopTitleBar
         t={t}
-        sidebarCollapsed={false}
         toggleSidebar={vi.fn()}
         toggleRightbar={toggleRightbar}
         toggleBottom={toggleBottom}
         openBottom={vi.fn()}
         openSession={vi.fn()}
         useSessions={useSessions}
+        useSidebarCollapsed={useCollapsed}
       />,
     )
     const labels = [...container.querySelectorAll('header button')]
