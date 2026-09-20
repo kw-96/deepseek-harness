@@ -35,8 +35,8 @@ const TOOL_NAMES = {
   webSearch: 'web_search',
 } as const
 
-/** Model provenance stamped on imported assistant messages. */
-const CODEX_PROVENANCE = { provider: 'codex', model: 'codex' } as const
+/** Model origin stamped on imported assistant messages. */
+const CODEX_ORIGIN = { provider: 'codex', model: 'codex' } as const
 
 /** One emit-able conversion step: the turn being built, its emitted-item count, and the running step. */
 interface TurnState {
@@ -174,7 +174,7 @@ function pushToolPair(
       id: brandString<MessageId>(`${item.itemId}:tool-call`),
       role: 'assistant',
       content: [{ type: 'tool-call', id: callId, name, arguments: argumentsText }],
-      source: { kind: 'model', ...CODEX_PROVENANCE },
+      source: { kind: 'model', ...CODEX_ORIGIN },
     },
     stream: [],
   }, 'append')
@@ -366,7 +366,7 @@ export function convertCodexThread(
               id: brandString<MessageId>(item.itemId),
               role: 'assistant',
               content: [{ type: 'text', text }],
-              source: { kind: 'model', ...CODEX_PROVENANCE },
+              source: { kind: 'model', ...CODEX_ORIGIN },
             },
             stream: [],
           }, 'append')

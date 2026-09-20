@@ -185,6 +185,9 @@ export function findViolations(
   const check = (url: string, node: Nodes): void => {
     if (isExternal(url)) return
     const target = pathPart(url)
+    // 本 checkout 有意移除了 GitHub 工作流（fork 不跑官方 CI）；指向
+    // `.github/workflows/` 的引用保留为历史说明文字，不再作为可解析链接检查。
+    if (target.includes('.github/workflows/')) return
     const resolved = target === '' ? absPath : resolve(dir, target)
     if (!existsSync(resolved)) {
       out.push({ file, line: node.position?.start.line ?? 0, url, reason: 'target' })
