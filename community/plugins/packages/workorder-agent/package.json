@@ -7,10 +7,14 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
   },
   "exports": {
     ".": "./lib/harness/host.js",
+    "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
   "files": [
@@ -26,7 +30,8 @@
   "scripts": {
     "clean": "node ../../scripts/clean-package.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "pnpm run clean && tsc -p tsconfig.json",
+    "build": "pnpm run clean && tsc -p tsconfig.json && pnpm run build:client",
+    "build:client": "tsc -p tsconfig.client.json && tsdown --config tsdown.client.config.ts",
     "test": "vitest run",
     "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/workorder-agent-0.1.6.tgz workorder-agent"
   },
@@ -58,6 +63,9 @@
     "@deepseek-ai/schemastery": "3.18.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.0",
+    "@types/react": "^18.3.28",
+    "react": "^18.3.1",
+    "tsdown": "^0.22.14",
     "typescript": "^6.0.3",
     "vitest": "^4.1.0"
   }

@@ -1,0 +1,7 @@
+# dsh-mode-router 是「agent 预设专属插件」：它由 agent 预设里的
+# `- name: dsh-mode-router` 行按会话挂载，不是 profile 级的组成层。
+#
+# 本层因此不注册任何条目。声明 `dsh.bundle` 的唯一目的，是让官方的
+# 插件管理入口（`dsh plugin add` / 桌面端「添加插件」）接受这个包，
+# 从而把它装进 profile 的 node_modules，供预设按裸包名引用。
+[]

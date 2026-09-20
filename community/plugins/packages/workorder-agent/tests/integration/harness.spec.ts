@@ -1,4 +1,4 @@
-﻿import { readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot'
@@ -46,7 +46,8 @@ describe('DeepSeek Harness 自研 Bundle', () => {
     expect(lifecycleSource).not.toContain('tapIndex')
     expect(hostSource).toContain('WORKORDER_SETTINGS_NS')
     expect(hostSource).toContain('settings.installSection')
-    expect(lifecycleSource).toContain('webserver/index-inject')
+    // 入口改由客户端面注册到官方右栏，Host 面不再注入左侧栏页脚脚本。
+    expect(lifecycleSource).not.toContain('webserver/index-inject')
     expect(lifecycleSource).toContain('ctx.webServer.register')
     expect(agentSource).toContain('ctx.agents.create')
     expect(agentSource).toContain('ctx.agents.get')

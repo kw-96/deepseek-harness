@@ -15,9 +15,15 @@
   },
   "files": [
     "lib",
+    "bundle.patch.yml",
     "README.md",
     "README.zh.md"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./bundle.patch.yml"
+    }
+  },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },

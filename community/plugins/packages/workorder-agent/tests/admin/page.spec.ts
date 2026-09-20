@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { controlPanelNavigationScript, injectControlPanelNavigation } from '../../src/harness/navigation.js'
 import { adminPage } from '../../src/plugins/admin/page.js'
 
 describe('Ticket Hub 控制面', () => {
@@ -45,22 +44,5 @@ describe('Ticket Hub 控制面', () => {
     const script = page.match(/<script>([\s\S]*)<\/script>/)?.[1]
     expect(script).toBeTruthy()
     expect(() => new Function(script ?? '')).not.toThrow()
-  })
-
-  it('通过官方索引扩展挂入侧边栏页脚动作区', () => {
-    const script = controlPanelNavigationScript()
-    expect(script).not.toContain('</script')
-    expect(script).toContain("querySelector('[class*=footerActions]')")
-    expect(script).toContain("querySelector('[class*=settingsArea]')")
-    expect(script).toContain("const path='/workorder-agent'")
-    expect(script).toContain("const label='Ticket Hub'")
-    expect(script).toContain('data-workorder-entry-label')
-    // observer 也在监听 data-wide：同值写入仍会派发 attribute 记录，必须只在值变化时写。
-    expect(script).toContain("const wide=peer===null?holder===null?'wide':'rail':peer.getAttribute('data-wide')")
-    expect(script).toContain("if(entry.getAttribute('data-wide')!==wide)entry.setAttribute('data-wide',wide)")
-    expect(script).not.toContain('工单控制面')
-    expect(() => new Function(script)).not.toThrow()
-    const html = injectControlPanelNavigation('<html><body><main></main></body></html>')
-    expect(html).toContain('data-workorder-navigation')
   })
 })
