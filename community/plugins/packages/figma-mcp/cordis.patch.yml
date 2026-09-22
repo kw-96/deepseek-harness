@@ -1,0 +1,52 @@
+# Figma MCP 接入（配置组合包，无 Host/Client 入口代码）
+#
+# 只插入已安装的 @deepseek-ai/dsh-mcp-client，挂载开源的 Framelink
+# figma-developer-mcp（GLips/Figma-Context-MCP，MIT），它经 Figma REST API 读取
+# 设计稿，向模型暴露两个工具：mcp__figma__get_figma_data 与
+# mcp__figma__download_figma_images。
+#
+# 为什么不接 Cursor / Codex 用的官方端点 https://mcp.figma.com/mcp：
+# Figma 的 MCP Catalog 只放行 VS Code / Cursor / Claude Code / Codex / Xcode，
+# 其授权服务器的动态客户端注册端点
+# https://api.figma.com/v1/oauth/mcp/register 对目录外客户端一律返回
+# 403 Forbidden（2026-09-22 实测），dsh-mcp-client 也只支持静态请求头，不实现
+# OAuth 授权码与刷新流程。官方给目录外客户端的替代品是 Figma 桌面版内置的本地
+# 服务器 http://127.0.0.1:3845/mcp，它要求 Figma 桌面版常驻并在 Dev Mode 的
+# inspect 面板里手动启用，故不作默认接入。
+#
+# 令牌取自 $DSH_HOME/.env 的 FIGMA_API_KEY：app-boot 的 loadLayeredEnv 在启动
+# 时把该文件的值注入 process.env（不覆盖同名变量，见 apps/desktop-host/src/index.ts）。
+# 令牌因此不出现在本文件里，不会随仓库提交泄露；代价是改完 .env 要重启一次 Harness。
+#
+# Windows 上必须经 cmd /c 启动 npx：npx 是 .cmd 批处理，直接 spawn 会 ENOENT。
+- insert:
+    - id: mcp-figma
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: figma
+        transport: stdio
+        command: cmd
+        args:
+          - /c
+          - npx
+          - -y
+          - figma-developer-mcp
+          - --stdio
+          - --image-dir
+          - E:/KW/qtGit/deepseek-harness
+        env:
+          # 令牌解析顺序：先用启动环境（含 $DSH_HOME/.env 注入的值），
+          # 再回退到只有本人可读的令牌文件；两处都缺时子进程会以
+          # "Either FIGMA_API_KEY or FIGMA_OAUTH_TOKEN is required" 退出，
+          # 本服务器因此不注册任何工具，直到令牌就位。
+          FIGMA_API_KEY: !!js >-
+            (process.env.FIGMA_API_KEY ?? '').trim()
+            || (() => {
+              try {
+                return process.getBuiltinModule('node:fs')
+                  .readFileSync(process.env.USERPROFILE + '/.dsh/figma-api-key.txt', 'utf8').trim()
+              } catch {
+                return ''
+              }
+            })()
+          FRAMELINK_TELEMETRY: 'off'
