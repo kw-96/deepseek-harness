@@ -6,7 +6,7 @@ Community-maintained plugin sources for [DeepSeek Harness](https://github.com/de
 
 - [`dsh-desktop-panel`](packages/desktop-panel) — view and operate the local desktop, including the lock screen, from the browser.
 - [`dsh-mode-router`](packages/mode-router) — classify each user turn and inject the verification focus as agent context.
-- [`dsh-figma-mcp`](packages/figma-mcp) — bring Figma design context to the model through the Framelink MCP server, which reads files, frames, and image assets over the Figma REST API.
+- [`dsh-figma-mcp`](packages/figma-mcp) — bring Figma to the model: read designs and image assets over the Figma REST API, and read or write the canvas through a Figma Desktop plugin bridge.
 - [`workorder-agent`](packages/workorder-agent) — EasyWork workorder inspection, field review, POPO notification, and a control panel.
 
 ## Development
