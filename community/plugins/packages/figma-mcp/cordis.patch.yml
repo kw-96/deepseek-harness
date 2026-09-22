@@ -1,22 +1,29 @@
 # Figma MCP 接入（配置组合包，无 Host/Client 入口代码）
 #
-# 只插入已安装的 @deepseek-ai/dsh-mcp-client，挂载开源的 Framelink
-# figma-developer-mcp（GLips/Figma-Context-MCP，MIT），它经 Figma REST API 读取
-# 设计稿，向模型暴露两个工具：mcp__figma__get_figma_data 与
-# mcp__figma__download_figma_images。
+# 插入两条已安装的 @deepseek-ai/dsh-mcp-client，分别挂两台互补的服务器：
 #
-# 为什么不接 Cursor / Codex 用的官方端点 https://mcp.figma.com/mcp：
-# Figma 的 MCP Catalog 只放行 VS Code / Cursor / Claude Code / Codex / Xcode，
-# 其授权服务器的动态客户端注册端点
-# https://api.figma.com/v1/oauth/mcp/register 对目录外客户端一律返回
-# 403 Forbidden（2026-09-22 实测），dsh-mcp-client 也只支持静态请求头，不实现
-# OAuth 授权码与刷新流程。官方给目录外客户端的替代品是 Figma 桌面版内置的本地
-# 服务器 http://127.0.0.1:3845/mcp，它要求 Figma 桌面版常驻并在 Dev Mode 的
-# inspect 面板里手动启用，故不作默认接入。
+#   1) figma        —— Framelink figma-developer-mcp（GLips/Figma-Context-MCP，MIT）
+#                      走 Figma REST API，只读，不需要 Figma 桌面版。
+#                      工具：get_figma_data、download_figma_images
+#   2) figma-canvas —— figma-ui-mcp（TranHoaiHung/figma-ui-mcp，MIT）
+#                      经 Figma 桌面版里的开发插件桥接，可读可写。
+#                      工具：figma_write（画布上创建/修改）、figma_read、figma_status、
+#                      figma_docs、figma_rules
 #
-# 令牌取自 $DSH_HOME/.env 的 FIGMA_API_KEY：app-boot 的 loadLayeredEnv 在启动
-# 时把该文件的值注入 process.env（不覆盖同名变量，见 apps/desktop-host/src/index.ts）。
-# 令牌因此不出现在本文件里，不会随仓库提交泄露；代价是改完 .env 要重启一次 Harness。
+# 为什么写画布必须走第二台：
+# 官方 MCP 的写工具（use_figma、create_new_file、generate_figma_design、
+# upload_assets、generate_diagram 等）全部标注 Remote only——桌面版本地服务器
+# 只有读工具，因此官方两条路都走不通：远程端点受 MCP Catalog 白名单与席位限制
+# （其动态客户端注册端点对目录外客户端返回 403，dsh-mcp-client 也不实现 OAuth
+# 刷新），本地端点则根本不提供写能力。figma-ui-mcp 用 Figma Plugin API 补上这段：
+# 插件在 Figma 内长轮询 localhost:38451，写操作经插件落到画布，不需要 API 令牌。
+#
+# 代价：figma-canvas 要求 Figma 桌面版常驻，并把本组合包固定的插件目录导入一次
+# （Plugins → Development → Import plugin from manifest…，选
+# $DSH_HOME/figma-ui-mcp-plugin/manifest.json），之后每次运行该插件建立桥接。
+# 桌面版未开时这台服务器照常启动，只是工具调用会报插件未连接；figma 那台不受影响。
+#
+# 令牌取自启动环境的 FIGMA_API_KEY 或 ~/.dsh/figma-api-key.txt，都不入库。
 #
 # Windows 上必须经 cmd /c 启动 npx：npx 是 .cmd 批处理，直接 spawn 会 ENOENT。
 - insert:
@@ -50,3 +57,17 @@
               }
             })()
           FRAMELINK_TELEMETRY: 'off'
+
+    # 版本与 $DSH_HOME/figma-ui-mcp-plugin 里那份插件产物对齐；升级两者必须同时做，
+    # 且升级后要在 Figma 里重新导入 manifest（插件不自动更新）。
+    - id: mcp-figma-canvas
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: figma-canvas
+        transport: stdio
+        command: cmd
+        args:
+          - /c
+          - npx
+          - -y
+          - figma-ui-mcp@2.5.26
