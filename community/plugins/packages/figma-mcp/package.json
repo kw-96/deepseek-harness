@@ -1,0 +1,31 @@
+{
+  "name": "dsh-figma-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH 配置组合包：经 Framelink MCP 接入 Figma 设计稿，向模型注册 mcp__figma__* 工具",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-bundle",
+    "mcp",
+    "figma"
+  ],
+  "license": "MIT",
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "README.zh.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

@@ -6,6 +6,7 @@
 
 - [`dsh-desktop-panel`](packages/desktop-panel) —— 在浏览器里查看并操作本机桌面（含锁屏）。
 - [`dsh-mode-router`](packages/mode-router) —— 为每轮对话分类，并把验证重点作为 agent 上下文注入。
+- [`dsh-figma-mcp`](packages/figma-mcp) —— 经 Framelink MCP 把 Figma 设计稿交给模型，走 Figma REST API 读取文件、画板与图片资源。
 - [`workorder-agent`](packages/workorder-agent) —— 易协作工单巡检、字段复核、POPO 通知与控制面面板。
 
 ## 开发
