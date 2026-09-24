@@ -1,8 +1,26 @@
-# The dsh-github bundle patch: mount the `ctx.github` capability seam.
-# One insert; row order carries no load semantics (activation is
-# service-availability driven), so installing the connector packages in any
-# order composes the same host.
+# dsh-github 的 bundle patch：从一个合并包里挂载整套 GitHub 连接器。
+# 五行 id 沿用合并前各包的行 id —— `github`（能力 seam）、`github-rest`
+# （REST v3 provider）、`tool-github`（面向模型的 `github_*` 工具）、
+# `github-connect`（Device Flow 与 @Remote 方法）、`ui-github`（web UI 的 node
+# 半侧）——各自经 exports 子路径加载。只有一次 insert；行顺序不承载加载语义
+# （激活由服务可用性驱动），任意顺序组合出同一套宿主。
+#
+# 关键约束：`ui-github` 行用的是子路径 `dsh-github/ui`，但 web 客户端面的发现
+# 依赖 `github` 行使用**裸包名** `dsh-github`。DSH 的 client-modules 扫描器只在
+# 说明符是裸包名时识别 client 行（`exactPackageSpecifier` 对含 `/` 的说明符返回
+# undefined，见 packages/client/modules/src/index.ts 的 locatePkgJson），再由这条
+# 裸包名行读到本包的 `dsh.client` 清单并下发 `lib/client.js`；该 bundle 的 factory
+# id 也必须等于包名（`dsh-github`）。所以不要把 `github` 行改成子路径：那样构建
+# 依旧全绿，但浏览器里不会再有「连接 GitHub」卡片与 PR 状态条。
 
 - insert:
     - id: github
       name: dsh-github
+    - id: github-rest
+      name: dsh-github/rest
+    - id: tool-github
+      name: dsh-github/tools
+    - id: github-connect
+      name: dsh-github/connect
+    - id: ui-github
+      name: dsh-github/ui

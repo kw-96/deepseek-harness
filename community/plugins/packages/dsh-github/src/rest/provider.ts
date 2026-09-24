@@ -1,0 +1,773 @@
+/**
+ * The REST v3 {@link GitHubProvider}: maps the v1 endpoint set onto the seam's
+ * normalized vocabulary. Configuration and the credential are re-read on EVERY
+ * operation (a changed token or base URL applies without restart), and
+ * `createPullRequest` is idempotent per ADR-0004: look up the open PR first,
+ * create only on a miss, and re-look-up once when the POST loses a race to a
+ * concurrent creation (HTTP 422 "already exists").
+ * @module dsh-github/rest/provider
+ */
+
+import type {
+  GitHubAnnotationLevel,
+  GitHubCheckAnnotation,
+  GitHubCheckFailure,
+  GitHubCheckFailureRequest,
+  GitHubCheckFailuresResult,
+  GitHubCheckLog,
+  GitHubCheckRun,
+  GitHubChecksResult,
+  GitHubComment,
+  GitHubCommentCreateRequest,
+  GitHubDiff,
+  GitHubDiffFile,
+  GitHubDiffFileStatus,
+  GitHubDiffRequest,
+  GitHubIssue,
+  GitHubIssueCreateRequest,
+  GitHubItemRef,
+  GitHubLabelsRequest,
+  GitHubMergeability,
+  GitHubMergeableState,
+  GitHubProvider,
+  GitHubPullRequest,
+  GitHubPullRequestCreateRequest,
+  GitHubPullRequestCreateResult,
+  GitHubPullRequestListRequest,
+  GitHubPullRequestUpdateRequest,
+  GitHubRepoRef,
+  GitHubReview,
+  GitHubReviewComment,
+  GitHubReviewersRequest,
+  GitHubReviewState,
+  GitHubReviewSubmitRequest,
+  GitHubSearchItem,
+  GitHubSearchKind,
+  GitHubSearchRequest,
+  GitHubSearchResult,
+} from '../index.js'
+import { GitHubError } from '../index.js'
+import { buildUrl, restPaginate, restRequest, restTextRequest, type RestTransport } from './http.js'
+
+/** The provider's stable registry id. */
+export const PROVIDER_ID = 'rest'
+
+/** Listing page size: the API maximum, minimizing requests per aggregation. */
+const PAGE_SIZE = 100
+
+/** Config snapshot one operation runs under, re-read from the source per call. */
+export interface ResolvedRestConfig {
+  /** Environment-variable name the token resolves through (default `GITHUB_TOKEN`). */
+  readonly credentialRef: string
+  /** API root, `https://api.github.com` or a GHES `/api/v3` root. */
+  readonly baseURL: string
+}
+
+/** Wiring the provider receives from the plugin layer (or directly from tests). */
+export interface RestGitHubProviderOptions {
+  /** Current config; consulted at every operation, never cached here. */
+  readonly config: () => ResolvedRestConfig
+  /** Resolve the credential ref to a token, or undefined while unconfigured. */
+  readonly resolveToken: (credentialRef: string) => Promise<string | undefined>
+  /** Cheap, local, non-network answer to `available()` for the same ref. */
+  readonly tokenConfigured: (credentialRef: string) => boolean
+  /** Fetch implementation; defaults to the platform's. */
+  readonly fetch?: typeof globalThis.fetch
+}
+
+/** Raw wire shapes — only the fields this provider reads. */
+interface RawUser { readonly login: string }
+interface RawLabel { readonly name?: string }
+interface RawIssue {
+  readonly number: number
+  readonly title: string
+  readonly state: string
+  readonly html_url?: string
+  readonly body?: string | null
+  readonly user?: RawUser | null
+  readonly labels?: readonly (RawLabel | string)[]
+  readonly created_at?: string
+  readonly updated_at?: string
+  readonly comments?: number
+}
+interface RawBranch { readonly ref: string, readonly sha: string }
+interface RawPullRequest {
+  readonly number: number
+  readonly title: string
+  readonly state: string
+  readonly merged_at?: string | null
+  readonly html_url?: string
+  readonly body?: string | null
+  readonly user?: RawUser | null
+  readonly draft?: boolean
+  readonly base: RawBranch
+  readonly head: RawBranch
+  readonly created_at?: string
+  readonly updated_at?: string
+  readonly comments?: number
+}
+interface RawComment {
+  readonly id: number
+  readonly body: string
+  readonly user?: RawUser | null
+  readonly created_at?: string
+  readonly html_url?: string
+}
+interface RawDiffFile {
+  readonly filename: string
+  readonly previous_filename?: string
+  readonly status: string
+  readonly additions: number
+  readonly deletions: number
+  readonly patch?: string
+}
+interface RawCheckRun {
+  readonly name: string
+  readonly status: 'queued' | 'in_progress' | 'completed'
+  readonly conclusion?: GitHubChecksResult['runs'][number]['conclusion'] | null
+  readonly html_url?: string | null
+}
+interface RawCheckRuns { readonly check_runs: readonly RawCheckRun[] }
+/** Check-run shape with the fields only the failure path needs. */
+interface RawFailureCheckRun extends RawCheckRun {
+  readonly id: number
+  readonly details_url?: string | null
+}
+interface RawFailureCheckRuns { readonly check_runs: readonly RawFailureCheckRun[] }
+interface RawReview {
+  readonly id: number
+  readonly state: string
+  readonly user?: RawUser | null
+  readonly body?: string | null
+  readonly submitted_at?: string | null
+  readonly html_url?: string
+}
+interface RawReviewComment {
+  readonly id: number
+  readonly path: string
+  readonly body: string
+  readonly side?: string | null
+  readonly line?: number | null
+  readonly diff_hunk?: string
+  readonly user?: RawUser | null
+  readonly created_at?: string
+  readonly html_url?: string
+  readonly in_reply_to_id?: number
+}
+/** Pull-request shape with the merge-readiness fields the merge path needs. */
+interface RawMergeablePullRequest {
+  readonly mergeable?: boolean | null
+  readonly mergeable_state?: string | null
+}
+interface RawAnnotation {
+  readonly path: string
+  readonly annotation_level?: string | null
+  readonly message: string
+  readonly title?: string | null
+  readonly start_line?: number | null
+  readonly end_line?: number | null
+}
+interface RawSearchIssue extends RawIssue {
+  readonly repository_url?: string
+  readonly pull_request?: { readonly merged_at?: string | null }
+}
+interface RawSearchRepo {
+  readonly full_name: string
+  readonly html_url: string
+  readonly description?: string | null
+}
+interface RawSearchCode {
+  readonly path: string
+  readonly html_url: string
+  readonly repository: { readonly full_name: string }
+}
+interface RawSearchResponse { readonly total_count: number, readonly items: readonly unknown[] }
+
+/** Search endpoint per kind; issues and pull requests share `/search/issues`. */
+const SEARCH_PATH: Record<GitHubSearchKind, string> = {
+  'issues': '/search/issues',
+  'pull-requests': '/search/issues',
+  'repositories': '/search/repositories',
+  'code': '/search/code',
+}
+
+/** Qualifier appended to the query so the shared issue endpoint filters by kind. */
+const SEARCH_QUALIFIER: Record<GitHubSearchKind, string> = {
+  'issues': ' is:issue',
+  'pull-requests': ' is:pr',
+  'repositories': '',
+  'code': '',
+}
+
+/** Wire review states (SCREAMING_SNAKE) mapped onto the seam's kebab vocabulary. */
+const REVIEW_STATES: Readonly<Record<string, GitHubReviewState>> = {
+  APPROVED: 'approved',
+  CHANGES_REQUESTED: 'changes-requested',
+  COMMENTED: 'commented',
+  DISMISSED: 'dismissed',
+  PENDING: 'pending',
+}
+
+/** Annotation levels the seam knows; anything else degrades to the least alarming one. */
+const ANNOTATION_LEVELS: ReadonlySet<string> = new Set<GitHubAnnotationLevel>(['notice', 'warning', 'failure'])
+
+/** Conclusions that count as a failure worth gathering evidence for (ADR-0015). */
+const FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'timed_out', 'cancelled'])
+
+/** Merge states the seam vocabulary knows; anything else reads as `unknown`. */
+const MERGEABLE_STATES: ReadonlySet<string> = new Set<GitHubMergeableState>([
+  'clean', 'blocked', 'dirty', 'unstable', 'behind', 'draft', 'unknown',
+])
+
+/** What each non-clean merge state means to someone deciding whether to merge. */
+const MERGE_BLOCKERS: Readonly<Record<GitHubMergeableState, string | undefined>> = {
+  clean: undefined,
+  blocked: 'a branch protection requirement is not satisfied (required review or required check)',
+  dirty: 'the branch has conflicts with its base',
+  unstable: 'a non-required check is failing',
+  behind: 'the branch is behind its base and must be updated first',
+  draft: 'the pull request is still a draft',
+  unknown: 'GitHub has not finished computing mergeability — retry shortly',
+}
+
+/** Diff statuses the seam vocabulary knows; anything the API adds later degrades to `changed`. */
+const FILE_STATUSES: ReadonlySet<string> = new Set<GitHubDiffFileStatus>([
+  'added', 'removed', 'modified', 'renamed', 'copied', 'changed', 'unchanged',
+])
+
+/** Spread helper: include `key` only when `value` is neither null nor undefined. */
+function optional<K extends string, V>(key: K, value: V | null | undefined): { readonly [P in K]?: V } {
+  return (value == null ? {} : { [key]: value }) as { readonly [P in K]?: V }
+}
+
+/** Parse `owner/repo` out of a `…/repos/{owner}/{repo}` API URL, or undefined. */
+function repoFromApiUrl(url: string | undefined): GitHubRepoRef | undefined {
+  const match = url === undefined ? null : /\/repos\/([^/]+)\/([^/]+)$/.exec(url)
+  return match === null ? undefined : { owner: match[1]!, repo: match[2]! }
+}
+
+/** Parse an `owner/repo` full name, or undefined when it is not exactly two segments. */
+function repoFromFullName(fullName: string): GitHubRepoRef | undefined {
+  const match = /^([^/]+)\/([^/]+)$/.exec(fullName)
+  return match === null ? undefined : { owner: match[1]!, repo: match[2]! }
+}
+
+/** Normalize label entries: the API returns objects (occasionally bare strings); nameless entries drop. */
+function labelNames(labels: readonly (RawLabel | string)[]): readonly string[] {
+  return labels
+    .map(label => typeof label === 'string' ? label : label.name)
+    .filter((name): name is string => name !== undefined)
+}
+
+function mapIssue(repo: GitHubRepoRef, raw: RawIssue): GitHubIssue {
+  return {
+    ref: { repo, number: raw.number, ...optional('url', raw.html_url) },
+    title: raw.title,
+    state: raw.state === 'closed' ? 'closed' : 'open',
+    ...optional('body', raw.body),
+    ...optional('author', raw.user?.login),
+    ...raw.labels === undefined ? {} : { labels: labelNames(raw.labels) },
+    ...optional('createdAt', raw.created_at),
+    ...optional('updatedAt', raw.updated_at),
+    ...optional('commentCount', raw.comments),
+  }
+}
+
+function mapPullRequest(repo: GitHubRepoRef, raw: RawPullRequest): GitHubPullRequest {
+  return {
+    ref: { repo, number: raw.number, ...optional('url', raw.html_url) },
+    title: raw.title,
+    state: raw.merged_at != null ? 'merged' : raw.state === 'closed' ? 'closed' : 'open',
+    baseRef: raw.base.ref,
+    headRef: raw.head.ref,
+    ...optional('body', raw.body),
+    ...optional('author', raw.user?.login),
+    ...optional('draft', raw.draft),
+    ...optional('createdAt', raw.created_at),
+    ...optional('updatedAt', raw.updated_at),
+    ...optional('commentCount', raw.comments),
+  }
+}
+
+function mapComment(raw: RawComment): GitHubComment {
+  return {
+    id: raw.id,
+    body: raw.body,
+    ...optional('author', raw.user?.login),
+    ...optional('createdAt', raw.created_at),
+    ...optional('url', raw.html_url),
+  }
+}
+
+function mapReview(raw: RawReview): GitHubReview {
+  return {
+    id: raw.id,
+    state: REVIEW_STATES[raw.state] ?? 'commented',
+    ...optional('author', raw.user?.login),
+    ...optional('body', raw.body),
+    ...optional('submittedAt', raw.submitted_at),
+    ...optional('url', raw.html_url),
+  }
+}
+
+function mapReviewComment(raw: RawReviewComment): GitHubReviewComment {
+  return {
+    id: raw.id,
+    path: raw.path,
+    body: raw.body,
+    // The API omits `side` on older comments; RIGHT (the post-change side) is
+    // where all but explicitly-left-side comments live.
+    side: raw.side === 'LEFT' ? 'left' : 'right',
+    ...optional('line', raw.line),
+    ...optional('diffHunk', raw.diff_hunk),
+    ...optional('author', raw.user?.login),
+    ...optional('createdAt', raw.created_at),
+    ...optional('url', raw.html_url),
+    ...optional('inReplyToId', raw.in_reply_to_id),
+  }
+}
+
+function mapAnnotation(raw: RawAnnotation): GitHubCheckAnnotation {
+  const level = raw.annotation_level ?? ''
+  return {
+    path: raw.path,
+    // Unknown levels degrade DOWNWARD: inventing `failure` out of a level we do
+    // not understand would overstate severity to the model.
+    level: ANNOTATION_LEVELS.has(level) ? level as GitHubAnnotationLevel : 'notice',
+    message: raw.message,
+    ...optional('title', raw.title),
+    ...optional('startLine', raw.start_line),
+    ...optional('endLine', raw.end_line),
+  }
+}
+
+function mapCheckRun(raw: RawCheckRun): GitHubCheckRun {
+  return {
+    name: raw.name,
+    status: raw.status,
+    ...optional('conclusion', raw.conclusion),
+    ...optional('url', raw.html_url),
+  }
+}
+
+/** The blockers to show for one merge state, plus GitHub's own boolean when it disagrees. */
+function blockersOf(state: GitHubMergeableState, raw: RawMergeablePullRequest): readonly string[] {
+  const reason = MERGE_BLOCKERS[state]
+  if (reason !== undefined) return [reason]
+  // `clean` with mergeable === false should not happen, but if GitHub says so,
+  // believe the boolean rather than the label.
+  return raw.mergeable === false ? ['GitHub reports the pull request as not mergeable'] : []
+}
+
+/**
+ * Turn GitHub's terse refusal of a self-approval into something the model can
+ * act on. Approving your own pull request is a platform rule, not a bug in the
+ * request, and the bare 422 says nothing a caller could use.
+ */
+function explainSelfApproval(request: GitHubReviewSubmitRequest, error: unknown): unknown {
+  if (!(error instanceof GitHubError) || error.code !== 'GITHUB_VALIDATION') return error
+  if (request.event !== 'APPROVE' && request.event !== 'REQUEST_CHANGES') return error
+  if (!/own pull request/i.test(error.message)) return error
+  return new GitHubError(
+    `GitHub does not allow ${request.event} on your own pull request — only COMMENT is available here.`,
+    'GITHUB_VALIDATION',
+    { cause: error },
+  )
+}
+
+/**
+ * Extract the Actions job id out of a check run's `details_url`
+ * (`…/actions/runs/{run}/job/{job}`). This is the only link from a check run to
+ * its job that costs no extra request; when the URL does not carry one (a
+ * non-Actions check, or a shape change), the run simply has no log evidence.
+ */
+function jobIdFromDetailsUrl(detailsUrl: string | null | undefined): number | undefined {
+  const match = detailsUrl == null ? null : /\/job\/(\d+)/.exec(detailsUrl)
+  return match === null ? undefined : Number(match[1])
+}
+
+function mapDiffFile(raw: RawDiffFile): GitHubDiffFile {
+  return {
+    path: raw.filename,
+    ...optional('previousPath', raw.previous_filename),
+    status: FILE_STATUSES.has(raw.status) ? raw.status as GitHubDiffFileStatus : 'changed',
+    additions: raw.additions,
+    deletions: raw.deletions,
+    ...optional('patch', raw.patch),
+  }
+}
+
+function mapSearchItem(kind: GitHubSearchKind, raw: unknown): GitHubSearchItem {
+  switch (kind) {
+    case 'issues':
+    case 'pull-requests': {
+      const item = raw as RawSearchIssue
+      return {
+        title: item.title,
+        url: item.html_url ?? '',
+        ...optional('repo', repoFromApiUrl(item.repository_url)),
+        number: item.number,
+        state: item.pull_request?.merged_at != null ? 'merged' : item.state,
+      }
+    }
+    case 'repositories': {
+      const item = raw as RawSearchRepo
+      return {
+        title: item.full_name,
+        url: item.html_url,
+        ...optional('repo', repoFromFullName(item.full_name)),
+        ...optional('snippet', item.description),
+      }
+    }
+    case 'code': {
+      const item = raw as RawSearchCode
+      return {
+        title: item.path,
+        url: item.html_url,
+        ...optional('repo', repoFromFullName(item.repository.full_name)),
+      }
+    }
+  }
+}
+
+/**
+ * The REST v3 provider. Owns ALL seam operations under one identity and
+ * credential (ADR-0003); never retries rate limits (the caller decides).
+ */
+export class RestGitHubProvider implements GitHubProvider {
+  readonly id = PROVIDER_ID
+  private readonly options: RestGitHubProviderOptions
+  private readonly fetch: typeof globalThis.fetch
+
+  constructor(options: RestGitHubProviderOptions) {
+    this.options = options
+    this.fetch = options.fetch ?? globalThis.fetch
+  }
+
+  /** Cheap local check only — no network (seam contract). */
+  available(): boolean {
+    return this.options.tokenConfigured(this.options.config().credentialRef)
+  }
+
+  async search(request: GitHubSearchRequest, signal?: AbortSignal): Promise<GitHubSearchResult> {
+    const transport = await this.transport()
+    const url = buildUrl(transport.baseURL, SEARCH_PATH[request.kind], {
+      q: request.query + SEARCH_QUALIFIER[request.kind],
+      ...request.maxResults === undefined ? {} : { per_page: Math.min(request.maxResults, PAGE_SIZE) },
+    })
+    const { json } = await restRequest(transport, url, { signal })
+    const response = json as RawSearchResponse
+    return {
+      items: response.items.map(item => mapSearchItem(request.kind, item)),
+      truncated: response.total_count > response.items.length,
+    }
+  }
+
+  async getIssue(item: GitHubItemRef, signal?: AbortSignal): Promise<GitHubIssue> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, item, 'issues'), { signal })
+    return mapIssue(item.repo, json as RawIssue)
+  }
+
+  async getPullRequest(item: GitHubItemRef, signal?: AbortSignal): Promise<GitHubPullRequest> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, item, 'pulls'), { signal })
+    return mapPullRequest(item.repo, json as RawPullRequest)
+  }
+
+  async getComments(item: GitHubItemRef, signal?: AbortSignal): Promise<readonly GitHubComment[]> {
+    const transport = await this.transport()
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/issues/${item.number}/comments`, { per_page: PAGE_SIZE })
+    const { items } = await restPaginate(transport, first, json => (json as readonly RawComment[]), { signal })
+    return items.map(mapComment)
+  }
+
+  async getDiff(item: GitHubItemRef, request: GitHubDiffRequest, signal?: AbortSignal): Promise<GitHubDiff> {
+    const transport = await this.transport()
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/pulls/${item.number}/files`, { per_page: PAGE_SIZE })
+    const { items, exhausted } = await restPaginate(
+      transport,
+      first,
+      json => (json as readonly RawDiffFile[]),
+      { signal },
+      // maxFiles is satisfiable early: later pages stay unfetched (ADR-0005
+      // lets the provider optimize; the seam still enforces the budget).
+      files => request.maxFiles !== undefined && files.length >= request.maxFiles,
+    )
+    return { files: items.map(mapDiffFile), truncated: !exhausted }
+  }
+
+  async getChecks(item: GitHubItemRef, signal?: AbortSignal): Promise<GitHubChecksResult> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, item, 'pulls'), { signal })
+    const sha = (json as RawPullRequest).head.sha
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/commits/${sha}/check-runs`, { per_page: PAGE_SIZE })
+    const { items } = await restPaginate(transport, first, page => (page as RawCheckRuns).check_runs, { signal })
+    return { runs: items.map(mapCheckRun) }
+  }
+
+  async getReviews(item: GitHubItemRef, signal?: AbortSignal): Promise<readonly GitHubReview[]> {
+    const transport = await this.transport()
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/pulls/${item.number}/reviews`, { per_page: PAGE_SIZE })
+    const { items } = await restPaginate(transport, first, json => (json as readonly RawReview[]), { signal })
+    return items.map(mapReview)
+  }
+
+  async getReviewComments(item: GitHubItemRef, signal?: AbortSignal): Promise<readonly GitHubReviewComment[]> {
+    const transport = await this.transport()
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/pulls/${item.number}/comments`, { per_page: PAGE_SIZE })
+    const { items } = await restPaginate(transport, first, json => (json as readonly RawReviewComment[]), { signal })
+    return items.map(mapReviewComment)
+  }
+
+  async getCheckFailures(
+    item: GitHubItemRef,
+    request: GitHubCheckFailureRequest,
+    signal?: AbortSignal,
+  ): Promise<GitHubCheckFailuresResult> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, item, 'pulls'), { signal })
+    const sha = (json as RawPullRequest).head.sha
+    const first = buildUrl(transport.baseURL, `${repoPath(item.repo)}/commits/${sha}/check-runs`, { per_page: PAGE_SIZE })
+    const { items, exhausted } = await restPaginate(transport, first, page => (page as RawFailureCheckRuns).check_runs, { signal })
+    let truncated = !exhausted
+    const failures: GitHubCheckFailure[] = []
+    for (const raw of items) {
+      if (raw.conclusion == null || !FAILED_CONCLUSIONS.has(raw.conclusion)) continue
+      const annotations = await this.annotationsOf(transport, item.repo, raw.id, signal)
+      if (!annotations.exhausted) truncated = true
+      // ADR-0015: annotations are already `path:line + message`; logs are only
+      // worth their weight when there is nothing structured to read.
+      const wantLog = annotations.items.length === 0 || request.includeLogs === true
+      const log = wantLog ? await this.jobLogOf(transport, item.repo, raw, signal) : undefined
+      failures.push({
+        run: mapCheckRun(raw),
+        annotations: annotations.items,
+        ...log === undefined ? {} : { log },
+      })
+    }
+    return { failures, truncated }
+  }
+
+  /** Annotations of one check run, with the pagination honesty the caller needs. */
+  private async annotationsOf(
+    transport: RestTransport,
+    repo: GitHubRepoRef,
+    checkRunId: number,
+    signal: AbortSignal | undefined,
+  ): Promise<{ items: GitHubCheckAnnotation[], exhausted: boolean }> {
+    const url = buildUrl(transport.baseURL, `${repoPath(repo)}/check-runs/${checkRunId}/annotations`, { per_page: PAGE_SIZE })
+    const { items, exhausted } = await restPaginate(transport, url, json => (json as readonly RawAnnotation[]), { signal })
+    return { items: items.map(mapAnnotation), exhausted }
+  }
+
+  /**
+   * Log of the Actions job behind one check run, or undefined when there is no
+   * job to point at or its log is gone. An EXPIRED log (410, mapped to
+   * `GITHUB_NOT_FOUND`) is missing evidence rather than a failed read: the
+   * annotations gathered alongside it stay usable, so the absence is reported
+   * by omission instead of aborting the whole failure read.
+   */
+  private async jobLogOf(
+    transport: RestTransport,
+    repo: GitHubRepoRef,
+    raw: RawFailureCheckRun,
+    signal: AbortSignal | undefined,
+  ): Promise<GitHubCheckLog | undefined> {
+    const jobId = jobIdFromDetailsUrl(raw.details_url)
+    if (jobId === undefined) return undefined
+    const url = buildUrl(transport.baseURL, `${repoPath(repo)}/actions/jobs/${jobId}/logs`)
+    try {
+      return { text: await restTextRequest(transport, url, { signal }), truncated: false }
+    } catch (error) {
+      if (error instanceof GitHubError && error.code === 'GITHUB_NOT_FOUND') return undefined
+      throw error
+    }
+  }
+
+  async createIssue(request: GitHubIssueCreateRequest, signal?: AbortSignal): Promise<GitHubIssue> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, buildUrl(transport.baseURL, `${repoPath(request.repo)}/issues`), {
+      method: 'POST',
+      body: {
+        title: request.title,
+        ...optional('body', request.body),
+        ...optional('labels', request.labels),
+      },
+      signal,
+    })
+    return mapIssue(request.repo, json as RawIssue)
+  }
+
+  async createComment(request: GitHubCommentCreateRequest, signal?: AbortSignal): Promise<GitHubComment> {
+    const transport = await this.transport()
+    const url = buildUrl(transport.baseURL, `${repoPath(request.item.repo)}/issues/${request.item.number}/comments`)
+    const { json } = await restRequest(transport, url, { method: 'POST', body: { body: request.body }, signal })
+    return mapComment(json as RawComment)
+  }
+
+  async getMergeability(item: GitHubItemRef, signal?: AbortSignal): Promise<GitHubMergeability> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, item, 'pulls'), { signal })
+    const raw = json as RawMergeablePullRequest
+    const state = MERGEABLE_STATES.has(raw.mergeable_state ?? '') ? raw.mergeable_state as GitHubMergeableState : 'unknown'
+    return {
+      ...optional('mergeable', raw.mergeable),
+      state,
+      blockedBy: blockersOf(state, raw),
+    }
+  }
+
+  async listPullRequests(request: GitHubPullRequestListRequest, signal?: AbortSignal): Promise<readonly GitHubPullRequest[]> {
+    const transport = await this.transport()
+    const first = buildUrl(transport.baseURL, `${repoPath(request.repo)}/pulls`, {
+      state: request.state ?? 'open',
+      // The API wants `owner:branch` for head; callers pass a bare branch name.
+      ...request.head === undefined ? {} : { head: `${request.repo.owner}:${request.head}` },
+      ...request.base === undefined ? {} : { base: request.base },
+      per_page: request.maxResults === undefined ? PAGE_SIZE : Math.min(request.maxResults, PAGE_SIZE),
+    })
+    const { items } = await restPaginate(
+      transport,
+      first,
+      json => (json as readonly RawPullRequest[]),
+      { signal },
+      prs => request.maxResults !== undefined && prs.length >= request.maxResults,
+    )
+    return items.map(raw => mapPullRequest(request.repo, raw))
+  }
+
+  async submitReview(request: GitHubReviewSubmitRequest, signal?: AbortSignal): Promise<GitHubReview> {
+    const transport = await this.transport()
+    const url = buildUrl(transport.baseURL, `${repoPath(request.item.repo)}/pulls/${request.item.number}/reviews`)
+    try {
+      const { json } = await restRequest(transport, url, {
+        method: 'POST',
+        body: {
+          event: request.event,
+          ...optional('body', request.body),
+          ...request.comments === undefined ? {} : {
+            comments: request.comments.map(comment => ({
+              path: comment.path,
+              line: comment.line,
+              body: comment.body,
+              ...comment.side === undefined ? {} : { side: comment.side === 'left' ? 'LEFT' : 'RIGHT' },
+            })),
+          },
+        },
+        signal,
+      })
+      return mapReview(json as RawReview)
+    } catch (error) {
+      throw explainSelfApproval(request, error)
+    }
+  }
+
+  async updatePullRequest(request: GitHubPullRequestUpdateRequest, signal?: AbortSignal): Promise<GitHubPullRequest> {
+    const transport = await this.transport()
+    const { json } = await restRequest(transport, this.itemUrl(transport, request.item, 'pulls'), {
+      method: 'PATCH',
+      body: {
+        ...optional('title', request.title),
+        ...optional('body', request.body),
+        ...optional('base', request.base),
+        ...optional('state', request.state),
+      },
+      signal,
+    })
+    return mapPullRequest(request.item.repo, json as RawPullRequest)
+  }
+
+  async requestReviewers(request: GitHubReviewersRequest, signal?: AbortSignal): Promise<void> {
+    const transport = await this.transport()
+    const url = buildUrl(transport.baseURL, `${repoPath(request.item.repo)}/pulls/${request.item.number}/requested_reviewers`)
+    await restRequest(transport, url, {
+      method: 'POST',
+      body: {
+        ...request.reviewers === undefined ? {} : { reviewers: request.reviewers },
+        ...request.teamReviewers === undefined ? {} : { team_reviewers: request.teamReviewers },
+      },
+      signal,
+    })
+  }
+
+  async setLabels(request: GitHubLabelsRequest, signal?: AbortSignal): Promise<readonly string[]> {
+    const transport = await this.transport()
+    const url = buildUrl(transport.baseURL, `${repoPath(request.item.repo)}/issues/${request.item.number}/labels`)
+    // POST adds to the existing set; PUT replaces it wholesale.
+    const { json } = await restRequest(transport, url, {
+      method: request.mode === 'set' ? 'PUT' : 'POST',
+      body: { labels: [...request.labels] },
+      signal,
+    })
+    return (json as readonly RawLabel[]).map(label => label.name).filter((name): name is string => name !== undefined)
+  }
+
+  async createPullRequest(request: GitHubPullRequestCreateRequest, signal?: AbortSignal): Promise<GitHubPullRequestCreateResult> {
+    const transport = await this.transport()
+    const existing = await this.findOpenPullRequest(transport, request, signal)
+    if (existing !== undefined) return { pullRequest: existing, created: false }
+    try {
+      const { json } = await restRequest(transport, buildUrl(transport.baseURL, `${repoPath(request.repo)}/pulls`), {
+        method: 'POST',
+        body: {
+          title: request.title,
+          head: request.head,
+          base: request.base,
+          ...optional('body', request.body),
+          ...optional('draft', request.draft),
+        },
+        signal,
+      })
+      return { pullRequest: mapPullRequest(request.repo, json as RawPullRequest), created: true }
+    } catch (error) {
+      // Race fallback (ADR-0004): a concurrent creation between our lookup and
+      // POST surfaces as 422 "already exists" — resolve it to the winner's PR.
+      if (error instanceof GitHubError && error.code === 'GITHUB_VALIDATION' && /already exists/i.test(error.message)) {
+        const raced = await this.findOpenPullRequest(transport, request, signal)
+        if (raced !== undefined) return { pullRequest: raced, created: false }
+      }
+      throw error
+    }
+  }
+
+  /** Look up the open PR for the exact head/base pair, or undefined. */
+  private async findOpenPullRequest(
+    transport: RestTransport,
+    request: GitHubPullRequestCreateRequest,
+    signal: AbortSignal | undefined,
+  ): Promise<GitHubPullRequest | undefined> {
+    const url = buildUrl(transport.baseURL, `${repoPath(request.repo)}/pulls`, {
+      head: `${request.repo.owner}:${request.head}`,
+      base: request.base,
+      state: 'open',
+      per_page: 1,
+    })
+    const { json } = await restRequest(transport, url, { signal })
+    const [first] = json as readonly RawPullRequest[]
+    return first === undefined ? undefined : mapPullRequest(request.repo, first)
+  }
+
+  /** URL of one issue/PR read; both families share the `/{collection}/{number}` shape. */
+  private itemUrl(transport: RestTransport, item: GitHubItemRef, collection: 'issues' | 'pulls'): string {
+    return buildUrl(transport.baseURL, `${repoPath(item.repo)}/${collection}/${item.number}`)
+  }
+
+  /**
+   * Assemble the transport for ONE operation: config and credential are
+   * resolved fresh here, which is the seam's change-without-restart guarantee.
+   */
+  private async transport(): Promise<RestTransport> {
+    const { credentialRef, baseURL } = this.options.config()
+    const token = await this.options.resolveToken(credentialRef)
+    if (token === undefined) {
+      throw new GitHubError(`GitHub credential "${credentialRef}" is not configured; set it or connect GitHub`, 'GITHUB_AUTH')
+    }
+    return { baseURL, token, fetch: this.fetch }
+  }
+}
+
+/** Escaped `/repos/{owner}/{repo}` path segment pair. */
+function repoPath(repo: GitHubRepoRef): string {
+  return `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`
+}

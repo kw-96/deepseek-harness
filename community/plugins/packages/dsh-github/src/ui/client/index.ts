@@ -1,0 +1,57 @@
+/**
+ * The dsh client half of `dsh-github/ui` (ADR-0008/ADR-0009): self-mounts the
+ * hand-written `githubConnect` Remote contribution through `ctx.remote.$mount`
+ * (no dsh-repo change required), then installs the connect card and the PR
+ * status bar over the browser shell adapter. Locale follows the page
+ * language; every registration is an effect on this plugin's fiber.
+ * @module dsh-github/ui/client
+ */
+
+import type { Context } from '@deepseek-ai/cordis'
+import type { UiLocale } from '../i18n.js'
+import { installGitHubUi } from '../install.js'
+import type { GitHubUiRemote } from '../types.js'
+import { GITHUB_CONNECT_REMOTE } from './contribution.js'
+import { createBrowserShell } from './shell.js'
+import { clientContext } from './shims.js'
+import { installStyles } from './styles.js'
+
+/** Cordis client plugin name. */
+export const name = 'ui-github'
+/** Services the client half consumes (ADR-0008: NOT `remote.githubConnect` — this plugin mounts that namespace itself, and injecting it would deadlock). */
+export const inject = ['remote', 'slots', 'sessions']
+
+/**
+ * Map a page language to a catalog locale.
+ * @param lang - `document.documentElement.lang` or `navigator.language`.
+ * @returns the catalog to render with.
+ */
+export function detectLocale(lang: string | undefined): UiLocale {
+  return lang !== undefined && /^zh(-|$)/i.test(lang) ? 'zh-CN' : 'en'
+}
+
+/**
+ * Mount the Remote face and both UI surfaces.
+ * @param ctx - the client plugin context.
+ */
+export async function apply(ctx: Context): Promise<void> {
+  // 一次收窄拿到 client 面（`ctx.slots` / `ctx.sessions` / `ctx.remote`），
+  // 断言只改类型，属性读取路径不变。
+  const client = clientContext(ctx)
+  await client.remote.$mount(GITHUB_CONNECT_REMOTE)
+  const shell = createBrowserShell(client)
+  const locale = detectLocale(document.documentElement.lang === '' ? navigator.language : document.documentElement.lang)
+  // The UI must not reach the namespace through the service proxy: that path
+  // re-enters the inject check with `remote.githubConnect`, which this plugin
+  // cannot declare (it mounts the namespace itself — see `inject` above).
+  // `ctx.get` is the inject-free resolution for exactly this case, deferred
+  // per access so the face survives a gateway remount.
+  const remote: GitHubUiRemote = {
+    get githubConnect(): GitHubUiRemote['githubConnect'] {
+      return ctx.get('remote.githubConnect') as GitHubUiRemote['githubConnect']
+    },
+    $on: (event, listener) => client.remote.$on(event, listener),
+  }
+  ctx.effect(() => installStyles(), 'ui-github.styles')
+  ctx.effect(() => installGitHubUi(shell, remote, { locale }), 'ui-github.install')
+}
