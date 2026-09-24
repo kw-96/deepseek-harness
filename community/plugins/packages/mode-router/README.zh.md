@@ -32,7 +32,9 @@
     enabled: true
 ```
 
-作者部署里另有一套预设 `$DSH_HOME/.agent-presets/mode-router/`：复制内置 `standard` 组成、追加本行，并把**中文回复要求**一并写进预设自己的 persona 前缀（预设级 persona 会按同名 section 遮蔽部署 persona，写在这里才不会被遮蔽）。换机器时，要么让社区的 `community/plugins/dev.mjs` 为 `community/plugins/packages/*` 建立 junction，要么 `pnpm build` 后打包，像其它社区插件一样安装。
+本包同时声明「模式路由（自动）」预设：`bundle.patch.yml` 里插入一行 `@deepseek-ai/dsh-agent-preset`（id `mode-router`），行集取官方随附 `standard` 加四处本地定制——persona 追加中文回复要求、启用 `tool-ralph`、去掉已下线的 `tool-plugin-manager`、末尾追加本插件的 `mode-router` 行。装好本包（`pnpm build` 后打包，或让 `community/plugins/dev.mjs` 建立 junction）即得到该预设，无需另行维护预设文件。
+
+0.1.7 之前预设是 `$DSH_HOME/.agent-presets/<id>/` 目录（`preset.yml` + `agent.cordis.yml`）；该目录已无人读取，仓库里的 `community/presets/` 已随本包声明一并删除。
 
 ## 证据落在哪里
 

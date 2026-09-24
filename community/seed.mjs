@@ -34,7 +34,6 @@
  */
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { createHash } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir, arch, platform } from 'node:os'
@@ -210,71 +209,11 @@ if (existsSync(homeSrc)) {
   }
 }
 
-// Agent presets: converge a shipped preset on the repository copy when the
-// installed file still matches what an earlier seed wrote. A ledger beside the
-// presets records each seeded file's content hash, so an upgrade replaces only
-// files this repository owns: a preset the user edited keeps its content, and
-// an install predating the ledger keeps its replaced file as `.bak`.
-const presetsSrc = join(here, 'presets')
-const presetsDst = join(dshHome, '.agent-presets')
-const presetLedger = join(presetsDst, '.seeded.json')
-const digest = value => createHash('sha256').update(value).digest('hex')
-if (existsSync(presetsSrc)) {
-  let ledger = {}
-  if (existsSync(presetLedger)) {
-    try {
-      ledger = JSON.parse(await readFile(presetLedger, 'utf8'))
-    } catch {
-      // A damaged ledger means every installed preset reads as user-owned
-      // below, which keeps files in place instead of guessing.
-      ledger = {}
-    }
-  }
-  let ledgerChanged = false
-  const remember = (key, hash) => {
-    if (ledger[key] === hash) return
-    ledger[key] = hash
-    ledgerChanged = true
-  }
-  for (const id of await readdir(presetsSrc)) {
-    for (const name of await readdir(join(presetsSrc, id))) {
-      const key = `${id}/${name}`
-      const from = join(presetsSrc, id, name)
-      const dest = join(presetsDst, id, name)
-      const sourceHash = digest(await readFile(from))
-      if (!existsSync(dest)) {
-        await mkdir(dirname(dest), { recursive: true })
-        await cp(from, dest)
-        console.log(`[community] 安装预设 → ${key}`)
-        remember(key, sourceHash)
-        continue
-      }
-      const installedHash = digest(await readFile(dest))
-      if (installedHash === sourceHash) {
-        remember(key, sourceHash)
-        continue
-      }
-      const recorded = ledger[key]
-      if (recorded !== undefined && recorded !== installedHash) {
-        console.log(`[community] 保留本地改过的预设 → ${key}`)
-        continue
-      }
-      if (recorded === undefined) {
-        // An install from before the ledger cannot prove ownership; keep the
-        // replaced file beside it so nothing is lost either way.
-        await cp(dest, `${dest}.bak`)
-        console.log(`[community] 旧预设已备份为 ${key}.bak`)
-      }
-      await cp(from, dest, { force: true })
-      console.log(`[community] 更新预设 → ${key}`)
-      remember(key, sourceHash)
-    }
-  }
-  if (ledgerChanged) {
-    await mkdir(presetsDst, { recursive: true })
-    await writeFile(presetLedger, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8')
-  }
-}
+// Agent presets: 0.1.7 reports presets through `@deepseek-ai/dsh-agent-preset`
+// declaration rows carried by bundle patches, so nothing is seeded into
+// `$DSH_HOME/.agent-presets` any more — no code reads that directory. This
+// repository's own preset travels inside the `dsh-mode-router` bundle; a
+// directory left by an earlier version is inert and stays where it is.
 
 const existing = await readProfileManifest()
 const force = process.argv.includes('--force')
