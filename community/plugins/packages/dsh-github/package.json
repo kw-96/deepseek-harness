@@ -1,6 +1,6 @@
 {
   "name": "dsh-github",
-  "description": "Abstract GitHub capability seam (ctx.github) for the DeepSeek Harness — provider registry, execution-time resolution, normalized read/write vocabulary, seam-enforced diff budgets, and the GitHubError taxonomy",
+  "description": "Merged GitHub connector for the DeepSeek Harness — the ctx.github capability seam, its REST v3 provider, the model-facing github_* tool suite, Device Flow connect with @Remote button methods, and the web UI (Connect settings section and conversation PR status bar) in one package with five host rows",
   "version": "0.1.0",
   "repository": {
     "type": "git",
@@ -15,9 +15,45 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./rest": {
+      "types": "./lib/types/rest/index.d.ts",
+      "default": "./lib/rest/index.js"
+    },
+    "./tools": {
+      "types": "./lib/types/tools/index.d.ts",
+      "default": "./lib/tools/index.js"
+    },
+    "./connect": {
+      "types": "./lib/types/connect/index.d.ts",
+      "default": "./lib/connect/index.js"
+    },
+    "./ui": {
+      "types": "./lib/types/ui/index.d.ts",
+      "default": "./lib/ui/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/ui/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
+    },
+    "./rest/invariant": {
+      "types": "./lib/types/rest/invariant.d.ts",
+      "default": "./lib/rest/invariant.js"
+    },
+    "./tools/invariant": {
+      "types": "./lib/types/tools/invariant.d.ts",
+      "default": "./lib/tools/invariant.js"
+    },
+    "./connect/invariant": {
+      "types": "./lib/types/connect/invariant.d.ts",
+      "default": "./lib/connect/invariant.js"
+    },
+    "./ui/invariant": {
+      "types": "./lib/types/ui/invariant.d.ts",
+      "default": "./lib/ui/invariant.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -30,26 +66,52 @@
   "license": "MIT",
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-invariants": "^0.1.7-rc.1",
-    "@deepseek-ai/dsh-llm": "^0.1.7-rc.1"
+    "@deepseek-ai/dsh-llm": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-util-values": "^0.1.7-rc.1",
+    "react": "^18.2.0"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-invariants": "^0.1.7-rc.1",
     "@deepseek-ai/dsh-llm": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.7-rc.1",
+    "@deepseek-ai/dsh-util-values": "^0.1.7-rc.1",
     "@types/node": "^22.15.0",
+    "@types/react": "^18.3.28",
+    "esbuild": "^0.28.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "typescript": "^5.8.3"
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web"
     }
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs"
   }
 }

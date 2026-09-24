@@ -1,13 +1,13 @@
-/** Community 插件的 UI 单测入口。 */
+/** Community 插件的单测入口。
+ *
+ * 这里刻意**不**用 `vite-tsconfig-paths`：仓库根的 `tsconfig.base.json` 把
+ * `@deepseek-ai/dsh-*` 指向主仓 TS 源码，vite 在本环境无法把那些源码转成可执行 JS，
+ * 任何经源码路径触及它们的 spec 都会在收集阶段抛 `SyntaxError`。改为让 Node 正常
+ * 解析已安装的包（走各包的 `exports` → `lib/`），测试因此不依赖主仓源码的转译能力。
+ */
 import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 export default defineConfig({
-  plugins: [tsconfigPaths({ projects: [resolve(repoRoot, 'tsconfig.base.json')] })],
   test: {
     include: ['community/plugins/packages/*/tests/**/*.spec.{ts,tsx}'],
     environment: 'node',

@@ -20,8 +20,8 @@ import GitHubRuntime, {
   type GitHubReview,
   type GitHubReviewComment,
   type GitHubSearchResult,
-} from 'dsh-github'
-import * as githubInvariant from 'dsh-github/invariant'
+} from '../src/index.ts'
+import * as githubInvariant from '../src/invariant.ts'
 
 const available = true
 const unavailable = false

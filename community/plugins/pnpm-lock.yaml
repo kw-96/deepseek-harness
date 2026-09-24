@@ -39,18 +39,69 @@ importers:
       '@deepseek-ai/cordis':
         specifier: ^4.0.1
         version: 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-agent':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d)
+      '@deepseek-ai/dsh-credentials':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-invariants':
         specifier: ^0.1.7-rc.1
         version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
       '@deepseek-ai/dsh-llm':
         specifier: ^0.1.7-rc.1
         version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-settings':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(f4dcea9572ceff19e90a0a738f2b70d2)
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-scope@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      '@deepseek-ai/dsh-tools':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(c88bee8666724fd6822e3db5e7499f93)
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-util-values':
+        specifier: ^0.1.7-rc.1
+        version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
       '@types/node':
         specifier: ^22.15.0
         version: 22.20.1
+      '@types/react':
+        specifier: ^18.3.28
+        version: 18.3.31
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+
+  packages/dsh-github-bundle:
+    dependencies:
+      dsh-github:
+        specifier: file:E:/KW/qtGit/deepseek-harness/community/plugins/tarballs/dsh-github-0.1.0.tgz
+        version: file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+      dsh-github-connect:
+        specifier: file:E:/KW/qtGit/deepseek-harness/community/plugins/tarballs/dsh-github-connect-0.1.3.tgz
+        version: file:tarballs/dsh-github-connect-0.1.3.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d))(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      dsh-github-rest:
+        specifier: file:E:/KW/qtGit/deepseek-harness/community/plugins/tarballs/dsh-github-rest-0.1.0.tgz
+        version: file:tarballs/dsh-github-rest-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-settings@0.1.7-rc.1(f4dcea9572ceff19e90a0a738f2b70d2))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      dsh-tool-github:
+        specifier: file:E:/KW/qtGit/deepseek-harness/community/plugins/tarballs/dsh-tool-github-0.1.0.tgz
+        version: file:tarballs/dsh-tool-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-scope@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))))(@deepseek-ai/dsh-tools@0.1.7-rc.1(c88bee8666724fd6822e3db5e7499f93))(@deepseek-ai/dsh-util-values@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      dsh-ui-github:
+        specifier: file:E:/KW/qtGit/deepseek-harness/community/plugins/tarballs/dsh-ui-github-0.1.4.tgz
+        version: file:tarballs/dsh-ui-github-0.1.4.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github-connect@file:tarballs/dsh-github-connect-0.1.3.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d))(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))))(react@18.3.1)
 
   packages/dsh-github-connect:
     dependencies:
@@ -1617,6 +1668,58 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dsh-github-connect@file:tarballs/dsh-github-connect-0.1.3.tgz:
+    resolution: {integrity: sha512-6Sz2miRRzaGv54DCbgYjijmoWDONcZMmWqX3XCCehcppnl3NRUfBGN/CM+ueOPJoER6J1s+effqc590xUYtS/w==, tarball: file:tarballs/dsh-github-connect-0.1.3.tgz}
+    version: 0.1.3
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-agent': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-credentials': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-invariants': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-typert-protocol': ^0.1.7-rc.1
+      dsh-github: ^0.1.0
+
+  dsh-github-rest@file:tarballs/dsh-github-rest-0.1.0.tgz:
+    resolution: {integrity: sha512-HbEZVcF/HhHMFPtI0syP8+iJao+C5TupCVlY5j8rKkbFS0P2GPZWqiSLPgN9SH22cAlTtToWCEfoeeNaJDsNBA==, tarball: file:tarballs/dsh-github-rest-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-credentials': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-invariants': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-settings': ^0.1.7-rc.1
+      dsh-github: ^0.1.0
+
+  dsh-github@file:tarballs/dsh-github-0.1.0.tgz:
+    resolution: {integrity: sha512-lBYeJJ8iAbqrjM61SISuLhFB/fm/yH+nXjVmDyXfhNRm89Z7VqzKG0thKm4Hdz5WxYRmIxMeHfPJvtMgfceQog==, tarball: file:tarballs/dsh-github-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-invariants': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-llm': ^0.1.7-rc.1
+
+  dsh-tool-github@file:tarballs/dsh-tool-github-0.1.0.tgz:
+    resolution: {integrity: sha512-vrrYUEeua8zOv49hA+5S+/qFy02g061slppEVOUmyiTNKjhkZz7xKbMf31/KGhlKQtV3iKAWrF8LRvwP0q4ZzA==, tarball: file:tarballs/dsh-tool-github-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-invariants': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-llm': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-system-prompt': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-tools': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-util-values': ^0.1.7-rc.1
+      dsh-github: ^0.1.0
+
+  dsh-ui-github@file:tarballs/dsh-ui-github-0.1.4.tgz:
+    resolution: {integrity: sha512-wH4+hBggQxDhk85vpFoCY6IRG2CJW3J7sxlaHJTvO7sger6OkEKXKZXpUVAt/wWbJg7jPsmox1xRQfKytZrPYw==, tarball: file:tarballs/dsh-ui-github-0.1.4.tgz}
+    version: 0.1.4
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-credentials': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-invariants': ^0.1.7-rc.1
+      '@deepseek-ai/dsh-typert-protocol': ^0.1.7-rc.1
+      dsh-github-connect: ^0.1.0
+      react: ^18.2.0
 
   dts-resolver@3.0.0:
     resolution: {integrity: sha512-1T1f+z+4tl9XD+m+0HBgWoL/nm0bOIffyWaUuUSBlFg/86IWvfx+wjNaO/ybU0AJzG9/Mi5hBUgGV6zCmWEN7Q==}
@@ -3644,6 +3747,52 @@ snapshots:
   depd@2.0.0: {}
 
   detect-libc@2.1.2: {}
+
+  dsh-github-connect@file:tarballs/dsh-github-connect-0.1.3.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d))(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))):
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-agent': 0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d)
+      '@deepseek-ai/dsh-credentials': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-invariants': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-typert-protocol': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/schemastery': 3.18.4
+      dsh-github: file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+
+  dsh-github-rest@file:tarballs/dsh-github-rest-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-settings@0.1.7-rc.1(f4dcea9572ceff19e90a0a738f2b70d2))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))):
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-credentials': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-invariants': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-settings': 0.1.7-rc.1(f4dcea9572ceff19e90a0a738f2b70d2)
+      '@deepseek-ai/schemastery': 3.18.4
+      dsh-github: file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+
+  dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)):
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-invariants': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-llm': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/schemastery': 3.18.4
+
+  dsh-tool-github@file:tarballs/dsh-tool-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-scope@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))))(@deepseek-ai/dsh-tools@0.1.7-rc.1(c88bee8666724fd6822e3db5e7499f93))(@deepseek-ai/dsh-util-values@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))):
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-invariants': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-llm': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-system-prompt': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-scope@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      '@deepseek-ai/dsh-tools': 0.1.7-rc.1(c88bee8666724fd6822e3db5e7499f93)
+      '@deepseek-ai/dsh-util-values': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/schemastery': 3.18.4
+      dsh-github: file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+
+  dsh-ui-github@file:tarballs/dsh-ui-github-0.1.4.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github-connect@file:tarballs/dsh-github-connect-0.1.3.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d))(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))))(react@18.3.1):
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+      '@deepseek-ai/dsh-credentials': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-invariants': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-typert-protocol': 0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)
+      dsh-github-connect: file:tarballs/dsh-github-connect-0.1.3.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.7-rc.1(f4793bd2b8f8034a65bc699d8e9fda1d))(@deepseek-ai/dsh-credentials@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-typert-protocol@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(dsh-github@file:tarballs/dsh-github-0.1.0.tgz(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.1)))
+      react: 18.3.1
 
   dts-resolver@3.0.0: {}
 
