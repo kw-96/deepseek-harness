@@ -277,32 +277,11 @@ describe('Messages request conversion', () => {
   })
 
   it.each([
-    [assistant([call()])], [assistant([call()]), user()],
+    [result()], [assistant([call()])], [assistant([call()]), user()],
     [assistant([call(), call()]), result()],
     [assistant([call()]), result(), result()],
   ])('rejects unmatched or duplicated tool history %#', (...messages) => {
     expect(() => body(messages)).toThrow(/tool/)
-  })
-
-  it('replays a tool result whose call this history never recorded as user text', () => {
-    const onDegrade = vi.fn()
-    const messages = [result('ghost', [{ type: 'text', text: 'orphan output' }])]
-    const request = serialize(options({ messages }), connection, messages, new Map(), () => undefined, onDegrade)
-    expect(request.messages).toEqual([{ role: 'user', content: [{
-      type: 'text',
-      text: '[earlier tool result for call "ghost"; its tool call is absent from this transcript]\norphan output',
-    }] }])
-    expect(onDegrade).toHaveBeenCalledWith(
-      'tool result for call "ghost" has no recorded tool call in this history',
-    )
-  })
-
-  it('marks a failed unpaired tool result with no output in its fallback text', () => {
-    const messages = [createToolResultMessage({ callId: ToolCallId('ghost'), content: [], isError: true })]
-    expect(body(messages).messages).toEqual([{ role: 'user', content: [{
-      type: 'text',
-      text: '[earlier failed tool result for call "ghost"; its tool call is absent from this transcript]\n(no output)',
-    }] }])
   })
 
   it.each(['{', '', '[]', 'null', '42', 'true', '"text"', '{"description":"最快，但"某个说法"没有证据。"}'])('uses empty input for malformed or non-object historical tool arguments %s', (arguments_) => {
@@ -439,15 +418,6 @@ describe('Messages images', () => {
     ] })
     expect(imagePricing(connection, model, access).priceImages([image])[0]?.visualTokens).toBeGreaterThan(0)
     expect(imagePricing(connection, MODEL, access).priceImages([image])[0]?.visualTokens).toBe(0)
-  })
-  it('keeps unpaired result images beside their fallback text', async () => {
-    const history = [result('ghost', [image])]
-    const prepared = await prepareImages(history, connection, model, attachments, access, signal)
-    const request = serialize(options({ model }), connection, prepared.messages, prepared.versions, access)
-    expect(request.messages[0]?.content).toEqual([
-      { type: 'text', text: expect.stringContaining('its tool call is absent from this transcript') as string },
-      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AQID' } },
-    ])
   })
   it('requires logged offload at exact encoded bytes and preserves durable references', async () => {
     const config = resolveAdapterOptions({

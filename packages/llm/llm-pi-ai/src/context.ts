@@ -5,10 +5,7 @@
  */
 
 import { brandString } from '@deepseek-ai/dsh-brand'
-import {
-  contentHasImage, IMAGE_OFFLOAD_REQUIRED_CODE, LlmError, offloadedImageText, projectOffloadedImages,
-  requestImageHandleText, requiredImageOffload, unpairedToolResultReason, unpairedToolResultText,
-} from '@deepseek-ai/dsh-llm'
+import { contentHasImage, IMAGE_OFFLOAD_REQUIRED_CODE, LlmError, offloadedImageText, projectOffloadedImages, requestImageHandleText, requiredImageOffload } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message, RequestMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {
   AttachmentId,
@@ -31,43 +28,22 @@ function flattenText(message: RequestMessage): string {
 }
 
 
-/** Append the pi-ai message for one harness tool-role message; an unpaired result becomes provider-neutral text. */
-function appendToolResult(
+/** Recover the pi-ai toolResult message for one harness tool-role message. */
+function toolResultOf(
   message: Extract<Message, { role: 'tool' }>,
-  messages: PiMessage[],
   toolNames: Map<ToolCallId, string>,
   content: string | (TextContent | ImageContent)[],
-  onReplayDegrade?: (reason: string) => void,
-): void {
-  const toolName = toolNames.get(message.toolCallId)
-  if (toolName === undefined) {
-    // A result whose call this history never recorded cannot become a provider
-    // tool message: every wire protocol rejects a result that follows no call.
-    // Its text rides on the user role, and the result's images stay beside it.
-    onReplayDegrade?.(unpairedToolResultReason(message.toolCallId))
-    const fallback = typeof content === 'string'
-      ? content
-      : content.filter(part => part.type === 'text').map(part => part.text).join('')
-    const text = unpairedToolResultText(message.toolCallId, fallback, message.isError ?? false)
-    messages.push(typeof content === 'string'
-      ? { role: 'user', content: text, timestamp: 0 }
-      : {
-        role: 'user',
-        content: [{ type: 'text', text }, ...content.filter(part => part.type === 'image')],
-        timestamp: 0,
-      })
-    return
-  }
-  messages.push({
+): PiMessage {
+  return {
     role: 'toolResult',
     toolCallId: message.toolCallId,
-    toolName,
+    toolName: toolNames.get(message.toolCallId) ?? 'unknown',
     content: typeof content === 'string'
       ? [{ type: 'text', text: content || '(no output)' }]
       : content,
     isError: message.isError ?? false,
     timestamp: 0,
-  })
+  }
 }
 
 /** Reject unsupported roles, tool-change blocks, and image roles before replay or image offloading. */
@@ -241,7 +217,7 @@ function textOnlyContext(options: GenerateOptions, onReplayDegrade?: (reason: st
     }
     if (appendSystemOrAssistant(message, messages, toolNames, onReplayDegrade)) continue
     if (message.role === 'tool') {
-      appendToolResult(message, messages, toolNames, flattenText(message), onReplayDegrade)
+      messages.push(toolResultOf(message, toolNames, flattenText(message)))
       continue
     }
     messages.push({ role: 'user', content: flattenText(message), timestamp: 0 })
@@ -276,11 +252,10 @@ function requestImageTarget(ref: ImageAttachmentRef, budget: PiImageRequestBudge
 
 /**
  * Convert text-only harness history to a synchronous pi-ai Context. Tool
- * result names are recovered from preceding assistant tool calls; a result
- * whose call this history never recorded becomes provider-neutral text instead.
+ * result names are recovered from preceding assistant tool calls.
  * @param options - the harness request; `options.system`, else a leading `system` message, maps to pi-ai's single `systemPrompt` slot.
  * @param images - absent; selects the synchronous conversion.
- * @param onReplayDegrade - called for each item this conversion cannot replay natively.
+ * @param onReplayDegrade - forwarded to {@link toPiAssistant} for each assistant message.
  * @returns the pi-ai context; `tools` is omitted when the request declares none.
  * @throws {LlmError} `UNSUPPORTED_CONTENT` for images in any history role, including a leading system message.
  */
@@ -291,15 +266,14 @@ export function toPiContext(
 ): PiContext
 /**
  * Convert harness history to a pi-ai Context while resolving durable images.
- * Tool result names are recovered from preceding assistant tool calls; a result
- * whose call this history never recorded becomes provider-neutral text instead.
- * Image occurrences the surface marks offloaded become text placeholders; when
- * the retained occurrences' exact base64 payload still exceeds
+ * Tool result names are recovered from preceding assistant tool calls. Image
+ * occurrences the surface marks offloaded become text placeholders; when the
+ * retained occurrences' exact base64 payload still exceeds
  * `maxRequestImageBytes`, the call fails with `IMAGE_OFFLOAD_REQUIRED` naming
  * how many more oldest occurrences must be offloaded.
  * @param options - the harness request; `options.system`, else a leading `system` message, maps to pi-ai's single `systemPrompt` slot.
  * @param images - attachment provider, current path resolver, and request limits.
- * @param onReplayDegrade - called for each item this conversion cannot replay natively.
+ * @param onReplayDegrade - forwarded to {@link toPiAssistant} for each assistant message.
  * @returns the asynchronously resolved pi-ai context.
  */
 export function toPiContext(
@@ -354,7 +328,7 @@ async function toPiContextWithImages(
   for (const message of exactMessages) {
     if (appendSystemOrAssistant(message, messages, toolNames, onReplayDegrade)) continue
     if (message.role === 'tool') {
-      appendToolResult(message, messages, toolNames, userContent(message.content, requestImages, resolveImageAccess), onReplayDegrade)
+      messages.push(toolResultOf(message, toolNames, userContent(message.content, requestImages, resolveImageAccess)))
       continue
     }
     const content = userContent(message.content, requestImages, resolveImageAccess)

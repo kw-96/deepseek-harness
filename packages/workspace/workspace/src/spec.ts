@@ -9,11 +9,10 @@ import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
-import type { ProjectId, WorkspaceId } from './types.ts'
+import type { WorkspaceId } from './types.ts'
 
 /** Workspace id schema at the durable boundary; branding has no runtime representation. */
 const workspaceId = z.string().transform(value => value as WorkspaceId)
-const projectId = z.string().transform(value => value as ProjectId)
 
 const sessionId = z.string().transform(value => brandString<SessionId>(value))
 
@@ -34,21 +33,6 @@ export const workspaceRecord = z.object({
 export type WorkspaceRecord = z.infer<typeof workspaceRecord>
 
 /**
- * Durable shape of one project record. `name` is the display tier; `roots`
- * are ordered directory roots whose prefix matches a workspace's canonical
- * path; timestamps are ISO-8601 strings.
- */
-export const projectRecord = z.object({
-  name: z.string(),
-  roots: z.array(z.string()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-})
-
-/** One stored project record, inferred from {@link projectRecord}. */
-export type ProjectRecord = z.infer<typeof projectRecord>
-
-/**
  * Recoverable two-write mutation marker. The marker is persisted before the
  * record/order pair can diverge, so startup can distinguish an interrupted
  * registry operation from unexplained medium corruption.
@@ -67,8 +51,7 @@ const workspacePendingMutation = z.discriminatedUnion('operation', [
  * position), so the set never participates in the one-owner accounting
  * invariant. `pinnedSessionIds` is the registry-global pin set in pin order
  * (most recently pinned first); pinning and archival are mutually
- * exclusive, so archiving drops the session's pin. `projectIds` is the
- * authoritative project display order. The session sets and `projectIds` are
+ * exclusive, so archiving drops the session's pin. Both session sets are
  * defaulted so records written before the fields parse unchanged.
  */
 export const workspaceDomainState = z.object({
@@ -76,7 +59,6 @@ export const workspaceDomainState = z.object({
   /** First-use Workspace identity, retained after its registration is deleted. */
   defaultWorkspaceId: workspaceId.optional(),
   workspaceIds: z.array(workspaceId),
-  projectIds: z.array(projectId).default([]),
   archivedSessionIds: z.array(sessionId).default([]),
   pinnedSessionIds: z.array(sessionId).default([]),
   pendingMutation: workspacePendingMutation.optional(),
@@ -96,16 +78,7 @@ export const workspaceDomainSpec = defineDomain({
   version: 2,
   global: {
     schema: workspaceDomainState,
-    initial: {
-      initialized: false,
-      workspaceIds: [],
-      projectIds: [],
-      archivedSessionIds: [],
-      pinnedSessionIds: [],
-    },
+    initial: { initialized: false, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] },
   },
-  tables: {
-    workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord),
-    projects: domainTable<ProjectId, ProjectRecord>(projectRecord),
-  },
+  tables: { workspaces: domainTable<WorkspaceId, WorkspaceRecord>(workspaceRecord) },
 })

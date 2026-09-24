@@ -1,7 +1,7 @@
 /** Map system snapshots and conversation turns to Messages using the configured route capability. */
 
-import { LlmError, requestImageHandleText, unpairedToolResultReason, unpairedToolResultText } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message, RequestMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmError, requestImageHandleText } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions, ImageAttachmentAccessResolver, Message, RequestMessage } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { DeepSeekConnectionOptions as Connection } from './types.ts'
 import type { DeepSeekFileId } from './file-id.ts'
@@ -46,7 +46,7 @@ function assistant(message: Message, model: string, onReplayDegrade?: (reason: s
  * @param history - image-projected history with complete system snapshots; durable messages remain unchanged.
  * @param images - request versions for retained images.
  * @param access - execution-world paths for image descriptions.
- * @param onReplayDegrade - diagnostic for content this request cannot replay natively.
+ * @param onReplayDegrade - diagnostic for discarded native replay metadata.
  * @param fileIds - resolved Files references; omission selects inline image bytes.
  * @returns the Messages API JSON body.
  */
@@ -83,22 +83,6 @@ export function serialize(
     if (messages.at(-1)?.role !== 'user') return unsupported('system update without a preceding user or tool-result turn')
     messages.push(...systemUpdates.splice(0))
   }
-  const declaredCalls = new Set<ToolCallId>()
-  // Tool results become wire blocks here; a result whose tool call this history
-  // never recorded cannot become a `tool_result` — the Messages API rejects one
-  // that follows no `tool_use` — so it rides as user text instead.
-  const toolResult = (message: Extract<Message, { role: 'tool' }>): WireBlock[] => {
-    if (declaredCalls.has(message.toolCallId)) {
-      return [{ type: 'tool_result', tool_use_id: message.toolCallId, content: input(message.content), ...message.isError === undefined ? {} : { is_error: message.isError } }]
-    }
-    onReplayDegrade?.(unpairedToolResultReason(message.toolCallId))
-    const blocks = input(message.content)
-    const text = blocks.filter(block => block.type === 'text').map(block => block.text).join('')
-    return [
-      { type: 'text', text: unpairedToolResultText(message.toolCallId, text, message.isError ?? false) },
-      ...blocks.filter(block => block.type !== 'text'),
-    ]
-  }
   // Deferred definitions are persisted for V4; provider loading is intentionally deferred.
   if (options.tools?.some(tool => tool.deferLoading === true)) return unsupported('deferred tool loading')
   for (const message of history) {
@@ -119,17 +103,11 @@ export function serialize(
       }
       continue
     }
-    if (message.role === 'assistant') {
-      flushSystemUpdates()
-      // The calls this history declares pair with the results that answer them.
-      for (const block of message.content) {
-        if (block.type === 'tool-call') declaredCalls.add(block.id)
-      }
-    }
+    if (message.role === 'assistant') flushSystemUpdates()
     const content: WireBlock[] = message.role === 'assistant'
       ? assistant(message, options.model, onReplayDegrade)
       : message.role === 'tool'
-        ? toolResult(message)
+        ? [{ type: 'tool_result', tool_use_id: message.toolCallId, content: input(message.content), ...message.isError === undefined ? {} : { is_error: message.isError } }]
         : message.content.flatMap((block): WireBlock[] => input([block]))
     if (message.role === 'user' && content.length === 0) continue
     const wireRole = message.role === 'tool' ? 'user' : message.role

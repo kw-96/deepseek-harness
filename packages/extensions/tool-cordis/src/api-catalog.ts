@@ -3490,18 +3490,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace projection.',
       },
       {
-        signature: '@Remote(\'attachSession\') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>',
-        description: 'Account one Session whose stored cwd matches the Workspace path.',
-        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
-        returns: 'the updated Workspace projection.',
-      },
-      {
-        signature: '@Remote(\'detachSession\') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>',
-        description: 'Remove one Session from a Workspace account (Ungrouped).',
-        parameters: [{ name: 'request', description: 'Workspace and Session identities.' }],
-        returns: 'the updated Workspace projection.',
-      },
-      {
         signature: '@Remote(\'archiveSession\') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Hide one known Session from Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to archive.' }],
@@ -3611,42 +3599,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Move one workspace within the durable display order, DOM-insertBefore-like. With an anchor it lands before that workspace; without one it appends.',
         parameters: [{ name: 'id', description: 'Workspace to move.' }, { name: 'beforeId', description: 'Workspace anchor; omitted appends.' }],
         returns: 'the complete committed workspace order.',
-      },
-      {
-        signature: 'createProject(name: string, roots: readonly string[] = []): Promise<Project>',
-        description: 'Create a project grouping over ordered directory roots.',
-        parameters: [{ name: 'name', description: 'Display tier name.' }, { name: 'roots', description: 'Ordered directory roots whose prefix matches workspaces.' }],
-        returns: 'the newly durable project.',
-      },
-      {
-        signature: 'getProject(id: ProjectId): Project | undefined',
-        description: 'Look up a project by id.',
-        parameters: [{ name: 'id', description: 'Project id.' }],
-        returns: 'the project, or `undefined` when unknown.',
-      },
-      {
-        signature: 'listProjects(): Project[]',
-        description: 'Synchronous project projection in durable registry order.',
-        parameters: [],
-        returns: 'a fresh ordered array of project entities.',
-      },
-      {
-        signature: 'projectForPath(path: string): Project | undefined',
-        description: 'Resolve the project owning one canonical directory path by longest root prefix; the empty root never matches, and longer roots win ties.',
-        parameters: [{ name: 'path', description: 'Canonical directory path to classify.' }],
-        returns: 'the owning project, or `undefined` when no root prefixes it.',
-      },
-      {
-        signature: 'deleteProject(id: ProjectId): Promise<boolean>',
-        description: 'Delete one project registration; its directory roots and workspaces are retained. The durable order is updated before the table deletion; a failed table write restores the prior order. Unknown ids are an idempotent no-op.',
-        parameters: [{ name: 'id', description: 'Project to remove.' }],
-        returns: '`true` when a record was deleted, `false` when it was unknown.',
-      },
-      {
-        signature: 'insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>',
-        description: 'Move one project within the durable display order, DOM-insertBefore-like.',
-        parameters: [{ name: 'id', description: 'The project to move.' }, { name: 'beforeId', description: 'Project to insert before; omitted appends.' }],
-        returns: 'the complete committed project order.',
       },
       {
         signature: 'archiveSession(sessionId: SessionId, options: ArchiveSessionOptions = {}): Promise<void>',
@@ -5825,10 +5777,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ProfilePnpmInvocation {\n    readonly command: string;\n    readonly args: readonly string[];\n    readonly env: Readonly<Record<string, string>>;\n}',
   },
   {
-    name: 'Project',
-    declaration: 'export interface Project {\n    readonly id: ProjectId;\n    readonly name: string;\n    readonly roots: readonly string[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    setName(name: string): Promise<void>;\n    setRoots(roots: readonly string[]): Promise<void>;\n}',
-  },
-  {
     name: 'ProjectionChangeListener',
     declaration: 'export type ProjectionChangeListener = (session: Session, key: Extract<keyof SessionProjectionMap, string>, value: unknown, seq: SessionSeq) => void;',
   },
@@ -7709,10 +7657,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WorkspaceArchiveValue {\n    readonly archivedSessionIds: readonly SessionId[];\n}',
   },
   {
-    name: 'WorkspaceAttachSessionRequest',
-    declaration: 'export interface WorkspaceAttachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
-  },
-  {
     name: 'WorkspaceBaseline',
     declaration: 'export interface WorkspaceBaseline {\n    readonly items: readonly WorkspaceView[];\n    readonly archivedSessionIds: readonly SessionId[];\n    readonly pinnedSessionIds: readonly SessionId[];\n}',
   },
@@ -7747,10 +7691,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceDeleteValue',
     declaration: 'export interface WorkspaceDeleteValue {\n    readonly deleted: true;\n}',
-  },
-  {
-    name: 'WorkspaceDetachSessionRequest',
-    declaration: 'export interface WorkspaceDetachSessionRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'WorkspaceDiffHunk',

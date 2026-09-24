@@ -25,10 +25,9 @@ Consumers see only the `Workspace` interface; the implementation stays package-p
 ```ts type-equiv
 /**
  * One workspace: a stable id over an existing directory, a display title, and
- * an ordered account of sessions. The directory is the default location for
- * new sessions and the Explorer target; membership is an explicit, durable
- * account and does not require a session's cwd to equal {@link path}.
- * Consumers only see this interface; the implementation stays private.
+ * an ordered candidate account of sessions. Membership requires both an id in
+ * that account and a session header whose canonical cwd equals the workspace
+ * path. Consumers only see this interface; the implementation stays private.
  */
 interface Workspace {
   /** Stable record id (generated uuid). */
@@ -51,10 +50,12 @@ interface Workspace {
   readonly updatedAt: string
 
   /**
-   * Explicitly accounted sessions in manually owned order: a new session is
+   * Header-validated sessions in manually owned order: a new session is
    * prepended at attach, explicit reordering goes through
-   * `insertSessionBefore`, and activity never reorders. The account is not
-   * filtered by cwd; a session may be moved across workspaces freely.
+   * `insertSessionBefore`, and activity never reorders. The durable candidate
+   * account is filtered synchronously: missing headers, invalid cwd values,
+   * and canonical cwd mismatches are never returned. A subsequent workspace
+   * mutation prunes those filtered candidates durably.
    */
   readonly sessionIds: readonly SessionId[]
 
@@ -66,9 +67,13 @@ interface Workspace {
   setTitle(title: string): Promise<void>
 
   /**
-   * Prepend a session to this workspace's account. An already accounted id
-   * resolves without writing. A new id must exist in the session store or
-   * persistence; unknown ids reject without writing.
+   * Prepend a session to this workspace's candidate account. An already
+   * accounted id resolves without writing, aside from the durable
+   * filtered-candidate prune every accepted mutation performs. A new id's
+   * live or persisted
+   * header cwd must resolve to an existing directory equal to {@link path};
+   * unknown ids, missing or invalid cwd values, and mismatches reject without
+   * writing.
    * @param sessionId - The session to record.
    * @returns resolution after durability.
    */
@@ -79,7 +84,9 @@ interface Workspace {
    * with an anchor the session lands before it, without one it appends to the
    * end. Only the moved id changes position. A session or anchor absent from
    * the account rejects without writing; a move to the current position
-   * resolves without writing; decided on the domain write chain.
+   * resolves without writing, aside from the durable filtered-candidate
+   * prune every accepted mutation performs; decided on the domain write
+   * chain.
    * @param sessionId - The accounted session to move.
    * @param beforeSessionId - Accounted anchor to insert before; omitted appends.
    * @returns resolution after durability.
@@ -88,8 +95,9 @@ interface Workspace {
 
   /**
    * Remove a session from this workspace's account. Idempotent: an id not on
-   * the account resolves without writing; decided on the domain write chain
-   * like attach. Never touches the session's own stored log.
+   * the account resolves without writing, aside from the durable
+   * filtered-candidate prune every accepted mutation performs; decided on
+   * the domain write chain like attach. Never touches the session's own stored log.
    * @param sessionId - The session to remove.
    * @returns resolution after durability.
    */
@@ -105,7 +113,7 @@ interface Workspace {
 }
 ```
 
-Ownership truth is the record's ordered `sessionIds`, never derived from session cwd — membership is exactly an id on that account, so one session structurally belongs to at most one workspace. Failed writes reject (`insertSessionBefore` account errors as `WorkspaceMoveInvalidError`, storage failures as plain errors); every accepted mutation stamps `updatedAt`.
+Ownership truth is the record's ordered `sessionIds`, never derived from session cwd — but membership requires both: an id on the account and a header whose canonical cwd equals the workspace path, so one session structurally belongs to at most one workspace. Failed writes reject (`insertSessionBefore` account errors as `WorkspaceMoveInvalidError`, storage failures as plain errors); every accepted mutation stamps `updatedAt` and durably prunes candidates that no longer pass the membership check.
 
 ## The registry: `ctx.workspaceRegistry`
 
@@ -367,20 +375,6 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('insertSessionBefore') insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<WorkspaceValue>
 
 /**
- * Account one Session whose stored cwd matches the Workspace path.
- * @param request - Workspace and Session identities.
- * @returns the updated Workspace projection.
- */
-@Remote('attachSession') attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue>
-
-/**
- * Remove one Session from a Workspace account (Ungrouped).
- * @param request - Workspace and Session identities.
- * @returns the updated Workspace projection.
- */
-@Remote('detachSession') detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue>
-
-/**
  * Hide one known Session from Workspace grouping surfaces.
  * @param request - Session identity to archive.
  * @returns the complete resulting archive set.
@@ -542,53 +536,6 @@ delete(id: WorkspaceId): Promise<boolean>
  * @returns the complete committed workspace order.
  */
 insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly WorkspaceId[]>
-
-/**
- * Create a project grouping over ordered directory roots.
- * @param name - Display tier name.
- * @param roots - Ordered directory roots whose prefix matches workspaces.
- * @returns the newly durable project.
- */
-createProject(name: string, roots: readonly string[] = []): Promise<Project>
-
-/**
- * Look up a project by id.
- * @param id - Project id.
- * @returns the project, or `undefined` when unknown.
- */
-getProject(id: ProjectId): Project | undefined
-
-/**
- * Synchronous project projection in durable registry order.
- * @returns a fresh ordered array of project entities.
- */
-listProjects(): Project[]
-
-/**
- * Resolve the project owning one canonical directory path by longest root
- * prefix; the empty root never matches, and longer roots win ties.
- * @param path - Canonical directory path to classify.
- * @returns the owning project, or `undefined` when no root prefixes it.
- */
-projectForPath(path: string): Project | undefined
-
-/**
- * Delete one project registration; its directory roots and workspaces are
- * retained. The durable order is updated before the table deletion; a
- * failed table write restores the prior order. Unknown ids are an idempotent
- * no-op.
- * @param id - Project to remove.
- * @returns `true` when a record was deleted, `false` when it was unknown.
- */
-deleteProject(id: ProjectId): Promise<boolean>
-
-/**
- * Move one project within the durable display order, DOM-insertBefore-like.
- * @param id - The project to move.
- * @param beforeId - Project to insert before; omitted appends.
- * @returns the complete committed project order.
- */
-insertProjectBefore(id: ProjectId, beforeId?: ProjectId): Promise<readonly ProjectId[]>
 
 /**
  * Archive one session durably. The session must exist (live or in session
