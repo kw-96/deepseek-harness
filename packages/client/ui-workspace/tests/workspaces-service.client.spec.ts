@@ -194,10 +194,6 @@ class FakeWorkspaces implements IWorkspaces {
   declare readonly delete: IWorkspaces['delete']
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']
-  // 官方 v0.1.6-alpha.2 吸收了会话归属管理面：这三个动作由用例按需桩定。
-  declare readonly attachSession: IWorkspaces['attachSession']
-  declare readonly moveSession: IWorkspaces['moveSession']
-  declare readonly detachSession: IWorkspaces['detachSession']
   readonly pinCalls: SessionId[] = []
   readonly unpinCalls: SessionId[] = []
   onPin: IWorkspaces['pinSession'] = async (sessionId) => {

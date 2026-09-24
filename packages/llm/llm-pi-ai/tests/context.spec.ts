@@ -201,16 +201,14 @@ describe('pi-ai request context conversion', () => {
         timestamp: 0,
       },
       {
-        role: 'user',
+        role: 'toolResult',
+        toolCallId: 'missing-call',
+        toolName: 'unknown',
         content: [
-          {
-            type: 'text',
-            text: expect.stringMatching(
-              /^\[earlier failed tool result for call "missing-call"; its tool call is absent from this transcript\]\nImage sha256:/,
-            ) as string,
-          },
+          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
           { type: 'image', data: 'AQ==', mimeType: 'image/png' },
         ],
+        isError: true,
         timestamp: 0,
       },
     ])
@@ -245,70 +243,40 @@ describe('pi-ai request context conversion', () => {
       toolCallId: callId,
       content: [{ type: 'text', text: 'result' }],
     })
-    expect(toPiContext(request([
-      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
-      message,
-    ])).messages).toEqual([
-      expect.objectContaining({ role: 'assistant' }),
-      {
-        role: 'toolResult', toolCallId: callId, toolName: 'lookup',
-        content: [{ type: 'text', text: 'result' }], isError: false, timestamp: 0,
-      },
-    ])
-  })
-
-  it('reports a result whose call this history never recorded and reads it as user text', () => {
-    const callId = ToolCallId('orphan-call')
-    const onReplayDegrade = vi.fn()
-    expect(toPiContext(
-      request([createToolResultMessage({ callId, content: [{ type: 'text', text: '' }], isError: true })]),
-      undefined,
-      onReplayDegrade,
-    ).messages).toEqual([{
-      role: 'user',
-      content: '[earlier failed tool result for call "orphan-call"; its tool call is absent from this transcript]\n(no output)',
-      timestamp: 0,
+    expect(toPiContext(request([message])).messages).toEqual([{
+      role: 'toolResult', toolCallId: callId, toolName: 'unknown',
+      content: [{ type: 'text', text: 'result' }], isError: false, timestamp: 0,
     }])
-    expect(onReplayDegrade).toHaveBeenCalledWith(
-      `tool result for call "${callId}" has no recorded tool call in this history`,
-    )
   })
 
   it('converts tool text and images on the image path', async () => {
     const callId = ToolCallId('nested-call')
-    const context = await toPiContext(request([
-      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
-      createToolResultMessage({
-        callId,
-        content: [
-          { type: 'text', text: 'nested text' },
-          { type: 'image', attachment: ref },
-        ],
-        isError: false,
-      }),
-    ]), imageContext(attachments))
+    const context = await toPiContext(request([createToolResultMessage({
+      callId,
+      content: [
+        { type: 'text', text: 'nested text' },
+        { type: 'image', attachment: ref },
+      ],
+      isError: false,
+    })]), imageContext(attachments))
 
-    expect(context.messages).toEqual([
-      expect.objectContaining({ role: 'assistant' }),
-      {
-        role: 'toolResult',
-        toolCallId: 'nested-call',
-        toolName: 'lookup',
-        content: [
-          { type: 'text', text: 'nested text' },
-          { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
-          { type: 'image', data: 'AQ==', mimeType: 'image/png' },
-        ],
-        isError: false,
-        timestamp: 0,
-      },
-    ])
+    expect(context.messages).toEqual([{
+      role: 'toolResult',
+      toolCallId: 'nested-call',
+      toolName: 'unknown',
+      content: [
+        { type: 'text', text: 'nested text' },
+        { type: 'text', text: expect.stringContaining(`Image ${ref.attachmentId}`) as string },
+        { type: 'image', data: 'AQ==', mimeType: 'image/png' },
+      ],
+      isError: false,
+      timestamp: 0,
+    }])
   })
 
   it('flattens tool text and ignores other block types without storage', () => {
     const callId = ToolCallId('nested-text')
     expect(toPiContext(request([
-      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
       createToolResultMessage({
         callId,
         content: [
@@ -318,14 +286,10 @@ describe('pi-ai request context conversion', () => {
         isError: false,
       }),
     ]))).toMatchObject({
-      messages: [
-        expect.objectContaining({ role: 'assistant' }),
-        {
-          role: 'toolResult',
-          toolName: 'lookup',
-          content: [{ type: 'text', text: 'nested' }],
-        },
-      ],
+      messages: [{
+        role: 'toolResult',
+        content: [{ type: 'text', text: 'nested' }],
+      }],
     })
   })
 
@@ -339,7 +303,6 @@ describe('pi-ai request context conversion', () => {
     // The tool-result occurrence is offloaded on the surface; the two retained 3-byte images cost
     // 4 base64 characters each and fit the 8-byte bound exactly.
     const context = await toPiContext(request([
-      history('assistant', [{ type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' }]),
       createToolResultMessage({
         callId,
         content: [{ type: 'image', attachment: sized, offloaded: true }],
@@ -350,11 +313,10 @@ describe('pi-ai request context conversion', () => {
     ]), imageContext(store, { maxRequestImageBytes: 8 }))
 
     expect(context.messages).toEqual([
-      expect.objectContaining({ role: 'assistant' }),
       {
         role: 'toolResult',
         toolCallId: 'shot-call',
-        toolName: 'lookup',
+        toolName: 'unknown',
         content: [{ type: 'text', text: offloadedImageText(sized) }],
         isError: false,
         timestamp: 0,
@@ -493,24 +455,19 @@ describe('pi-ai request context conversion', () => {
     expect(readImageRequest).toHaveBeenCalledTimes(2)
   })
   it('keeps empty text-only users while separating result-only messages', () => {
-    const callId = ToolCallId('paired-call')
+    const callId = ToolCallId('unknown-call')
     expect(toPiContext(request([
       user([]),
       history('assistant', [
         { type: 'text', text: 'answer' },
-        { type: 'tool-call', id: callId, name: 'lookup', arguments: '{}' },
+        { type: 'tool-call', id: ToolCallId('other-call'), name: 'lookup', arguments: '{}' },
       ]),
       createToolResultMessage({ callId, content: [{ type: 'text', text: 'result' }], isError: false }),
     ]))).toMatchObject({
       messages: [
         { role: 'user', content: '' },
         { role: 'assistant' },
-        {
-          role: 'toolResult',
-          toolCallId: 'paired-call',
-          toolName: 'lookup',
-          content: [{ type: 'text', text: 'result' }],
-        },
+        { role: 'toolResult', toolName: 'unknown' },
       ],
     })
   })

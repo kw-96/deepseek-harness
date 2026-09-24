@@ -86,16 +86,6 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
     workspace: workspace(String(request.workspaceId), [request.sessionId]),
   }))
-  onAttachSession: (
-    request: { workspaceId: WorkspaceId; sessionId: SessionId },
-  ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
-    workspace: workspace(String(request.workspaceId), [request.sessionId]),
-  }))
-  onDetachSession: (
-    request: { workspaceId: WorkspaceId; sessionId: SessionId },
-  ) => Promise<RemoteResult<WorkspaceValue>> = request => Promise.resolve(remoteOk({
-    workspace: workspace(String(request.workspaceId), []),
-  }))
   onArchiveSession: (
     request: WorkspaceArchiveSessionRequest,
   ) => Promise<RemoteResult<WorkspaceArchiveValue>> = request =>
@@ -136,16 +126,6 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   insertSessionBefore(request: WorkspaceInsertSessionBeforeRequest): Promise<RemoteResult<WorkspaceValue>> {
     this.record('insertSessionBefore', request)
     return this.onInsertSessionBefore(request)
-  }
-
-  attachSession(request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
-    this.record('attachSession', request)
-    return this.onAttachSession(request)
-  }
-
-  detachSession(request: { workspaceId: WorkspaceId; sessionId: SessionId }): Promise<RemoteResult<WorkspaceValue>> {
-    this.record('detachSession', request)
-    return this.onDetachSession(request)
   }
 
   archiveSession(request: WorkspaceArchiveSessionRequest): Promise<RemoteResult<WorkspaceArchiveValue>> {
@@ -383,19 +363,80 @@ describe('ClientWorkspaceModel', () => {
     await expect(model.archiveSession(sid('fresh'))).resolves.toMatchObject({ ok: true })
     expect(model.getSnapshot().archivedSessionIds).toEqual(['fresh'])
 
-    // Restore installs the returned complete set; a failed restore leaves it.
     remote.onUnarchiveSession = () => Promise.resolve(workspaceError(
-      new RemoteError('session/not-found', 'missing', { sessionId: sid('fresh') }),
+      new RemoteError('session/not-found', 'missing', { sessionId: sid('missing') }),
     ))
-    await expect(model.unarchiveSession(sid('fresh'))).resolves.toMatchObject({ ok: false })
+    await expect(model.unarchiveSession(sid('missing'))).resolves.toMatchObject({ ok: false })
     expect(model.getSnapshot().archivedSessionIds).toEqual(['fresh'])
     remote.onUnarchiveSession = () => Promise.resolve(remoteOk({ archivedSessionIds: [] }))
     await expect(model.unarchiveSession(sid('fresh'))).resolves.toMatchObject({ ok: true })
     expect(model.getSnapshot().archivedSessionIds).toEqual([])
-    expect(remote.calls).toContainEqual({
-      method: 'unarchiveSession',
-      request: { sessionId: 'fresh' },
-    })
+    expect(remote.calls).toContainEqual({ method: 'unarchiveSession', request: { sessionId: 'fresh' } })
+  })
+
+  it('keeps the latest unarchive reply when overlapping requests settle out of order', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [], [sid('first'), sid('second')])
+    const firstGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    const secondGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    let request = 0
+    remote.onUnarchiveSession = () => request++ === 0 ? firstGate.promise : secondGate.promise
+
+    const first = model.unarchiveSession(sid('first'))
+    const second = model.unarchiveSession(sid('second'))
+    secondGate.resolve(remoteOk({ archivedSessionIds: [] }))
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual([])
+    firstGate.resolve(remoteOk({ archivedSessionIds: [sid('second')] }))
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual([])
+  })
+
+  it('keeps a pushed archive set when an unarchive reply lands later', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [], [sid('first')])
+    const gate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    remote.onUnarchiveSession = () => gate.promise
+
+    const pending = model.unarchiveSession(sid('first'))
+    model.replaceArchived([sid('first'), sid('second')])
+    gate.resolve(remoteOk({ archivedSessionIds: [] }))
+    await expect(pending).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['first', 'second'])
+  })
+
+  it('keeps the latest archive reply when overlapping requests settle out of order', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    const firstGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    const secondGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    let request = 0
+    remote.onArchiveSession = () => request++ === 0 ? firstGate.promise : secondGate.promise
+
+    const first = model.archiveSession(sid('first'))
+    const second = model.archiveSession(sid('second'))
+    secondGate.resolve(remoteOk({ archivedSessionIds: [sid('first'), sid('second')] }))
+    await expect(second).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['first', 'second'])
+    firstGate.resolve(remoteOk({ archivedSessionIds: [sid('first')] }))
+    await expect(first).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['first', 'second'])
+  })
+
+  it('keeps a baseline archive set when an unarchive reply lands later', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [], [sid('first')])
+    const gate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    remote.onUnarchiveSession = () => gate.promise
+
+    const pending = model.unarchiveSession(sid('first'))
+    baseline(model, [], [sid('second')])
+    gate.resolve(remoteOk({ archivedSessionIds: [] }))
+    await expect(pending).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['second'])
   })
 
   it('applies pin mutation echoes and leaves failed results unchanged', async () => {

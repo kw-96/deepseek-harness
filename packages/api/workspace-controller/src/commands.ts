@@ -15,12 +15,10 @@ import { workspaceView } from './feed.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
-  WorkspaceAttachSessionRequest,
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
-  WorkspaceDetachSessionRequest,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
@@ -150,39 +148,6 @@ export class WorkspaceCommands {
         { cause: error },
       )
     }
-    return { workspace: workspaceView(workspace) }
-  }
-
-  /**
-   * Account one existing Session in a Workspace. The session must exist (live
-   * or in session persistence); membership eligibility is decided on the
-   * registry's write chain rather than by comparing stored paths here.
-   * @param request - Workspace and Session identities.
-   * @returns the updated Workspace projection.
-   */
-  async attachSession(request: WorkspaceAttachSessionRequest): Promise<WorkspaceValue> {
-    const workspace = this.requireWorkspace(request.workspaceId)
-    try {
-      await workspace.attachSession(request.sessionId)
-    } catch (error) {
-      throw new RemoteError(
-        'workspace/attach-invalid',
-        errorMessage(error),
-        { workspaceId: request.workspaceId, sessionId: request.sessionId },
-        { cause: error },
-      )
-    }
-    return { workspace: workspaceView(workspace) }
-  }
-
-  /**
-   * Remove one Session from a Workspace account (Ungrouped).
-   * @param request - Workspace and Session identities.
-   * @returns the updated Workspace projection.
-   */
-  async detachSession(request: WorkspaceDetachSessionRequest): Promise<WorkspaceValue> {
-    const workspace = this.requireWorkspace(request.workspaceId)
-    await workspace.detachSession(request.sessionId)
     return { workspace: workspaceView(workspace) }
   }
 

@@ -240,26 +240,6 @@ describe('WorkspaceController commands', () => {
       sessionId: session.id,
     })).rejects.toMatchObject({ code: 'workspace/not-found' })
 
-    const ungrouped = ctx.sessions.create(SessionId('session-ungrouped'), {
-      meta: { cwd: first.workspace.path },
-    })
-    await expect(controller.attachSession({
-      workspaceId: first.workspace.workspaceId,
-      sessionId: ungrouped.id,
-    })).resolves.toMatchObject({
-      workspace: { sessionIds: expect.arrayContaining([session.id, ungrouped.id]) },
-    })
-    await expect(controller.attachSession({
-      workspaceId: second.workspace.workspaceId,
-      sessionId: ungrouped.id,
-    })).resolves.toMatchObject({ workspace: { sessionIds: [ungrouped.id] } })
-    await expect(controller.detachSession({
-      workspaceId: first.workspace.workspaceId,
-      sessionId: ungrouped.id,
-    })).resolves.toMatchObject({
-      workspace: { sessionIds: [session.id] },
-    })
-
     // A session reported active by the registry's activity waterfall is a
     // stable business failure carrying what still runs, and nothing is written.
     const activity = [{ kind: 'probe' as const }, { kind: 'probe-items' as const, items: [{ id: 'item-1', label: 'build' }] }]
@@ -288,8 +268,8 @@ describe('WorkspaceController commands', () => {
       .rejects.toMatchObject({ code: 'session/not-found' })
     await expect(controller.unarchiveSession({ sessionId: session.id }))
       .resolves.toEqual({ archivedSessionIds: [] })
-    // Restoring an id outside the set is a silent no-op, not an error.
-    await expect(controller.unarchiveSession({ sessionId: SessionId('unknown') }))
+    // Unarchive is idempotent: an id that is not archived is not an error.
+    await expect(controller.unarchiveSession({ sessionId: session.id }))
       .resolves.toEqual({ archivedSessionIds: [] })
   })
 
@@ -409,7 +389,6 @@ describe('WorkspaceController follow', () => {
     await expect(nextFrame(iterator)).resolves.toEqual({
       type: 'archived', archivedSessionIds: [session.id],
     })
-
     // Unarchive rides the same complete-set increment: no new frame type.
     await controller.unarchiveSession({ sessionId: session.id })
     await expect(nextFrame(iterator)).resolves.toEqual({

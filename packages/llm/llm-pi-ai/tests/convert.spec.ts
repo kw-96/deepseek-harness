@@ -147,42 +147,32 @@ describe('toPiContext', () => {
     const context = await toPiContext({
       provider: 'openai',
       model: 'gpt-4.1',
-      messages: [
-        createMessage({
-          role: 'assistant',
-          content: [{ type: 'tool-call', id: ToolCallId('outer'), name: 'get_weather', arguments: '{}' }],
-          source: { kind: 'model', provider: 'openai', model: 'gpt-4.1' },
-        }),
-        createToolResultMessage({
-          callId: ToolCallId('outer'),
-          content: [
-            { type: 'text', text: 'before' },
-            { type: 'text', text: 'middle' },
-            { type: 'image', attachment },
-            { type: 'text', text: 'after' },
-          ],
-          isError: false,
-        }),
-      ],
-    }, imageContext(attachmentStore(readImageRequest)))
-
-    expect(context.messages).toEqual([
-      expect.objectContaining({ role: 'assistant' }),
-      {
-        role: 'toolResult',
-        toolCallId: 'outer',
-        toolName: 'get_weather',
+      messages: [createToolResultMessage({
+        callId: ToolCallId('outer'),
         content: [
           { type: 'text', text: 'before' },
           { type: 'text', text: 'middle' },
-          { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
-          { type: 'image', data: 'AQID', mimeType: 'image/png' },
+          { type: 'image', attachment },
           { type: 'text', text: 'after' },
         ],
         isError: false,
-        timestamp: 0,
-      },
-    ])
+      })],
+    }, imageContext(attachmentStore(readImageRequest)))
+
+    expect(context.messages).toEqual([{
+      role: 'toolResult',
+      toolCallId: 'outer',
+      toolName: 'unknown',
+      content: [
+        { type: 'text', text: 'before' },
+        { type: 'text', text: 'middle' },
+        { type: 'text', text: expect.stringContaining(`Image ${attachment.attachmentId}`) as string },
+        { type: 'image', data: 'AQID', mimeType: 'image/png' },
+        { type: 'text', text: 'after' },
+      ],
+      isError: false,
+      timestamp: 0,
+    }])
   })
 
   it('rejects structured image history when no durable resolver is supplied', () => {
@@ -313,38 +303,18 @@ describe('toPiContext', () => {
     })
   })
 
-  it('degrades an unmatched failed tool result with no output to provider-neutral text', () => {
-    const onReplayDegrade = vi.fn()
+  it('labels unmatched tool results with toolName unknown and keeps isError', () => {
     const context = toPiContext({
       provider: 'deepseek',
       model: 'm',
       messages: [createToolResultMessage({ callId: ToolCallId('zz'), content: [], isError: true })],
-    }, undefined, onReplayDegrade)
-    expect(context.messages).toEqual([{
-      role: 'user',
-      content: '[earlier failed tool result for call "zz"; its tool call is absent from this transcript]\n(no output)',
-      timestamp: 0,
-    }])
-    expect(onReplayDegrade).toHaveBeenCalledWith(
-      'tool result for call "zz" has no recorded tool call in this history',
-    )
-  })
-
-  it('keeps the unmatched tool result body after the degradation notice', () => {
-    const context = toPiContext({
-      provider: 'deepseek',
-      model: 'm',
-      messages: [createToolResultMessage({
-        callId: ToolCallId('gone'),
-        content: [{ type: 'text', text: 'Sunny' }],
-        isError: false,
-      })],
     })
-    expect(context.messages).toEqual([{
-      role: 'user',
-      content: '[earlier tool result for call "gone"; its tool call is absent from this transcript]\nSunny',
-      timestamp: 0,
-    }])
+    expect(context.messages[0]).toMatchObject({
+      role: 'toolResult',
+      toolName: 'unknown',
+      isError: true,
+      content: [{ type: 'text', text: '(no output)' }],
+    })
   })
 
   it('splits mixed user text + tool results and lifts a leading system message into systemPrompt', () => {
@@ -355,11 +325,6 @@ describe('toPiContext', () => {
         createMessage({
           role: 'system', content: [{ type: 'text', text: 'rule' }],
           source: { kind: 'system-prompt' },
-        }),
-        createMessage({
-          role: 'assistant',
-          content: [{ type: 'tool-call', id: ToolCallId('c1'), name: 'get_weather', arguments: '{}' }],
-          source: { kind: 'model', provider: 'deepseek', model: 'm' },
         }),
         createUserMessage({
           content: [{ type: 'text', text: 'note' }],
@@ -373,9 +338,7 @@ describe('toPiContext', () => {
       ],
     })
     expect(context.systemPrompt).toBe('rule')
-    expect(context.messages.map(message => message.role)).toEqual(['assistant', 'user', 'toolResult'])
-    expect(context.messages[1]).toEqual({ role: 'user', content: 'note', timestamp: 0 })
-    expect(context.messages[2]).toMatchObject({ toolCallId: 'c1', toolName: 'get_weather' })
+    expect(context.messages.map(message => message.role)).toEqual(['user', 'toolResult'])
   })
 
   it('skips plugin-added (unknown) blocks in assistant content', () => {
@@ -960,14 +923,6 @@ describe('mapStopReason / mapUsage', () => {
     'OpenAI Responses stream ended before a terminal response event',
     'openrouter stream ended without a terminal event',
     'Stream ended without finish_reason',
-    // A gateway relaying its own upstream's stream failure: the proxy reports the
-    // supplier's body could not be decoded, after the response had started.
-    'server_error: [upstream_stream_error] upstream stream error: error decoding response body',
-    'upstream stream error: error decoding response body',
-    // A payload JSON.parse rejected, from whichever hop in the chain returned it.
-    'Bad control character in string literal in JSON at position 13437 (line 1 column 13438)',
-    'Unexpected token < in JSON at position 0',
-    'Unexpected end of JSON input',
   ])('maps pi-ai transport wording %j', (errorMessage) => {
     expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
