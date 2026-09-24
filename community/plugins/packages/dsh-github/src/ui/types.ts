@@ -121,9 +121,12 @@ export interface GitHubUiShell {
    * Mount one render function into a client slot.
    * @param slot - the slot id.
    * @param render - produces the slot's React content on each slot render.
+   * @param label - display text where the target slot projects one; the
+   * settings target renders a tab whose title comes from here, so omitting it
+   * leaves an unnamed tab. Slots projecting no label ignore it.
    * @returns the registration's disposer.
    */
-  registerSlot(slot: GitHubUiSlotId, render: () => ReactNode): () => void
+  registerSlot(slot: GitHubUiSlotId, render: () => ReactNode, label?: string): () => void
   /**
    * The session the dock currently renders for (ADR-0010): its id rides every
    * git-touching Remote call so the host detects in that session's workspace.

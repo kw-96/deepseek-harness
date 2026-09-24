@@ -13,7 +13,7 @@ import { STYLE_MARKER, STYLE_TEXT, installStyles } from '../../src/ui/client/sty
 // —— fakes ————————————————————————————————————————————————————————————————————
 
 interface FakeRegistration {
-  options: { name: string, id: string, order: number }
+  options: { name: string, id: string, order: number, label?: string }
   component: (props: { sessionId?: string }) => unknown
 }
 
@@ -67,7 +67,8 @@ function descriptor(method: string): InvocationDescriptor {
 
 function parseOf(codec: InvocationDescriptor['result']): (value: unknown) => unknown {
   if (codec.mode !== 'strict') throw new Error('expected a strict codec')
-  return value => codec.schema.parse(value)
+  // 0.1.7：strict codec 通过 `create()` 惰性物化 schema（旧的 `codec.schema` 字段已移除）。
+  return value => codec.create().parse(value)
 }
 
 // —— contribution —————————————————————————————————————————————————————————————
@@ -199,14 +200,14 @@ describe('GITHUB_CONNECT_REMOTE', () => {
 // —— browser shell ————————————————————————————————————————————————————————————
 
 describe('createBrowserShell', () => {
-  it('narrows the settings slot to the plugin-config card and keeps the dock name', () => {
+  it('narrows the settings slot to the plugin-config tab and keeps the dock name', () => {
     const suite = fakeClientCtx()
     const shell = createBrowserShell(suite.ctx)
-    shell.registerSlot('settings.section', () => 'card')
+    shell.registerSlot('settings.section', () => 'card', 'GitHub')
     shell.registerSlot('conversation.input.dock', () => 'dock')
-    expect(suite.injected).toEqual(['settings.plugin.item', 'conversation.input.dock'])
+    expect(suite.injected).toEqual(['settings.plugins.tab', 'conversation.input.dock'])
     expect(suite.registrations.map(entry => entry.options)).toEqual([
-      { name: 'settings.plugin.item', id: 'github', order: 30 },
+      { name: 'settings.plugins.tab', id: 'github', order: 30, label: 'GitHub' },
       { name: 'conversation.input.dock', id: 'github', order: 30 },
     ])
     expect(suite.registrations[0]!.component({})).toBe('card')
@@ -347,7 +348,11 @@ describe('client apply', () => {
     document.documentElement.lang = 'zh-CN'
     await apply(suite.ctx)
     expect(suite.raw.remote.$mount).toHaveBeenCalledWith(GITHUB_CONNECT_REMOTE)
-    expect(suite.injected).toEqual(['settings.plugin.item', 'conversation.input.dock'])
+    expect(suite.injected).toEqual(['settings.plugins.tab', 'conversation.input.dock'])
+    // The settings page carries its tab title (a label-less tab renders unnamed).
+    expect(suite.registrations[0]!.options).toEqual({
+      name: 'settings.plugins.tab', id: 'github', order: 30, label: 'GitHub',
+    })
 
     const card = suite.registrations[0]!.component({}) as ReactElement<{ locale: string }>
     expect(card.type).toBe(ConnectGitHubSection)
