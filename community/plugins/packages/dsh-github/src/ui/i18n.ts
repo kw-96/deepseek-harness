@@ -12,6 +12,8 @@ export type UiLocale = 'en' | 'zh-CN'
 
 /** Every user-visible string of the two slots, parameterized where needed. */
 export interface UiCatalog {
+  /** Title of this UI's page in the Plugins settings section's tab strip. */
+  readonly tabLabel: string
   readonly connectLoading: string
   readonly connectButton: string
   readonly connectedAs: (login: string) => string
@@ -45,6 +47,7 @@ export interface UiCatalog {
 }
 
 const EN: UiCatalog = Object.freeze<UiCatalog>({
+  tabLabel: 'GitHub',
   connectLoading: 'Checking GitHub connection…',
   connectButton: 'Connect GitHub',
   connectedAs: login => `Connected as @${login}`,
@@ -93,6 +96,7 @@ const EN: UiCatalog = Object.freeze<UiCatalog>({
 })
 
 const ZH_CN: UiCatalog = Object.freeze<UiCatalog>({
+  tabLabel: 'GitHub',
   connectLoading: '正在检查 GitHub 连接…',
   connectButton: '连接 GitHub',
   connectedAs: login => `已连接 @${login}`,

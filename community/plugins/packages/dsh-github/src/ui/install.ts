@@ -6,7 +6,7 @@
  */
 
 import { createElement as h } from 'react'
-import type { UiLocale } from './i18n.js'
+import { catalogFor, type UiLocale } from './i18n.js'
 import { ConnectGitHubSection } from './settings-section.js'
 import type { GitHubUiRemote, GitHubUiShell } from './types.js'
 import { PrStatusBar, type PollPolicy, type StatusBarTimers } from './status-bar.js'
@@ -34,7 +34,8 @@ export function installGitHubUi(shell: GitHubUiShell, remote: GitHubUiRemote, op
   const locale = options.locale === undefined ? {} : { locale: options.locale }
   const timers = options.timers === undefined ? {} : { timers: options.timers }
   const offSection = shell.registerSlot('settings.section', () =>
-    h(ConnectGitHubSection, { remote, shell, ...locale, ...timers }))
+    h(ConnectGitHubSection, { remote, shell, ...locale, ...timers }),
+    catalogFor(options.locale ?? 'en').tabLabel)
   const offDock = shell.registerSlot('conversation.input.dock', () =>
     h(PrStatusBar, {
       remote,
