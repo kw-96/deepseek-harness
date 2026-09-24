@@ -1,7 +1,7 @@
 {
   "name": "dsh-github",
   "description": "Merged GitHub connector for the DeepSeek Harness — the ctx.github capability seam, its REST v3 provider, the model-facing github_* tool suite, Device Flow connect with @Remote button methods, and the web UI (Connect settings section and conversation PR status bar) in one package with five host rows",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kaziii/dsh-github-connector.git",
