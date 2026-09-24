@@ -32,7 +32,9 @@ This package is a plugin row, not a bundle patch: a preset references it by name
     enabled: true
 ```
 
-The author's deployment also ships a preset named `mode-router` under `$DSH_HOME/.agent-presets/mode-router/` that copies the shipped `standard` composition, adds this row, and carries the Chinese-language persona instruction inside the preset so a preset-level persona cannot shadow it. Other machines either run the community `dev.mjs` junction for `community/plugins/packages/*`, or build (`pnpm build`) and pack the package and add it like any other community plugin.
+This package also declares the `mode-router` agent preset: `bundle.patch.yml` inserts one `@deepseek-ai/dsh-agent-preset` row whose plugin list is the shipped `standard` preset with four local changes — the Chinese-language reply requirement appended to the persona prefix, `tool-ralph` enabled, the retired `tool-plugin-manager` row dropped, and this plugin's own `mode-router` row appended. Installing the package (pack it after `pnpm build`, or run the community `dev.mjs` junction for `community/plugins/packages/*`) is therefore all it takes to get the preset.
+
+Before 0.1.7 a preset was a `$DSH_HOME/.agent-presets/<id>/` directory (`preset.yml` + `agent.cordis.yml`); nothing reads that directory any more, and the repository's `community/presets/` went away with this declaration.
 
 ## Where the evidence lives
 

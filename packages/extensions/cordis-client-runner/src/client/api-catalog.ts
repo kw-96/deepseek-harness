@@ -83,19 +83,20 @@ export interface TypeApiEntry {
 export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'layout',
-    summary: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply.',
-    description: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply. The attachPanels wiring hook stays on the concrete class (root-entry assembly only).',
+    summary: 'Panel navigation and geometry actions exposed through ctx.layout.',
+    description: 'Panel navigation and geometry actions exposed through ctx.layout.',
     methods: [
       {
         signature: 'selectPanel(panelId: MainPanelId | null): void',
-        description: '选择全局中央面板而不改变当前会话（官方兼容面）。',
-        parameters: [{ name: 'panelId', description: '已注册的 \'main\' 槽 key，或 null 回到会话视图。' }],
+        description: 'Select a global central panel without changing the current Session.',
+        parameters: [{ name: 'panelId', description: 'registered main key, or null to show the Conversation.' }],
+        throws: ['if the selected main key is not registered; preserves the current selection.'],
       },
       {
         signature: 'beginNavigation(): AbortSignal',
-        description: '开始一次异步导航，作废此前未完成的导航（官方兼容面）。',
+        description: 'Start an asynchronous navigation, superseding any earlier pending navigation.',
         parameters: [],
-        returns: '下一次导航或布局卸载时中止的信号；提交 UI 状态前先检查它。',
+        returns: 'a signal aborted by the next navigation or layout disposal; check it before committing UI state.',
       },
       {
         signature: 'toggleSidebar(): void',
@@ -104,12 +105,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'openRightbar(track: boolean, fullscreen: boolean): void',
-        description: '官方兼容面：右栏 occupant 上报"已展开 + 轨道/全屏形态"。 本地面板架构把右栏等价于 details 列，且只有"打开/关闭"两种形态 （无轨道悬浮与全屏覆盖），故 track/fullscreen 仅保留签名兼容， 调用一律映射为打开 details 列。',
-        parameters: [{ name: 'track', description: '是否让中心列让出轨道（本地忽略）。' }, { name: 'fullscreen', description: '是否覆盖整帧（本地忽略）。' }],
+        description: 'Report the right panel\'s presentation without changing its expanded state.',
+        parameters: [{ name: 'track', description: 'whether the normal panel width reserves a grid track, including beneath a fullscreen overlay.' }, { name: 'fullscreen', description: 'whether the panel covers the frame and hides its outer resize handle; independent of the underlying grid track.' }],
       },
       {
         signature: 'closeRightbar(): void',
-        description: '官方兼容面：右栏 occupant 上报隐藏，映射为关闭 details 列。',
+        description: 'Report the right panel as hidden: no track, no handle.',
         parameters: [],
       },
     ],
@@ -200,14 +201,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a stable read-only source across same-id generations, with zero counts when none is live.',
       },
       {
-        signature: 'setSubagentCatalogOpen(parentSessionId: SessionId, open: boolean): void',
-        description: 'Mark whether a catalog menu is consuming live membership updates.',
-        parameters: [{ name: 'parentSessionId', description: 'catalog owner.' }, { name: 'open', description: 'current menu state.' }],
-      },
-      {
-        signature: 'refreshSubagents(parentSessionId: SessionId): Promise<void>',
-        description: 'Refresh one direct-child catalog.',
-        parameters: [{ name: 'parentSessionId', description: 'catalog owner.' }],
+        signature: 'refreshProjections(sessionId: SessionId): Promise<void>',
+        description: 'Load all Session projections once per connection; retry an unsuccessful initial read.',
+        parameters: [{ name: 'sessionId', description: 'Session to inspect without opening its conversation.' }],
         returns: 'completion of the current or newly started refresh.',
       },
       {
@@ -218,8 +214,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>',
-        description: 'Fork a session from a completed-turn prefix of the source; on resolution the child is in the catalog and may be explicitly retained.',
-        parameters: [{ name: 'opts', description: 'source session id, the optional event seq anchoring the cut (the boundary is the first turn/end at or after it; an in-log anchor in an open turn is unavailable rather than clipped backward), and whether to increment an inherited durable title before resolving.' }],
+        description: 'Fork a session from an exact inclusive prefix of the source; on resolution the child is catalogued and can be explicitly retained.',
+        parameters: [{ name: 'opts', description: 'source session id, the optional exact inclusive boundary seq (a real event seq the caller already knows; a cut inside an open turn is balanced Host-side with synthetic closers, and omission selects the latest completed-turn prefix), and whether to increment an inherited durable title before resolving.' }],
         returns: 'the child session id.',
         throws: ['when the fork fails, or when a requested child-title rename fails after creation.'],
       },
@@ -349,12 +345,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Connect a Workspace and open its Session unless a later navigation supersedes it.',
         parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession.' }],
         returns: 'completion; a superseded request may create a Session but does not open it.',
+        throws: ['on failure; a refused creation is also shown through the Workspace notice unless a later navigation or disposal superseded the request.'],
       },
       {
         signature: 'forkSession(sessionId: SessionId): Promise<void>',
-        description: 'Fork a Session and open the child unless a later navigation supersedes it.',
+        description: 'Fork a Session without changing the current selection.',
         parameters: [{ name: 'sessionId', description: 'source Session.' }],
-        returns: 'completion; a superseded request leaves its child available without selecting it.',
+        returns: 'completion after child creation and inherited-title increment.',
       },
       {
         signature: 'connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
@@ -364,13 +361,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'startSession(workspaceId?: WorkspaceId): void',
-        description: 'Start a New Session flow and navigate to its Session.',
+        description: 'Start a New Session flow and navigate to its Session; a creation the Host refuses is shown through the Workspace notice and leaves the selection as it was.',
         parameters: [{ name: 'workspaceId', description: 'explicit target; absent inherits the current or most recent Workspace.' }],
       },
       {
-        signature: 'archiveSession(sessionId: SessionId): Promise<void>',
+        signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
         description: 'Archive a Session and clear it when it is the current selection.',
-        parameters: [{ name: 'sessionId', description: 'Session to archive.' }],
+        parameters: [{ name: 'sessionId', description: 'Session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the Session\'s running work instead of refusing.' }],
       },
       {
         signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
@@ -420,9 +417,10 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'workspaceId', description: 'target Workspace.' }],
       },
       {
-        signature: 'archiveSession(sessionId: SessionId): Promise<void>',
+        signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
         description: 'Archive a Session from Workspace grouping surfaces.',
-        parameters: [{ name: 'sessionId', description: 'Session to archive.' }],
+        parameters: [{ name: 'sessionId', description: 'Session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the Session\'s running work instead of refusing.' }],
+        throws: ['{WorkspaceArchiveError} when the Host refuses; without `stopActivity` a Session with running work fails as `workspace/session-active`, its details naming what runs.'],
       },
       {
         signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
@@ -519,7 +517,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ClientConnectionRpc',
-    declaration: 'export interface ClientConnectionRpc {\n    call(channel: string, endpoint: string, payload: unknown, signal?: AbortSignal): Promise<ConnectionRpcResult<unknown>>;\n    readonly open?: (channel: string, endpoint: string, payload: unknown, signal: AbortSignal) => AsyncIterable<unknown>;\n}',
+    declaration: 'export interface ClientConnectionRpc {\n    call(channel: string, endpoint: string, payload: unknown, signal?: AbortSignal): Promise<ConnectionRpcResult<unknown>>;\n    readonly open?: (channel: string, endpoint: string, payload: unknown, signal: AbortSignal, uplink?: AsyncIterable<unknown>) => AsyncIterable<unknown>;\n}',
   },
   {
     name: 'ClientRemote',
@@ -791,7 +789,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'QueueAction',
-    declaration: 'export type QueueAction = {\n    readonly kind: \'edit\';\n    readonly content: readonly ContentBlock[];\n} | {\n    readonly kind: \'remove\';\n} | {\n    readonly kind: \'steer\';\n};',
+    declaration: 'export type QueueAction = {\n    readonly kind: \'edit\';\n    readonly content: readonly TextBlock[];\n} | {\n    readonly kind: \'remove\';\n} | {\n    readonly kind: \'steer\';\n};',
   },
   {
     name: 'RegisterFactory',

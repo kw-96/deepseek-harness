@@ -156,10 +156,11 @@ function assistantText(event: Extract<SessionEvent, { type: 'assistant/message' 
 }
 
 function toolResultText(event: Extract<SessionEvent, { type: 'tool/result' }>): string {
-  return event.data.message.content[0].content
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('')
+  let text = ''
+  for (const block of event.data.message.content) {
+    if (block.type === 'text') text += block.text
+  }
+  return text
 }
 
 function messageKey(event: SessionEvent<'user/message'>): string {
@@ -317,7 +318,7 @@ describe.skipIf(process.platform === 'win32')('web e2e: continuous conversation 
       })
       expect(results[0]?.data.turn).toBe(spec.index)
       expect(results[0]?.data.message.source.callId).toBe(spec.callId)
-      expect(results[0]?.data.message.content[0].isError).toBe(false)
+      expect(results[0]?.data.message.isError).toBe(false)
       expect(toolResultText(results[0]!)).toBe(`${spec.toolResultMarker}\n`)
 
       const toolRow = page.locator(`[data-chat-call-id="${spec.callId}"]`)
@@ -341,9 +342,9 @@ describe.skipIf(process.platform === 'win32')('web e2e: continuous conversation 
     ))).toHaveLength(TURN_COUNT)
     expect(sessionEvents.flatMap(event =>
       event.type === 'request/header' ? [event.data.reason] : [])).toEqual(['initial'])
-    expect(await page.getByRole('button', { name: 'System prompt' }).count()).toBe(1)
+    expect(await page.getByRole('button', { name: 'System prompt' }).count()).toBe(0)
     expect(await page.locator(
-      '[data-chat-flow-kind="system-prompt"][hidden="until-found"]',
+      '[data-chat-flow-kind="system-prompt"]',
     ).count()).toBe(0)
     expect(specs.at(-1)?.prompt.length).toBeGreaterThan(4_000)
     expect(sessionEvents.flatMap(event => (

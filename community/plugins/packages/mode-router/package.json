@@ -30,7 +30,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-mode-router-0.1.0.tgz dsh-mode-router"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
