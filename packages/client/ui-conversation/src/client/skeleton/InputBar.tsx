@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  IconPaperclipOutlineMedium, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -175,19 +175,8 @@ export const InputBar = memo(function InputBar({
   // scroll walk (preventScroll inside), so the reveal in our own scrollport
   // is ours to perform — switching to a longer draft otherwise leaves the
   // caret (restored at the draft's end) off screen.
-  //
-  // Only a keyboard surface takes that focus: a device that answers a tap with
-  // a software keyboard would cover the conversation the switch was made to
-  // show. The reading is deliberately a whitelist — hovering pointer plus no
-  // touch points — because a browser in desktop mode can report a mouse-like
-  // pointer type on a touchscreen, while maxTouchPoints keeps reporting the
-  // hardware. Tapping the box still focuses it, and jsdom (no matchMedia; the
-  // unit lane) keeps the pointer behavior its specs assert.
   useEffect(() => {
     if (locked || editor === null) return
-    const keyboardSurface = typeof window.matchMedia !== 'function'
-      || (window.matchMedia('(hover: hover) and (pointer: fine)').matches && navigator.maxTouchPoints === 0)
-    if (!keyboardSurface) return
     focusDraftEditor(editor, revealSelection)
   }, [locked, sessionId, editor])
 
@@ -244,6 +233,14 @@ export const InputBar = memo(function InputBar({
 
   const canAcceptDrop = subagent === null && !locked && !machineBusy && addFiles !== undefined
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const onPickFiles = (e: ChangeEvent<HTMLInputElement>): void => {
+    const picked = e.target.files === null ? [] : [...e.target.files]
+    // Reset so picking the same file again re-fires the change event.
+    e.target.value = ''
+    if (picked.length > 0) intakeFiles(picked)
+  }
+
   // The keymap handlers read live bar state through this ref so the editor
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
@@ -282,16 +279,6 @@ export const InputBar = memo(function InputBar({
     if (editor !== null) focusDraftEditor(editor, revealSelection)
     toggleCommandMenu?.(keyboard.caretSpan())
   }
-
-  // 附件入口：原生文件选择器，图片与通用文件走同一 intake 路径（通用文件由
-  // 附件服务在选取后立即后台上传）；清空 value 以便重复选择同一文件。
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const onPickFiles = (event: ChangeEvent<HTMLInputElement>): void => {
-    const files = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    if (files.length > 0) intakeFiles(files)
-  }
-  const attachDisabled = locked || addFiles === undefined || subagent !== null
 
   // The no-session Workspace trigger: the resident editable div acts as the
   // picker trigger for keyboard users (no editor is bound in this state).
@@ -451,18 +438,6 @@ export const InputBar = memo(function InputBar({
               hidden
               onChange={onPickFiles}
             />
-            <Tooltip label={t('file.attach')} side="top" delayMs={500} disabled={attachDisabled}>
-              <button
-                type="button"
-                className={css.add}
-                aria-label={t('file.attach')}
-                disabled={attachDisabled}
-                onMouseDown={keepFocus}
-                onClick={() => { fileInputRef.current?.click() }}
-              >
-                <IconPaperclipOutlineMedium size={14} />
-              </button>
-            </Tooltip>
             <div className={css.modes}>
               {sessionId === undefined ? null : renderSlot('conversation.input.permission', { locked })}
               {sessionId === undefined ? null : renderSlot('conversation.input.plan', { locked })}

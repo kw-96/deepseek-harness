@@ -33,12 +33,10 @@
 |---|---|---|
 | `mobile-adaptation.css` | 原 `packages/client/ui-conversation`、`ui-settings-general`、`ui-primitives` 中的移动端媒体查询 | 见文件内逐段标注 |
 
-## 尚未迁移的部分
+## 组件行为（不在样式片段范围内）
 
-以下改动不是 CSS，样式片段无法覆写，仍留在 `packages/` 内：
+样式片段只能改几何与外观，改不了组件里的行为决策。当前仍留在 `packages/` 内、且**不属于**本目录范围的只剩一处：
 
-- `ui-conversation/src/client/skeleton/InputBar.tsx` —— 键盘面判定（触屏切换会话不抢输入框焦点）与「添加附件」按钮
-- `ui-settings-general/src/client/SettingsRoot.tsx` —— 监听桌面壳的 `dsh-desktop:command` 事件
-- `ui-sidebar-right/src/client/shell/SidebarRight.tsx` —— `noTrack` 全屏判据
+- `ui-settings-general/src/client/SettingsRoot.tsx` —— 监听桌面壳标题栏菜单发出的 `dsh-desktop:command` 事件（桌面端专有，与移动端无关）。
 
-这些属于组件行为，如需从官方包中移出，需要另做插件化处理。
+原 `ui-conversation/src/client/skeleton/InputBar.tsx` 的键盘面聚焦判定与「添加附件」按钮、`ui-sidebar-right/src/client/shell/SidebarRight.tsx` 的 `noTrack` 判据已在 2026-09-24 移除，官方包恢复为逐字节官方版本：查证确认这两处在现有扩展点下无法插件化（聚焦发生在组件自身 effect 内，右栏的 `setExpanded` 由组件私有 store 驱动，均无公开 slot 或服务可用），故不再保留。

@@ -393,22 +393,18 @@ describe('RightbarSeat presentation', () => {
     expect(h.instance.getSnapshot()).toBe(stored)
   })
 
-  it('covers a normal panel that cannot fit instead of collapsing it, without clearing records', async () => {
+  it('collapses a normal panel that cannot fit without clearing records or reopening on growth', async () => {
     const h = await mountSeat()
     const tab = h.open()
     const signal = h.bodies.get(tab.id)!.tab.signal
     h.view.update({ width: 420, viewportWidth: 900, canShow: false })
-    // 容器给不出轨道（768–995px 区间）时改为全屏覆盖：面板保持打开、记录与 tab 都不动。
-    expect(h.layout().expanded).toBe(true)
-    expect(h.layout().mode).toBe('push')
+    expect(h.layout().expanded).toBe(false)
     expect(h.layout().tabs[tab.id]).toBeDefined()
     expect(signal.aborted).toBe(false)
-    expect(h.frame.openRightbar).toHaveBeenLastCalledWith(false, true)
     const stored = h.instance.getSnapshot()
     h.view.update({ width: 420, viewportWidth: 1440, canShow: true })
     expect(h.instance.getSnapshot()).toBe(stored)
-    expect(h.layout().expanded).toBe(true)
-    expect(h.frame.openRightbar).toHaveBeenLastCalledWith(true, false)
+    expect(h.layout().expanded).toBe(false)
   })
 })
 
