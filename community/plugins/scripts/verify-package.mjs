@@ -6,15 +6,23 @@ import { spawnSync } from 'node:child_process'
 const archive = resolve(process.argv[2] ?? '')
 const flavor = process.argv[3]
 if (process.argv[2] === undefined) throw new Error('usage: node scripts/verify-package.mjs <package.tgz>')
-const flavors = ['manager', 'workorder-agent']
+const flavors = ['manager', 'workorder-agent', 'mode-router']
 if (!flavors.includes(flavor)) throw new Error(`package flavor must be one of ${flavors.join(', ')}`)
 const packageNames = {
   manager: 'dsh-plugin-manager',
   'workorder-agent': 'workorder-agent',
+  'mode-router': 'dsh-mode-router',
 }
 const entryFiles = {
   manager: ['client.js', 'index.js', 'remote.js'],
   'workorder-agent': ['harness/host.js'],
+  'mode-router': ['index.js'],
+}
+const requiredDocsByFlavor = {
+  manager: ['cordis.patch.yml', 'README.md', 'README.zh.md', 'LICENSE'],
+  'workorder-agent': ['cordis.patch.yml', 'README.md', 'README.zh.md'],
+  // The preset declaration lives in the bundle patch, not a cordis patch.
+  'mode-router': ['bundle.patch.yml', 'README.md', 'README.zh.md'],
 }
 
 const directory = await mkdtemp(join(tmpdir(), 'dsh-plugin-manager-pack-'))
@@ -26,9 +34,7 @@ try {
   if (manifest.name !== packageNames[flavor]) throw new Error(`unexpected package name ${manifest.name}`)
   if (typeof manifest.dsh?.bundle?.patch !== 'string') throw new Error('package does not declare dsh.bundle')
   await Promise.all(entryFiles[flavor].map(file => readFile(join(packageRoot, 'lib', file))))
-  const requiredDocs = flavor === 'workorder-agent'
-    ? ['cordis.patch.yml', 'README.md', 'README.zh.md']
-    : ['cordis.patch.yml', 'README.md', 'README.zh.md', 'LICENSE']
+  const requiredDocs = requiredDocsByFlavor[flavor]
   await Promise.all(requiredDocs.map(file => readFile(join(packageRoot, file))))
   const pending = entryFiles[flavor].map(file => join(packageRoot, 'lib', file))
   const visited = new Set()
