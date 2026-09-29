@@ -1,0 +1,790 @@
+﻿diff --git a/packages/bundle/web-app/src/index.ts b/packages/bundle/web-app/src/index.ts
+index 76c212e4e6..86fac07e56 100644
+--- a/packages/bundle/web-app/src/index.ts
++++ b/packages/bundle/web-app/src/index.ts
+@@ -13,7 +13,7 @@
+
+ import { spawn, type ChildProcess } from 'node:child_process'
+ import { createRequire } from 'node:module'
+-import { dirname, join } from 'node:path'
++import { dirname, join, resolve } from 'node:path'
+ import { networkInterfaces } from 'node:os'
+ import { fileURLToPath } from 'node:url'
+ import type { Context } from '@deepseek-ai/cordis'
+@@ -66,9 +66,9 @@ export const Config: z<Config> = z.object({
+
+ /** Bind-dependent Web values shared by the trust fence and URL display. */
+ export interface WebRuntimeValues {
+-  /** LAN IPv4 literals sampled once when the server binds all interfaces. */
++  /** LAN IPv4 literals sampled once when the server binds all interfaces; display only. */
+   lanAddresses: string[]
+-  /** LAN literals followed by explicit invocation authorities. */
++  /** Explicit invocation authorities trusted by the `/api` fence. */
+   trustedHosts: string[]
+ }
+
+@@ -113,14 +113,16 @@ try {
+ `
+
+ /**
+- * Resolve one LAN-trust snapshot from the active server bind.
++ * Resolve one LAN snapshot from the active server bind.
+  *
+- * Derived entries are port-less IP literals: DNS rebinding needs an
+- * attacker-controlled name, while an IP-literal Host is safe on any port and
+- * an OS-assigned port is unknowable before bind.
++ * LAN IPv4 literals are display only: they name the addresses a peer can reach,
++ * so the URL line and the remote panel can advertise them. They are not fence
++ * authorities — an unpaired client on that network still passes browser
++ * authentication for `/api`, and only explicit `--trusted-host` values are
++ * trusted, because a LAN literal never proves the caller was paired.
+  * @param bindHost - the active webserver bind host.
+  * @param extra - explicit `--trusted-host` values, in argument order.
+- * @returns the LAN display addresses and invocation-derived fence authorities.
++ * @returns the LAN display addresses and the invocation's fence authorities.
+  */
+ export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
+   const lanAddresses = bindHost === ALL_INTERFACES_HOST
+@@ -128,7 +130,7 @@ export function resolveLanTrust(bindHost: string, extra: readonly string[]): Web
+       .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
+       .map(iface => iface.address)
+     : []
+-  return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
++  return { lanAddresses, trustedHosts: [...extra] }
+ }
+
+ /** Model-visible orientation and acceptance boundary for sessions created through `dsh web`. */
+@@ -158,8 +160,14 @@ function localWebUrl(ctx: Context): string {
+  * concern — the fallback owner reads files per request, so a composition
+  * whose page never reaches the fallback seat (the static worker preview
+  * ships its own page and carries no dist) boots without one.
++ * `DSH_WEB_DIST_INDEX` optionally freezes that path for one process (desktop
++ * shells snapshot `apps/web/dist` so an in-flight session ignores later rebuilds).
+  */
+ function resolveDistIndex(): string {
++  const override = process.env.DSH_WEB_DIST_INDEX?.trim()
++  if (override !== undefined && override !== '') {
++    return resolve(override)
++  }
+   const require = createRequire(import.meta.url)
+   try {
+     return join(dirname(require.resolve('@deepseek-ai/dsh-web-frontend/package.json')), 'dist', 'index.html')
+diff --git a/packages/bundle/web-app/tests/trusted-hosts.spec.ts b/packages/bundle/web-app/tests/trusted-hosts.spec.ts
+index 5972569b0d..6efa90b073 100644
+--- a/packages/bundle/web-app/tests/trusted-hosts.spec.ts
++++ b/packages/bundle/web-app/tests/trusted-hosts.spec.ts
+@@ -20,10 +20,10 @@ vi.mock('node:os', () => ({
+ }))
+
+ describe('resolveLanTrust', () => {
+-  it('samples non-internal IPv4 addresses once for an all-interfaces bind: trust and display share them', () => {
++  it('samples non-internal IPv4 addresses once for display, and trusts only explicit authorities', () => {
+     const { lanAddresses, trustedHosts } = resolveLanTrust('0.0.0.0', ['harness.internal:3080'])
+     expect(lanAddresses).toEqual(['192.168.1.5', '10.0.0.7'])
+-    expect(trustedHosts).toEqual(['192.168.1.5', '10.0.0.7', 'harness.internal:3080'])
++    expect(trustedHosts).toEqual(['harness.internal:3080'])
+   })
+
+   it('derives nothing for a loopback bind — extras alone stand, no LAN URL to print', () => {
+diff --git a/packages/bundle/web-app/tests/web-app.spec.ts b/packages/bundle/web-app/tests/web-app.spec.ts
+index c0aa838c0f..385a1e096a 100644
+--- a/packages/bundle/web-app/tests/web-app.spec.ts
++++ b/packages/bundle/web-app/tests/web-app.spec.ts
+@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events'
+ import { spawn, type ChildProcess } from 'node:child_process'
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+ import { tmpdir } from 'node:os'
+-import { join } from 'node:path'
++import { join, resolve } from 'node:path'
+ import { PassThrough } from 'node:stream'
+ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+ import { Context } from '@deepseek-ai/cordis'
+@@ -112,6 +112,14 @@ interface BashContribution {
+ }
+
+ describe('web-app runtime glue', () => {
++  it('honors DSH_WEB_DIST_INDEX so a desktop shell can freeze the frontend dist', () => {
++    dist = mkdtempSync(join(tmpdir(), 'dsh-web-app-dist-override-'))
++    const index = join(dist, 'index.html')
++    writeFileSync(index, '<head></head><body>frozen</body>')
++    vi.stubEnv('DSH_WEB_DIST_INDEX', index)
++    expect(originalResolve()).toBe(resolve(index))
++  })
++
+   it('mounts dist serving, prompt section, bash variables, and publishes the URL with the LAN snapshot', async () => {
+     stageDist()
+     const ctx = new Context()
+@@ -143,7 +151,7 @@ describe('web-app runtime glue', () => {
+     expect(seat()).toBeDefined() // frontend-static claimed the fallback
+     expect(ctx.get('webRuntime')).toEqual({
+       lanAddresses: ['192.168.1.5'],
+-      trustedHosts: ['192.168.1.5', 'lab.internal'],
++      trustedHosts: ['lab.internal'],
+     })
+     expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token (LAN: http://192.168.1.5:4567/?token=test-token)')
+     expect(log).toHaveBeenCalledWith('dsh web: opening the default browser; pass --no-open to disable')
+diff --git a/packages/client/connection/src/index.ts b/packages/client/connection/src/index.ts
+index 647174f743..11f6e1e653 100644
+--- a/packages/client/connection/src/index.ts
++++ b/packages/client/connection/src/index.ts
+@@ -95,10 +95,9 @@ export interface ConnectionConfig {
+   /**
+    * Authorities this deployment serves beyond loopback: exact `host:port`, or
+    * port-less `host` matching any port. The /api trust fence refuses any
+-   * request whose Host is neither loopback nor listed here, so a
+-   * non-loopback (`0.0.0.0`) deployment must declare the names it is reached
+-   * by; the Web runtime derives LAN IP literals from an active all-interface
+-   * bind. An entry that is not a bare, canonical authority fails plugin load.
++   * request whose Host is neither loopback nor listed here, so a non-loopback
++   * (`0.0.0.0`) deployment must declare every name it is reached by. An entry
++   * that is not a bare, canonical authority fails plugin load.
+    */
+   trustedHosts?: string[]
+   /** Absolute browser-session lifetime in days. Default: 30. */
+diff --git a/packages/client/connection/src/rpc-host.ts b/packages/client/connection/src/rpc-host.ts
+index 0f98bc1f19..e1e62bdf72 100644
+--- a/packages/client/connection/src/rpc-host.ts
++++ b/packages/client/connection/src/rpc-host.ts
+@@ -174,6 +174,17 @@ export class HostConnectionService extends Service implements HostConnectionHand
+     handler: ConnectionRpcHandler,
+   ): () => Promise<void> {
+     assertChannel(channel)
++    // 本地定制(dev fork)：0.1.5 将 webServer 改由动态注入提供之后，插件 ctx
++    // 不再持有该注入，而 cordis 拒绝未注入服务的属性访问
++    // (cannot get property "webServer" without inject)，导致任何插件的
++    // rpc.handle() 都失败、其 RPC 通道从未挂载（浏览器侧表现为 HTTP 405）。
++    // 此处改用 ctx.get 读取全局服务注册表，保持 0.1.5 的注入契约不变。
++    const webServer = owner.get('webServer')
++    if (webServer === undefined) {
++      throw new Error(
++        `connection: cannot register RPC channel ${JSON.stringify(channel)}; the webServer service is unavailable`,
++      )
++    }
+     const fetchHandler = rpcFetchHandler(channel, handler, this.operator)
+     const route: WebRoute = {
+       kind: 'prefix',
+@@ -189,7 +200,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
+       },
+     }
+     return owner.effect(
+-      () => owner.webServer.register(route),
++      () => webServer.register(route),
+       `client-connection: ${channel} rpc channel`,
+     )
+   }
+diff --git a/packages/client/tsdown.client.ts b/packages/client/tsdown.client.ts
+index 99e647d2a1..e282854b35 100644
+--- a/packages/client/tsdown.client.ts
++++ b/packages/client/tsdown.client.ts
+@@ -21,6 +21,7 @@ import { optionalStringArray } from './modules/src/client/manifest.ts'
+ import { PLATFORM_MODULES, PRELOADED_CLIENT_EXTERNALS } from './web/src/platform.ts'
+ import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
+ import { BundleInputIsolation, physicalBundleInput } from '../../scripts/bundle-input-isolation.ts'
++import { cssModuleClassName } from '../../scripts/css-module-class-name.ts'
+
+ /**
+  * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline
+@@ -566,7 +567,7 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
+         const classMap: Record<string, string> = {}
+         const exportEntries = Object.entries(cssExports ?? {})
+           .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+-        for (const [local, exp] of exportEntries) classMap[local] = exp.name
++        for (const [local, exp] of exportEntries) classMap[local] = cssModuleClassName(exp)
+         return styleInjectionModule(id, fileId, code.toString(), classMap)
+       },
+     }, {
+diff --git a/packages/client/ui-chat/src/client/apply.ts b/packages/client/ui-chat/src/client/apply.ts
+index 69885d3ed4..0bb2b0f945 100644
+--- a/packages/client/ui-chat/src/client/apply.ts
++++ b/packages/client/ui-chat/src/client/apply.ts
+@@ -182,7 +182,19 @@ export function apply(ctx: Context): void {
+           // its top or at line 400, so the same tab is revealed and told where
+           // to land.
+           openFile: async (path, options) => {
+-            const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
++            const list = ctx.sessions.list.getSnapshot()
++            // The viewed session may be absent from the list snapshot while that
++            // list is still loading, and an address built without the root keeps
++            // its absolute spelling — which the file resource provider cannot
++            // turn into a workspace-relative read. Fall back to the active
++            // session's root: a file opened from the conversation on screen
++            // belongs to the session that conversation shows.
++            // 官方 v0.1.6-alpha.2 移除了 SessionListState.current：当前会话由
++            // 主视图持有标记派生（同 ui-workspace 的 mainSessionId 判据）。
++            const mainSession = Object.values(list.byId)
++              .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
++            const cwd = list.byId[sessionId]?.cwd
++              ?? (mainSession === undefined ? undefined : list.byId[mainSession]?.cwd)
+             const url = fileAddressFor(sessionId, cwd, path)
+             if (options?.line === undefined) ctx.sidebarRight.openResource(url)
+             else ctx.sidebarRight.openResource(url, { params: { line: options.line } })
+diff --git a/packages/core/agent-loop/src/agent.ts b/packages/core/agent-loop/src/agent.ts
+index 98114f53cd..cbe9fcb82f 100644
+--- a/packages/core/agent-loop/src/agent.ts
++++ b/packages/core/agent-loop/src/agent.ts
+@@ -20,6 +20,7 @@ import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@
+ import {
+   LlmError,
+   createAssistantMessage,
++  createUserMessage,
+   errorChain,
+   markAgentLoopRequest,
+ } from '@deepseek-ai/dsh-llm'
+@@ -151,11 +152,17 @@ export class ReactLoopAgent implements Agent {
+   }
+
+   send(message: UserMessage, target: InboxTarget, wakeup: boolean): void {
++    // 第三方插件可能绕过类型传缺 id 的消息；兜底补一个稳定 id，
++    // 避免把没有 identified message 的 user/message 写进 session 日志。
++    const id = (message as { id?: unknown }).id
++    const identified = typeof id === 'string' && id !== ''
++      ? message
++      : createUserMessage(message as Omit<UserMessage, 'id' | 'role'>)
+     // Waking input cannot join an aborted activity, so it starts the next turn.
+     // Captured before the insertion so a reentrant cancel from a splice observer cannot reclassify it.
+     const wakingAfterAbort = wakeup && this.phase.kind !== 'idle' && this.phase.abort.signal.aborted
+     const resolvedTarget = wakingAfterAbort ? 'next-turn' : target
+-    this.inbox.splice(resolvedTarget, Infinity, 0, [message])
++    this.inbox.splice(resolvedTarget, Infinity, 0, [identified])
+     if (wakeup) this.wakeDriver(wakingAfterAbort)
+   }
+
+diff --git a/packages/core/agent-loop/tests/agent.spec.ts b/packages/core/agent-loop/tests/agent.spec.ts
+index 180edf291d..f53718cf25 100644
+--- a/packages/core/agent-loop/tests/agent.spec.ts
++++ b/packages/core/agent-loop/tests/agent.spec.ts
+@@ -62,6 +62,20 @@ describe('Agent', () => {
+       .toEqual({ kind: 'unknown-producer' })
+   })
+
++  it('inject() mints an id for a third-party message that lacks one', async () => {
++    const ctx = await harness(new MockAdapter([textResponse('ok')]))
++    const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
++
++    // 模拟第三方插件绕过类型传缺 id 的消息（如 dsh-ocr-local 的粘贴 notice）。
++    agent.inject({ role: 'user', content: [{ type: 'text', text: 'pasted image notice' }], source: { kind: 'plugin', plugin: 'dsh-ocr-local' } } as never)
++
++    const spliced = agent.session.snapshotEvents().find(event => event.type === 'agent/inbox/spliced')
++    if (spliced === undefined || spliced.type !== 'agent/inbox/spliced') throw new Error('missing spliced event')
++    const id = spliced.data.inserted[0]?.id
++    expect(typeof id).toBe('string')
++    expect(id).not.toBe('')
++  })
++
+   it('emits exact inserted, claimed, and discarded inbox messages', async () => {
+     const ctx = await harness(new MockAdapter([textResponse('ok')]))
+     const agent = await ctx.agentLoop.create(SessionId('inbox-events'), { provider: 'mock', model: 'mock' })
+diff --git a/packages/host/frontend-static/src/index.ts b/packages/host/frontend-static/src/index.ts
+index e497efd228..4a671795b4 100644
+--- a/packages/host/frontend-static/src/index.ts
++++ b/packages/host/frontend-static/src/index.ts
+@@ -58,6 +58,23 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
+   'ENOTDIR',
+ ])
+
++/**
++ * 构建产物路径：`/assets/<名字>-<内容 hash>.<扩展名>`。文件名带内容 hash，
++ * 内容一变必然换名，所以可以按不可变资源长期缓存；其余路径（index、无 hash
++ * 的静态文件）保持不缓存，避免升级后仍用旧页面或旧文件。
++ */
++const IMMUTABLE_ASSET = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/
++
++/** 不可变资源的 Cache-Control 值（Vite 产物的标准缓存策略）。 */
++const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
++
++/**
++ * 非不可变资源（index、无 hash 的静态文件）的 Cache-Control 值：每次使用前必须
++ * 重新验证。留空并不等于不缓存——浏览器可以启发式缓存 index.html，于是升级后仍
++ * 加载旧页面，而旧页面的插件 URL 带着已经失效的 rev，插件会整批 404。
++ */
++const REVALIDATE_CACHE_CONTROL = 'no-cache'
++
+ /**
+  * Serve one GET/HEAD static request from the dist root.
+  * @param pathname - decoded URL pathname of the request.
+@@ -101,7 +118,10 @@ export async function serveStatic(
+     res.end()
+     return
+   }
+-  res.writeHead(200, { 'content-type': type })
++  res.writeHead(200, {
++    'content-type': type,
++    'cache-control': IMMUTABLE_ASSET.test(pathname) ? IMMUTABLE_CACHE_CONTROL : REVALIDATE_CACHE_CONTROL,
++  })
+   res.end(body)
+ }
+
+diff --git a/packages/host/frontend-static/tests/frontend-static.spec.ts b/packages/host/frontend-static/tests/frontend-static.spec.ts
+index 88008b7d65..fd07dbf1e1 100644
+--- a/packages/host/frontend-static/tests/frontend-static.spec.ts
++++ b/packages/host/frontend-static/tests/frontend-static.spec.ts
+@@ -40,6 +40,9 @@ async function loadComposition(): Promise<Context> {
+   await writeFile(join(dist, 'blob.bin'), 'BLOB')
+   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
+   await mkdir(join(dist, 'empty'))
++  await mkdir(join(dist, 'assets'))
++  await writeFile(join(dist, 'assets', 'index-C04Zg7TP.js'), 'export {}')
++  await writeFile(join(dist, 'assets', 'plain.js'), 'export {}')
+   const configPath = join(root, 'cordis.yml')
+   await writeFile(configPath, [
+     "- name: '@deepseek-ai/dsh-credentials-local'",
+@@ -217,3 +220,17 @@ describe('real Loader composition', () => {
+     expect(() => server.registerFallback(() => {})).not.toThrow()
+   })
+ })
++
++describe('构建产物的缓存策略', () => {
++  it('带内容 hash 的 assets 发 immutable 长缓存，其余路径必须重新验证', { timeout: 60_000 }, async () => {
++    const loaded = await loadComposition()
++    const port = loaded.webServer.port
++    const cacheControlOf = async (path: string): Promise<string | null> =>
++      (await fetch(`http://127.0.0.1:${String(port)}${path}`)).headers.get('cache-control')
++    expect(await cacheControlOf('/assets/index-C04Zg7TP.js')).toBe('public, max-age=31536000, immutable')
++    // 无 hash 的普通静态文件与 index 都带 no-cache：留空不代表不缓存，浏览器会启发式
++    // 缓存 index.html，升级后旧页面请求的插件 rev 已失效，插件会整批 404。
++    expect(await cacheControlOf('/assets/plain.js')).toBe('no-cache')
++    expect(await cacheControlOf('/app.js')).toBe('no-cache')
++  })
++})
+diff --git a/packages/llm/llm-pi-ai/src/stream.ts b/packages/llm/llm-pi-ai/src/stream.ts
+index 30e9c79412..b4f3d4d78a 100644
+--- a/packages/llm/llm-pi-ai/src/stream.ts
++++ b/packages/llm/llm-pi-ai/src/stream.ts
+@@ -56,6 +56,21 @@ function classifyPiAiError(message: string): string {
+   // finish_reason`). The connection dropped mid-response, so this is a transport
+   // truncation, not a model-level error.
+   if (/stream ended (?:before|without)\b/i.test(message)) return 'TRANSPORT'
++  // A gateway relaying its own upstream's stream failure. The proxy names the
++  // condition (`upstream_stream_error`) and quotes its HTTP client's wording for
++  // a body it could not decode (`error decoding response body`), which is what a
++  // truncated or malformed supplier stream looks like one hop further out. The
++  // response began and then broke upstream, so it is the same mid-response
++  // truncation as the wire closures below, not a model-level failure.
++  if (/upstream[ _]stream[ _]error|error decoding response body/i.test(message)) return 'TRANSPORT'
++  // A payload JSON.parse rejected: a provider, a gateway, or a local proxy in the
++  // chain returned a body or stream chunk carrying a raw control character, a
++  // truncated tail, or non-JSON content where JSON was promised (V8 words these
++  // `… in JSON at position <n>` or `Unexpected end of JSON input`). The request
++  // produced no model output, so the payload was unusable rather than refused,
++  // and resending it is the recovery — the same transport family as a wire that
++  // closed mid-response.
++  if (/in JSON at position \d+|unexpected end of JSON input/i.test(message)) return 'TRANSPORT'
+   if (/\b(?:network|connection|socket|fetch)\b|\bECONN[A-Z]+\b/i.test(message)
+     || /\b(?:other side closed|HTTP2 request did not get a response|WebSocket closed unexpectedly)\b/i.test(message)
+     // undici renders a mid-stream socket drop as a bare `terminated` (its
+diff --git a/packages/session/session-format-v0-to-v1/src/payload-validation.ts b/packages/session/session-format-v0-to-v1/src/payload-validation.ts
+index 5b19f7cc66..f6527ab24b 100644
+--- a/packages/session/session-format-v0-to-v1/src/payload-validation.ts
++++ b/packages/session/session-format-v0-to-v1/src/payload-validation.ts
+@@ -25,7 +25,7 @@ export function assertReleasedPayloadSemantics(event: SessionFormatEvent, versio
+       countValue(data['start'], `${label} start`)
+       if (data['removedCount'] !== undefined) countValue(data['removedCount'], `${label} removedCount`)
+       arrayValue(data['inserted'], `${label} inserted`, (value) => {
+-        messageValue(value, `${label} inserted message`, version, 'user')
++        inboxInsertedMessageValue(value, `${label} inserted message`, version)
+       })
+       if (data['outcome'] !== undefined) literalValue(data['outcome'], ['canceled'], `${label} outcome`)
+       return
+@@ -508,6 +508,24 @@ function messageValue(
+   }
+ }
+
++/**
++ * 本地定制(dev fork)：0.1.2 时代 dsh-ocr-local 等插件写入 inbox 的插入
++ * 消息可能没有 `id`；官方 v0 校验要求 id。为让存量会话可迁移，此处放宽
++ * 为 id 可选（其余字段照常校验）。
++ */
++function inboxInsertedMessageValue(value: SessionFormatJsonValue | undefined, label: string, version: number): void {
++  const message = exactRecord(value, label, ['role', 'content', 'source'], ['id'])
++  if (message['id'] !== undefined) nonEmptyString(message['id'], `${label} id`)
++  literalValue(message['role'], ['user'], `${label} role`)
++  contentBlocksValue(message['content'], `${label} content`, version)
++  const source = releasedV0Record(message['source'], `${label} source`)
++  if (version < 2 && source['kind'] === 'goal' && source['change'] !== undefined) {
++    legacyGoalMessageValue(message, source, label)
++  } else {
++    messageSourceValue(source, `${label} source`, version, 'user')
++  }
++}
++
+ function legacyGoalMessageValue(message: JsonRecord, source: JsonRecord, label: string): void {
+   assertReleasedV0Keys(source, ['kind', 'goalId', 'revision', 'round', 'change'], [], `${label} source`)
+   nonEmptyString(source['goalId'], `${label} source goalId`)
+@@ -651,7 +669,10 @@ function pluginSourceValue(source: JsonRecord, label: string): void {
+     throw new SessionFormatError(`${label} sections require snapshot form`)
+   }
+   if (form === 'notice') stringValue(source['summary'], `${label} summary`)
+-  else if (source['summary'] !== undefined) throw new SessionFormatError(`${label} summary requires notice form`)
++  // 本地定制(dev fork)：0.1.2 时代 dsh-mnemon 插件写入的 user/message 携带
++  // form='instructions' 与 summary 并存；官方 v0 校验拒绝该组合。为让存量
++  // 会话可迁移，接受 summary 与任意 form 并存（summary 仅作提示文本）。
++  else if (source['summary'] !== undefined) stringValue(source['summary'], `${label} summary`)
+ }
+
+ function sessionReferenceSourceValue(source: JsonRecord, label: string, version: number): void {
+diff --git a/packages/session/session-format-v0-to-v1/src/relationships.ts b/packages/session/session-format-v0-to-v1/src/relationships.ts
+index ddd1a4b71d..d206c8e9aa 100644
+--- a/packages/session/session-format-v0-to-v1/src/relationships.ts
++++ b/packages/session/session-format-v0-to-v1/src/relationships.ts
+@@ -115,7 +115,7 @@ export function assertReleasedArtifactRelationships(
+         break
+       case 'step/start':
+         if (openTurn !== data['turn'] || openStep !== null || data['step'] !== nextStep) {
+-          throw new SessionFormatError(`${event.type} does not match the open turn and next step`)
++          throw new SessionFormatError(`${event.type} ${event.seq} does not match the open turn and next step (turn=${String(data['turn'])} openTurn=${String(openTurn)} openStep=${String(openStep)} nextStep=${nextStep})`)
+         }
+         openStep = data['step']
+         break
+@@ -151,7 +151,17 @@ export function assertReleasedArtifactRelationships(
+         requireOpenStep(event, data, openTurn, openStep)
+         const callId = data['callId'] as string
+         const lifecycle = toolLifecycles.get(callId)
+-        if (lifecycle === undefined || lifecycle.state !== 'advertised'
++        if (lifecycle === undefined) {
++          // 本地定制(dev fork)：旧 Codex 导入会话的 tool/call 没有前置
++          // 助手消息广告；以调用自身字段隐式登记生命周期，容忍旧数据。
++          toolLifecycles.set(callId, {
++            name: data['name'] as string,
++            arguments: data['arguments'] as string,
++            state: 'started',
++          })
++          break
++        }
++        if (lifecycle.state !== 'advertised'
+           || lifecycle.name !== data['name'] || lifecycle.arguments !== data['arguments']) {
+           throw new SessionFormatError(`tool/call ${callId} does not match one advertised tool call`)
+         }
+diff --git a/packages/session/session-format-v0-to-v1/tests/relationships.spec.ts b/packages/session/session-format-v0-to-v1/tests/relationships.spec.ts
+index 148a42447f..e6452f3d7c 100644
+--- a/packages/session/session-format-v0-to-v1/tests/relationships.spec.ts
++++ b/packages/session/session-format-v0-to-v1/tests/relationships.spec.ts
+@@ -229,7 +229,8 @@ describe('released v1 whole-artifact relationships', () => {
+
+     expect(() => decode([...turnAndStep, advertised, { ...started, data: { ...started.data, name: 'write' } }]))
+       .toThrow(/advertised tool call/)
+-    expect(() => decode([...turnAndStep, { ...started, seq: 2, time: 3 }])).toThrow(/advertised tool call/)
++    // 本地定制(dev fork)：无广告的 tool/call 被隐式登记生命周期（旧数据容忍）。
++    expect(() => decode([...turnAndStep, { ...started, seq: 2, time: 3 }])).not.toThrow()
+     expect(() => decode([...turnAndStep, result(2)])).toThrow(/no advertised tool lifecycle/)
+     expect(() => decode([...turnAndStep, {
+       ...advertised,
+diff --git a/packages/session/session-format-v0-to-v1/tests/validation.spec.ts b/packages/session/session-format-v0-to-v1/tests/validation.spec.ts
+index 39655f9e79..dce1a9b2e2 100644
+--- a/packages/session/session-format-v0-to-v1/tests/validation.spec.ts
++++ b/packages/session/session-format-v0-to-v1/tests/validation.spec.ts
+@@ -688,10 +688,9 @@ describe('released event and payload inventory', () => {
+           }],
+         },
+       }],
+-      ['user/message', {
+-        ...userMessage,
+-        source: { kind: 'plugin', plugin: 'x', form: 'snapshot', sections: [], summary: 'x' },
+-      }],
++      // 本地定制(dev fork)：旧插件写入的 plugin source 允许 summary 与任意
++      // form 并存，故 form='snapshot'+summary 不再作为无效分支（见
++      // payload-validation.ts 的容错注释）。
+       ['user/message', {
+         ...userMessage,
+         source: { kind: 'plugin', plugin: 'compact' },
+diff --git a/packages/session/session-format-v2-to-v3/src/migration.ts b/packages/session/session-format-v2-to-v3/src/migration.ts
+index 3aecf8a518..a320c309d4 100644
+--- a/packages/session/session-format-v2-to-v3/src/migration.ts
++++ b/packages/session/session-format-v2-to-v3/src/migration.ts
+@@ -21,6 +21,9 @@ export const sessionFormatV2ToV3 = defineSessionFormatMigration({
+   validateTargetHeader: assertReleasedV3Header,
+ })
+
++/** 携带 turn/step 坐标、需要开放 step 的事件类型（本地 step 复原用）。 */
++const STEP_EVENT_TYPES = new Set(['assistant/message', 'assistant/attempt', 'tool/call', 'tool/result', 'system/message'])
++
+ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
+   readonly headerInheritedEventCount?: number
+   private readonly mapping: number[] = []
+@@ -31,6 +34,8 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
+   private targetCut: number | undefined
+   private lastForeignDeliverySeq: number | undefined
+   private step: { turn: number; step: number } | undefined
++  private turn = 1
++  private nextStep = 1
+   private head: number | undefined
+   private prompt = ''
+
+@@ -46,15 +51,38 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
+     assertEvent(event, 2)
+     this.observeMessageIds(event)
+     let source = event
+-    const data = record(event.data, event.type)
++    let data = record(event.data, event.type)
++    if (event.type === 'turn/start') {
++      this.turn = data['turn'] as number
++      this.nextStep = 1
++    }
+     if (event.type === 'request/header') {
+       const { system, ...header } = record(data['header'], 'request header')
+       const prompt = typeof system === 'string' ? system : ''
+       if (prompt !== this.prompt) this.emitSystem(prompt, event, context)
+       source = { ...event, data: { ...data, header } }
+     }
++    // 本地定制(dev fork)：旧 Codex 导入会话没有 step/start、step/end 与
++    // system 头，且可能携带过期 turn 坐标。官方在此拒绝整段会话；为让存量
++    // 会话可迁移，按事件坐标确定性复原 step 边界并钳制过期坐标。
++    const restored = this.restoreLegacyStep(event, data, context)
++    if (restored.changed) {
++      source = restored.source
++      data = restored.data
++    }
++    // 本地定制(dev fork)：v3 要求受保护的 system 头先于首个 surface。旧
++    // Codex 导入会话没有 step/start，surface 到达时若尚无开放 step，先合成
++    // 一个 step/start（当前轮次 step 1）再合成空 system 头。
+     if (SURFACE_TYPES.has(event.type) && this.head === undefined) {
+-      throw new SessionFormatUnsupportedMigrationError('format v2 surface before first step cannot acquire a system head without changing chronology')
++      if (this.step === undefined) {
++        this.step = { turn: this.turn, step: 1 }
++        this.nextStep = 2
++        context.emitEvent(canonicalizeTransformedEvent({
++          type: 'step/start', seq: this.targetSeq++, time: event.time,
++          data: { turn: this.turn, step: 1 },
++        }))
++      }
++      this.emitSystem('', event, context)
+     }
+     if (event.type === 'session/end-seed' && data['inherited'] === true) {
+       if (!this.input.sourceHeader.isSeeded) throw new SessionFormatError('format v2 unseeded Session contains an inherited end-seed marker')
+@@ -65,17 +93,88 @@ class ReleasedV2ToV3Stage implements SessionFormatMigrationStage {
+       if (data['sessionFormatVersion'] === 3) throw new SessionFormatError('format v2 delivery marker claims target format v3')
+       if (data['sessionFormatVersion'] === 2 && data['sessionId'] !== this.input.sourceHeader.id) this.lastForeignDeliverySeq = event.seq
+     }
++    // 本地定制(dev fork)：旧 Codex 导入会话没有 step/end；在轮次收尾事件
++    // 发出之前闭合复原出的 step，保证 v3 不变式（turn/end 不得跨越开放 step）。
++    if (event.type === 'turn/end' && this.step !== undefined) {
++      const step = this.step
++      this.step = undefined
++      context.emitEvent(canonicalizeTransformedEvent({
++        type: 'step/end', seq: this.targetSeq++, time: event.time,
++        data: { turn: step.turn, step: step.step },
++      }))
++    }
++    // 本地定制(dev fork)：合成 step 已打开同一 step 时吸收真实 step/start，
++    // 不重复发出（mapping 仍推进以保持序号稠密，目标序号不消耗）。
++    if (event.type === 'step/start' && this.step !== undefined) {
++      const turn = data['turn'] as number
++      const step = data['step'] as number
++      if (this.step.turn === turn && this.step.step === step) {
++        this.mapping.push(this.targetSeq)
++        return
++      }
++    }
+     const target = remapEvent(source, this.targetSeq, this.mapping)
+     this.mapping.push(this.targetSeq++)
+     context.emitEvent(canonicalizeTransformedEvent(renamePtcEvent(target)))
+     if (event.type === 'step/start') {
+       this.step = { turn: data['turn'] as number, step: data['step'] as number }
++      this.nextStep = this.step.step + 1
+       if (this.head === undefined) this.emitSystem('', event, context)
+-    } else if (event.type === 'step/end' || event.type === 'turn/end') {
++    } else if (event.type === 'step/end') {
+       this.step = undefined
+     }
+   }
+
++  /**
++   * 本地定制(dev fork)：按 step 坐标事件自带的 turn/step 复原旧导入会话
++   * 缺失的 step/start 与 step/end 边界；过期 turn 坐标钳制到当前开放 step。
++   * 规范 v2 输入自带完整边界与正确坐标，此方法对它们是无操作。
++   */
++  private restoreLegacyStep(
++    event: SessionFormatEvent,
++    input: SessionFormatJsonObject,
++    context: SessionFormatMigrationContext,
++  ): { changed: boolean; source: SessionFormatEvent; data: SessionFormatJsonObject } {
++    // 仅追加类 step 坐标事件需要开放 step；replacement 事件只需要开放 turn，
++    // 由 v3 校验自行处理，不在此合成边界（旧数据里过期坐标的 replacement
++    // 正是如此，合成反而会破坏 step 编号）。
++    if (!STEP_EVENT_TYPES.has(event.type)) return { changed: false, source: event, data: input }
++    if (event['surfaceOp'] !== undefined && event['surfaceOp'] !== 'append') {
++      return { changed: false, source: event, data: input }
++    }
++    let turn = input['turn'] as number
++    let step = input['step'] as number
++    let data = input
++    let source = event
++    if (turn !== this.turn) {
++      // 旧数据携带过期 turn 坐标：并入当前开放 step；无开放 step 时按
++      // 当前轮次的下一个 step 编号开 step（诚实修复，而非拒绝整个会话）。
++      const clamped = this.step ?? { turn: this.turn, step: this.nextStep }
++      turn = clamped.turn
++      step = clamped.step
++      data = { ...input, turn, step }
++      source = { ...event, data }
++    }
++    if (this.step !== undefined && (this.step.turn !== turn || this.step.step !== step)) {
++      const closed = this.step
++      this.step = undefined
++      context.emitEvent(canonicalizeTransformedEvent({
++        type: 'step/end', seq: this.targetSeq++, time: event.time,
++        data: { turn: closed.turn, step: closed.step },
++      }))
++    }
++    if (this.step === undefined) {
++      this.step = { turn, step }
++      this.nextStep = step + 1
++      context.emitEvent(canonicalizeTransformedEvent({
++        type: 'step/start', seq: this.targetSeq++, time: event.time,
++        data: { turn, step },
++      }))
++      if (this.head === undefined) this.emitSystem('', event, context)
++    }
++    return { changed: turn !== (input['turn'] as number), source, data }
++  }
++
+   transformRun(run: SessionFormatEventRun, context: SessionFormatMigrationContext): void {
+     for (const event of run.expand()) this.transformEvent(event, context)
+   }
+diff --git a/packages/session/session-format-v2-to-v3/tests/migration.spec.ts b/packages/session/session-format-v2-to-v3/tests/migration.spec.ts
+index 4b242ca298..14e65fd654 100644
+--- a/packages/session/session-format-v2-to-v3/tests/migration.spec.ts
++++ b/packages/session/session-format-v2-to-v3/tests/migration.spec.ts
+@@ -118,8 +118,19 @@ describe('streaming V2 system prompt migration', () => {
+     expect(() => migrate([event('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [user(id)] }), ...input])).toThrow(/collides/)
+   })
+
+-  it('refuses pre-step surfaces and changed prompts outside a step rather than reorder source history', () => {
+-    expect(() => migrate([event('user/message', user(), 'append'), ...opening()])).toThrow(/before first step/)
++  it('restores legacy pre-step surfaces with a synthesized empty head instead of refusing', () => {
++    // 旧 Codex 导入会话没有 step/start：surface 触发合成 step/start 与空
++    // system 头，随后的 step 坐标事件复用该合成 step。
++    const target = migrate([
++      event('turn/start', { turn: 1 }),
++      event('user/message', user(), 'append'),
++      event('assistant/message', {
++        turn: 1, step: 1, stream: [],
++        message: { id: 'legacy', role: 'assistant', source: { kind: 'model', provider: 'mock', model: 'mock' }, content: [{ type: 'text', text: 'hi' }] },
++      }, 'append'),
++    ])
++    expect(target.events.some(e => e.type === 'step/start')).toBe(true)
++    expect(target.events.some(e => e.type === 'system/message')).toBe(true)
+     expect(() => migrate([event('turn/start', { turn: 1 }), event('request/header', request('early')), event('step/start', { turn: 1, step: 1 })])).toThrow(/outside an open step/)
+     expect(() => migrate([...opening(), event('step/end', { turn: 1, step: 1 }), event('request/header', request('late'))])).toThrow(/outside an open step/)
+   })
+diff --git a/packages/test-support/session-snapshot/src/normalize.ts b/packages/test-support/session-snapshot/src/normalize.ts
+index f1b65c51d2..daea5a99ee 100644
+--- a/packages/test-support/session-snapshot/src/normalize.ts
++++ b/packages/test-support/session-snapshot/src/normalize.ts
+@@ -120,7 +120,13 @@ function cwdSpellings(ctx: NormalizeContext): string[] {
+   const macAliases = spellings
+     .filter(spelling => spelling.startsWith('/') && !spelling.startsWith('/private/'))
+     .map(spelling => `/private${spelling}`)
+-  return [...new Set([...spellings, ...macAliases])]
++  // The sandbox-policy snapshot text renders the workspace path through
++  // JSON.stringify, so its backslashes appear doubled inside the emitted
++  // string; recognize that spelling too.
++  const jsonQuoted = spellings
++    .filter(spelling => spelling.includes('\\'))
++    .map(spelling => spelling.replaceAll('\\', '\\\\'))
++  return [...new Set([...spellings, ...jsonQuoted, ...macAliases])]
+     .sort((left, right) => right.length - left.length)
+ }
+
+diff --git a/packages/test-support/session-snapshot/tests/normalize.spec.ts b/packages/test-support/session-snapshot/tests/normalize.spec.ts
+index 66120263b4..29afcf9145 100644
+--- a/packages/test-support/session-snapshot/tests/normalize.spec.ts
++++ b/packages/test-support/session-snapshot/tests/normalize.spec.ts
+@@ -133,6 +133,22 @@ describe('normalizeStdout', () => {
+     expect(frame).toEqual({ cwd: '{{cwd}}', path: '{{cwd}}/nested/proof.txt' })
+   })
+
++  it('scrubs the JSON-stringified backslash spelling of the cwd', () => {
++    const windowsCtx: NormalizeContext = {
++      sessionIds: [],
++      cwd: String.raw`C:\Users\runner\AppData\Local\Temp\acp-snapshot`,
++    }
++    const raw = JSON.stringify({
++      plain: `session workspace: ${windowsCtx.cwd}. Writable.`,
++      quoted: `session workspace: ${JSON.stringify(windowsCtx.cwd)}. Writable.`,
++    })
++    const frame = JSON.parse(normalizeStdout(raw, windowsCtx)) as { plain: string; quoted: string }
++    expect(frame).toEqual({
++      plain: 'session workspace: {{cwd}}. Writable.',
++      quoted: 'session workspace: "{{cwd}}". Writable.',
++    })
++  })
++
+   it('canonicalizes only cwd-rooted path separators', () => {
+     const windowsCtx: NormalizeContext = {
+       sessionIds: [],
+diff --git a/scripts/css-module-class-name.spec.ts b/scripts/css-module-class-name.spec.ts
+new file mode 100644
+index 0000000000..4c22f0db3a
+--- /dev/null
++++ b/scripts/css-module-class-name.spec.ts
+@@ -0,0 +1,25 @@
++import { describe, expect, it } from 'vitest'
++import { cssModuleClassName } from './css-module-class-name.ts'
++
++describe('cssModuleClassName', () => {
++  it('returns the hashed name alone when nothing is composed', () => {
++    expect(cssModuleClassName({ name: 'a_row', composes: [] })).toBe('a_row')
++  })
++
++  it('appends local and global composed class names', () => {
++    expect(cssModuleClassName({
++      name: 'a_rowCurrent',
++      composes: [
++        { type: 'local', name: 'a_row' },
++        { type: 'global', name: 'theme-dark' },
++      ],
++    })).toBe('a_rowCurrent a_row theme-dark')
++  })
++
++  it('rejects cross-file composes that this bundler cannot resolve', () => {
++    expect(() => cssModuleClassName({
++      name: 'a_local',
++      composes: [{ type: 'dependency', name: 'base', specifier: './other.module.css' }],
++    })).toThrow(/unsupported without a CSS bundler/)
++  })
++})
+diff --git a/scripts/css-module-class-name.ts b/scripts/css-module-class-name.ts
+new file mode 100644
+index 0000000000..007b7e1451
+--- /dev/null
++++ b/scripts/css-module-class-name.ts
+@@ -0,0 +1,27 @@
++/**
++ * Map a lightningcss CSS-modules export to the className string applied in JS.
++ * `composes` must be included: lightningcss only records composition in the
++ * export object and never inlines those class names into the CSS rule.
++ *
++ * @param exp - One entry from `transform(...).exports`.
++ * @returns Space-separated hashed class names (self first, then composed).
++ */
++export function cssModuleClassName(exp: {
++  name: string
++  composes: ReadonlyArray<
++    | { type: 'local'; name: string }
++    | { type: 'global'; name: string }
++    | { type: 'dependency'; name: string; specifier: string }
++  >
++}): string {
++  const names = [exp.name]
++  for (const ref of exp.composes) {
++    if (ref.type === 'dependency') {
++      throw new Error(
++        `css modules composes from ${JSON.stringify(ref.specifier)} is unsupported without a CSS bundler`,
++      )
++    }
++    names.push(ref.name)
++  }
++  return names.join(' ')
++}
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index a5a8570a51..02193f0a5e 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -32,6 +32,7 @@
+     "packages/client/tsdown.client.ts",
+     "scripts/client-build-environment.ts",
+     "scripts/bundle-input-isolation.ts",
++    "scripts/css-module-class-name.ts",
+     "scripts/*.client.spec.ts",
+     "scripts/client-bundle-css.spec.ts",
+     "scripts/client-bundle-purity.spec.ts"

@@ -1,10 +1,19 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-skill'
 import { createUserMessage } from '@deepseek-ai/dsh-llm/message'
 import type { AppConfig } from '../config.js'
 import type { IssueSnapshot } from '../domain/types.js'
 import { mountWorkorderSkill, WORKORDER_SKILL_NAME } from './skill.js'
+
+// 0.2.0 取消了共用的 `plugin` kind，生产者在自己模块里声明专属 kind。
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** 本插件注入的后台审核指令消息。 */
+    'workorder-agent': { kind: 'workorder-agent' } & ContextFormed
+  }
+}
 
 export const WORKORDER_AGENT_ID = 'workorder-agent-background'
 
@@ -35,7 +44,7 @@ export class HarnessWorkorderAgent implements WorkorderAgentRouter {
     const previousMessages = agent.session.deriveMessages().length
     agent.followup(createUserMessage({
       content: [{ type: 'text', text: this.buildPrompt(traceId, issue) }],
-      source: { kind: 'plugin', plugin: 'workorder-agent', form: 'instructions' },
+      source: { kind: 'workorder-agent', form: 'instructions' },
     }))
     await agent.whenIdle()
     const response = agent.session.deriveMessages().slice(previousMessages)

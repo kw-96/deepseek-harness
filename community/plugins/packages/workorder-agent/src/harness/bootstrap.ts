@@ -1,6 +1,6 @@
-﻿import { Hono } from 'hono'
+import { Hono } from 'hono'
 import { PRODUCT_NAME } from '../brand.js'
-import type { PluginConfig } from './pluginConfig.js'
+import type { PluginConfigValues } from './pluginConfig.js'
 
 /** 写入工单设置并等待运行时重载。 */
 export type BootstrapWrite = (patch: Record<string, unknown>) => Promise<void>
@@ -15,7 +15,7 @@ function escape(value: string): string {
 }
 
 /** 生成 Ticket Hub 首次配置页。 */
-function bootstrapPage(config: PluginConfig): string {
+function bootstrapPage(config: PluginConfigValues): string {
   const field = (label: string, id: string, value: string, type = 'text', required = false): string => `
     <label class="field">
       <span>${label}${required ? '（必填）' : ''}</span>
@@ -95,7 +95,7 @@ document.getElementById('form').addEventListener('submit',async(event)=>{
 }
 
 /** 构建未配置时的引导路由，接收表单并写入设置。 */
-export function bootstrapRoute(config: PluginConfig, write: BootstrapWrite): Hono {
+export function bootstrapRoute(config: PluginConfigValues, write: BootstrapWrite): Hono {
   const app = new Hono()
   app.get('/', (context) => context.html(bootstrapPage(config)))
   app.post('/bootstrap', async (context) => {

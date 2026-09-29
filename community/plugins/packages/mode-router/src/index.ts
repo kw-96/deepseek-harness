@@ -110,7 +110,8 @@ export function apply(ctx: Context, config: Config = {}): void {
   }
 
   for (const agent of ctx.agents.list()) install(agent)
-  ctx.on('agent/created', ({ agent }) => { install(agent) })
+  // 0.2.0 起 `agent/created` 是 serial 事件，监听器返回 `undefined | Promise<undefined>`。
+  ctx.on('agent/created', async ({ agent }) => { install(agent) })
   ctx.on('agent/disposed', ({ agent }) => {
     disposeAgent(agent)
     latest.delete(agent.session.id)

@@ -44,8 +44,9 @@ describe('DeepSeek Harness 自研 Bundle', () => {
     expect(hostSource).not.toContain('ctx.jobs')
     expect(hostSource).not.toContain('tapIndex')
     expect(lifecycleSource).not.toContain('tapIndex')
-    expect(hostSource).toContain('WORKORDER_SETTINGS_NS')
-    expect(hostSource).toContain('settings.installSection')
+    // 0.2.0 里设置分节即 profile 条目本身：条目 id 由 Loader 提供，写入走设置服务。
+    expect(hostSource).toContain('ctx.fiber.entry')
+    expect(hostSource).toContain('settings.update')
     // 入口改由客户端面注册到官方右栏，Host 面不再注入左侧栏页脚脚本。
     expect(lifecycleSource).not.toContain('webserver/index-inject')
     expect(lifecycleSource).toContain('ctx.webServer.register')

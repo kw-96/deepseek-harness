@@ -5,7 +5,7 @@ import { createApp, type AppRuntime } from '../app.js'
 import type { AppConfig } from '../config.js'
 import { HarnessWorkorderAgent } from './agent.js'
 import { bootstrapRoute, type BootstrapWrite } from './bootstrap.js'
-import { toAppConfig, type PluginConfig } from './pluginConfig.js'
+import { toAppConfig, type PluginConfigValues } from './pluginConfig.js'
 
 /** 工单插件运行时：启用时挂载控制面、调度与 Webhook，禁用时完整卸载。 */
 export class WorkorderPluginLifecycle {
@@ -27,7 +27,7 @@ export class WorkorderPluginLifecycle {
    * 按最新配置启停运行时；相同配置跳过。
    * @param config 当前生效的插件配置
    */
-  apply(config: PluginConfig): Promise<void> {
+  apply(config: PluginConfigValues): Promise<void> {
     this.queue = this.queue.then(() => this.applyNow(config), () => this.applyNow(config))
     return this.queue
   }
@@ -39,7 +39,7 @@ export class WorkorderPluginLifecycle {
     return this.queue
   }
 
-  private async applyNow(config: PluginConfig): Promise<void> {
+  private async applyNow(config: PluginConfigValues): Promise<void> {
     const key = JSON.stringify(config)
     if (key === this.lastKey) return
     await this.stopNow()
@@ -48,7 +48,7 @@ export class WorkorderPluginLifecycle {
     await this.startNow(config)
   }
 
-  private async startNow(config: PluginConfig): Promise<void> {
+  private async startNow(config: PluginConfigValues): Promise<void> {
     let appConfig: AppConfig
     try {
       appConfig = toAppConfig(config)

@@ -1,7 +1,7 @@
-﻿import { Hono } from 'hono'
+import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import { Config, toAppConfig, type PluginConfig } from '../../src/harness/pluginConfig.js'
+import { Config, toAppConfig, type PluginConfigValues } from '../../src/harness/pluginConfig.js'
 
 const { close, createApp } = vi.hoisted(() => {
   const close = vi.fn(async (): Promise<void> => undefined)
@@ -11,7 +11,7 @@ const { close, createApp } = vi.hoisted(() => {
 
 vi.mock('../../src/app.js', () => ({ createApp }))
 
-const valid: PluginConfig = {
+const valid: PluginConfigValues = {
   enabled: true,
   dataDir: '',
   webhookToken: 'webhook-token',
@@ -45,10 +45,11 @@ function createCtx(): Context {
 
 describe('工单插件配置', () => {
   it('默认启用，并映射到业务运行配置', () => {
+    // 0.2.0 的 Config 字段是 Loader 原地提交的 volatile 引用。
     const parsed = Config()
-    expect(parsed.enabled).toBe(true)
-    expect(parsed.completedStatusId).toBe(6)
-    expect(parsed.projectIdChannelArt).toBe(7)
+    expect(parsed.enabled.get()).toBe(true)
+    expect(parsed.completedStatusId.get()).toBe(6)
+    expect(parsed.projectIdChannelArt.get()).toBe(7)
     const config = toAppConfig(valid)
     expect(config.projects).toEqual({ 渠道美术: 7, 回流业务: 2001, AI运营活动: 2004 })
     expect(config.gcp.userKey).toBe('user-key')
