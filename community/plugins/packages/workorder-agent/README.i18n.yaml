@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write community/plugins/packages/workorder-agent/README.md
-README.md: 6abc742b44584e3351fe0c8e9aa52cb6c574566d
-README.zh.md: 6633fc7359739c5fcf133750c7f1d9dbc94a87e3
+/workorder-agent:
+  en: 94db28150db30ed0
+  zh: ff23d1300f5f50ec
+/workorder-agent/configuration:
+  en: 5783b0f14277fdd0
+  zh: 1856e3e64d32669c
+/workorder-agent/popo-robot-app-channel:
+  en: 712a9cd599296562
+  zh: 6f0f862f1f21c3f1
+/workorder-agent/yixiezuo-event-ingress:
+  en: 7ce3c1d4774d547f
+  zh: 591643d5a6d260fb
+/workorder-agent/vivo-excellent-cases:
+  en: 2b9c6f4abb2f6164
+  zh: c65aa62efaf4412e
+/workorder-agent/development:
+  en: 08b48c3d0b1898f2
+  zh: 6aa206f09591de9b

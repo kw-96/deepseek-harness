@@ -1,6 +1,6 @@
-﻿# workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host。
+# workorder-agent 自研 Bundle：在 Web Profile 上挂载可热拔插 Host。
 # 配置以前端为主：首次启动时 /workorder-agent 显示引导页，保存后写入
-# Harness 的 workorder-agent 设置命名空间并热加载控制面。
+# 本 profile 条目的设置分节（条目 id workorder-agent-host）并热加载控制面。
 # 环境变量仅在存在时作为首次默认值回退。
 - insert:
     - id: workorder-agent-host

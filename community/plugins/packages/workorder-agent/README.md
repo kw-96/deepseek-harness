@@ -17,7 +17,7 @@ The package declares official `dsh.bundle` metadata and is installed from the ta
 The frontend-first setup needs no preset environment variables:
 
 1. Open `/workorder-agent` on first startup and enter the Webhook token, Yixiezuo GCP user key, robot-app App ID / App Secret / receiver, data directory, project ids, review model, and workorder-standard knowledge base.
-2. Saving writes to the Harness `workorder-agent` settings namespace and reloads the runtime; the control plane Settings page can later update the model, maximum output tokens, knowledge base, and notification switches.
+2. Saving writes to this profile entry's settings section (entry id `workorder-agent-host`) and reloads the runtime; the control plane Settings page can later update the model, maximum output tokens, knowledge base, and notification switches.
 3. Review provider and model id must be supplied together. Leaving both empty makes the background review Agent inherit Harness's default model selection.
 4. Missing-field reminders are direct messages to the **assignee** (the designer): operations files the workorder, a designer is assigned, and that designer fills the fields. The text shows the plain name without a mention, and the receiver is the assignee mailbox, falling back to the default receiver when absent.
 

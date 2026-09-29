@@ -79,9 +79,10 @@ document.getElementById('form').addEventListener('submit',async(event)=>{
   const msg=document.getElementById('msg');
   button.disabled=true;msg.className='';msg.textContent='正在保存…';
   const patch={};
-    const value=document.getElementById(id).value;
-    patch[id]=numbers.includes(id)?Number(value):value.trim();
-  }
+  document.querySelectorAll('#form input, #form textarea').forEach(element=>{
+    if(element.type==='checkbox'||!element.id)return;
+    patch[element.id]=numbers.includes(element.id)?Number(element.value):element.value.trim();
+  });
   checks.forEach(id=>{patch[id]=document.getElementById(id).checked;});
   try{
     const response=await fetch('/workorder-agent/bootstrap',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(patch)});

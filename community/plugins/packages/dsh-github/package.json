@@ -112,6 +112,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs"
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-github-0.1.2.tgz dsh-github"
   }
 }

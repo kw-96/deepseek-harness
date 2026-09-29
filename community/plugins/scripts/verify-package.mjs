@@ -6,23 +6,28 @@ import { spawnSync } from 'node:child_process'
 const archive = resolve(process.argv[2] ?? '')
 const flavor = process.argv[3]
 if (process.argv[2] === undefined) throw new Error('usage: node scripts/verify-package.mjs <package.tgz>')
-const flavors = ['manager', 'workorder-agent', 'mode-router']
+const flavors = ['manager', 'workorder-agent', 'mode-router', 'dsh-github']
 if (!flavors.includes(flavor)) throw new Error(`package flavor must be one of ${flavors.join(', ')}`)
 const packageNames = {
   manager: 'dsh-plugin-manager',
   'workorder-agent': 'workorder-agent',
   'mode-router': 'dsh-mode-router',
+  'dsh-github': 'dsh-github',
 }
 const entryFiles = {
   manager: ['client.js', 'index.js', 'remote.js'],
   'workorder-agent': ['harness/host.js'],
   'mode-router': ['index.js'],
+  // The browser half (lib/client.js) is a prebuilt bundle with its own factory
+  // wrapper, so only the Node entry takes part in the relative-import walk.
+  'dsh-github': ['index.js'],
 }
 const requiredDocsByFlavor = {
   manager: ['cordis.patch.yml', 'README.md', 'README.zh.md', 'LICENSE'],
   'workorder-agent': ['cordis.patch.yml', 'README.md', 'README.zh.md'],
   // The preset declaration lives in the bundle patch, not a cordis patch.
   'mode-router': ['bundle.patch.yml', 'README.md', 'README.zh.md'],
+  'dsh-github': ['cordis.patch.yml', 'README.md', 'README.zh.md'],
 }
 
 const directory = await mkdtemp(join(tmpdir(), 'dsh-plugin-manager-pack-'))
