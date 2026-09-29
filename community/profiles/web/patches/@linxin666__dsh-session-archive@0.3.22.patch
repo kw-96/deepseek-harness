@@ -1,0 +1,201 @@
+diff --git a/lib/index.js b/lib/index.js
+index ead372504f7fbf59943162434c2186f4adcc2abe..4c4d8c51de891cc1d6bd3b240ad23f86375ae958 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -59,6 +59,9 @@ function autoArchiveCandidates(rows, options) {
+ 	const candidates = [];
+ 	for (const row of rows) {
+ 		if (row.archived) continue;
++		// 本地补丁：草稿（零消息的空白会话）不是历史，不进归档桶——归档它只会让
++		// 「新建会话」留下的空壳长期占着列表，过期草稿由 expiredDraftCandidates 回收。
++		if (row.blank) continue;
+ 		if (!row.lastActivityReliable || row.lastActivityAt === void 0) continue;
+ 		if (options.protectedIds.has(row.id)) continue;
+ 		if (options.now - row.lastActivityAt <= threshold) continue;
+@@ -70,6 +73,32 @@ function autoArchiveCandidates(rows, options) {
+ 	candidates.sort((a, b) => a.lastActivityAt - b.lastActivityAt);
+ 	return candidates;
+ }
++/** 本地补丁：草稿的回收年龄——超过一天没人动过、且零消息的空白会话直接删掉。 */
++const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1e3;
++/**
++ * 本地补丁：可回收的草稿。草稿是「新建会话 / 打开工作区」为输入框铸造的空白会话
++ * （只有会话头与权限、沙箱、审批等种子事件，没有任何消息），既不属于历史，也不该
++ * 长期留在磁盘上；侧栏本就把它隐藏，归档管理却会把它们全部列成「缺少标题」。
++ * 已归档的草稿同样回收：它们是被旧规则误归档进去的同一批空壳。
++ * @param rows 清单行。
++ * @param options now、protectedIds。
++ * @returns 按最近活动升序排列的待回收草稿。
++ */
++function expiredDraftCandidates(rows, options) {
++	const candidates = [];
++	for (const row of rows) {
++		if (!row.blank) continue;
++		if (!row.lastActivityReliable || row.lastActivityAt === void 0) continue;
++		if (options.protectedIds.has(row.id)) continue;
++		if (options.now - row.lastActivityAt <= DRAFT_MAX_AGE_MS) continue;
++		candidates.push({
++			id: row.id,
++			lastActivityAt: row.lastActivityAt
++		});
++	}
++	candidates.sort((a, b) => a.lastActivityAt - b.lastActivityAt);
++	return candidates;
++}
+ /**
+ * Sessions eligible for auto-delete BEFORE family-cascade planning: archived
+ * with a KNOWN archive time, older than the retention threshold, and archived
+@@ -237,7 +266,13 @@ function resolveAutoConfig(config) {
+ * inventory never produces phantom duplicate rows.
+ */
+ function canonicalSessionId(segment) {
+-	return segment.startsWith("session-") ? segment : `session-${segment}`;
++	// 本地补丁（deepseek-harness fork）：宿主报出的 id 才是权威，插件原样使用即可。
++	// 原规则「不以 session- 开头就补前缀」假设旧布局的目录丢了前缀、而规范 id 带前缀；
++	// 本部署的历史会话 id 本身就是裸 uuid（Codex 导入会话则是 `codex-<thread-id>`），
++	// 补前缀会造出宿主与磁盘都不认识的名字：归档/取消归档/删除全部失败（每轮 auto sweep
++	// 33 项失败），projection cache 也就查不到（归档管理整列缺标题）。本部署的目录段与
++	// feed id 逐字一致，原样返回让目录、feed、ledger 三处来源自然归一。
++	return segment;
+ }
+ function dirSize(path) {
+ 	let total = 0;
+@@ -421,21 +456,28 @@ function titleFromProjcache(entry) {
+ */
+ async function readProjcacheFile(dshHome, id, cache) {
+ 	if (cache !== void 0 && cache.has(id)) return cache.get(id) ?? void 0;
+-	const path = join(dshHome, "storages", "session_projcache", "sessions", `${id}.json`);
++	// 本地补丁：缓存文件按「宿主持久化键」命名，旧布局的键是去掉 `session-` 前缀的裸
++	// uuid（目录名即如此），于是按规范化 id 直接去找必然落空——本部署 246 行无标题里
++	// 有 232 行属于这种拼写差异。先按 id 找，找不到再退回裸 uuid 名字。
++	const bare = id.startsWith("session-") ? id.slice("session-".length) : id;
+ 	let entry;
+-	try {
+-		const parsed = JSON.parse(await readFile(path, "utf8"));
+-		const record = parsed.record ?? parsed;
+-		const title = typeof record.rows?.title?.val === "string" && record.rows.title.val !== "" ? record.rows.title.val : void 0;
+-		const createdAt = typeof record.identity?.createdAt === "number" ? record.identity.createdAt : void 0;
+-		const cwd = typeof record.identity?.cwd === "string" && record.identity.cwd !== "" ? record.identity.cwd : void 0;
+-		if (title !== void 0 || createdAt !== void 0 || cwd !== void 0) entry = {
+-			...title !== void 0 ? { title } : {},
+-			...createdAt !== void 0 ? { createdAt } : {},
+-			...cwd !== void 0 ? { cwd } : {}
+-		};
+-	} catch {
+-		entry = void 0;
++	for (const candidate of bare === id ? [id] : [id, bare]) {
++		const path = join(dshHome, "storages", "session_projcache", "sessions", `${candidate}.json`);
++		try {
++			const parsed = JSON.parse(await readFile(path, "utf8"));
++			const record = parsed.record ?? parsed;
++			const title = typeof record.rows?.title?.val === "string" && record.rows.title.val !== "" ? record.rows.title.val : void 0;
++			const createdAt = typeof record.identity?.createdAt === "number" ? record.identity.createdAt : void 0;
++			const cwd = typeof record.identity?.cwd === "string" && record.identity.cwd !== "" ? record.identity.cwd : void 0;
++			if (title !== void 0 || createdAt !== void 0 || cwd !== void 0) entry = {
++				...title !== void 0 ? { title } : {},
++				...createdAt !== void 0 ? { createdAt } : {},
++				...cwd !== void 0 ? { cwd } : {}
++			};
++		} catch {
++			entry = void 0;
++		}
++		if (entry !== void 0) break;
+ 	}
+ 	if (cache !== void 0) cache.set(id, entry ?? null);
+ 	return entry;
+@@ -1234,7 +1276,13 @@ var ArchiveService = class {
+ 			runStartedAt: now,
+ 			protectedIds: protectedSet
+ 		}) : [];
+-		const plan = planDelete(built.rows, deleteSeeds.map((seed) => seed.id), this.protectedReason(void 0, built.rows));
++		// 本地补丁：过期草稿也计入删除计划，让预览与执行看到同一批目标。
++		const draftSeeds = expiredDraftCandidates(built.rows, { now, protectedIds: protectedSet });
++		const plan = planDelete(
++			built.rows,
++			[...deleteSeeds.map((seed) => seed.id), ...draftSeeds.map((seed) => seed.id)],
++			this.protectedReason(void 0, built.rows),
++		);
+ 		let deleteBytes = 0;
+ 		for (const id of plan.targets) {
+ 			const size = built.rows.find((row) => row.id === id)?.sizeBytes;
+@@ -1266,14 +1314,16 @@ var ArchiveService = class {
+ 			try {
+ 				if (kind === "archive") {
+ 					const built = await buildInventory(this.sources(), AbortSignal.timeout(3e4));
+-					const protectedSet = new Set(this.protectedReason(currentSessionId, built.rows).keys());
++					const protectedMap = this.protectedReason(currentSessionId, built.rows);
++					const protectedSet = new Set(protectedMap.keys());
+ 					const candidates = autoArchiveCandidates(built.rows, {
+ 						days: this.config.autoArchiveDays,
+ 						now: startedAt,
+ 						protectedIds: protectedSet
+ 					});
+ 					const response = await this.archiveInternal(candidates.map((entry) => entry.id), "auto", currentSessionId);
+-					const stats = this.statsFrom(response.results, startedAt);
++					const reaped = await this.reapExpiredDrafts(built, protectedMap, startedAt);
++					const stats = this.statsFrom([...response.results, ...reaped.results], startedAt);
+ 					this.autoState.lastArchiveRun = stats;
+ 					await this.flushState();
+ 					return stats;
+@@ -1287,22 +1337,16 @@ var ArchiveService = class {
+ 					runStartedAt: startedAt,
+ 					protectedIds: protectedSet
+ 				});
++				const reaped = await this.reapExpiredDrafts(built, protectedMap, startedAt);
+ 				if (seeds.length === 0) {
+-					const stats = {
+-						at: startedAt,
+-						total: 0,
+-						ok: 0,
+-						skipped: 0,
+-						failed: 0,
+-						entries: []
+-					};
++					const stats = this.statsFrom(reaped.results, startedAt);
+ 					this.autoState.lastDeleteRun = stats;
+ 					await this.flushState();
+ 					return stats;
+ 				}
+ 				const plan = planDelete(built.rows, seeds.map((seed) => seed.id), protectedMap);
+ 				const response = await this.executeDelete(plan, built, "auto");
+-				const stats = this.statsFrom(response.results, startedAt);
++				const stats = this.statsFrom([...response.results, ...reaped.results], startedAt);
+ 				this.autoState.lastDeleteRun = stats;
+ 				await this.flushState();
+ 				return stats;
+@@ -1311,6 +1355,24 @@ var ArchiveService = class {
+ 			}
+ 		});
+ 	}
++	/**
++	* 本地补丁：回收过期草稿（零消息的空白会话）。草稿不是历史，既不进归档桶，也不
++	* 跟着归档保留期走；超过 DRAFT_MAX_AGE_MS 没人用过就直接删。受保护集合（在世会话、
++	* 运行中、当前、正在处理的）照旧生效，因此正开着的草稿不会被删。
++	* @param built 本轮清单。
++	* @param protectedMap 受保护 id 及其原因。
++	* @param startedAt 本轮开始时间。
++	* @returns 与别的批次同样的 results（可能为空）。
++	*/
++	async reapExpiredDrafts(built, protectedMap, startedAt) {
++		const drafts = expiredDraftCandidates(built.rows, {
++			now: startedAt,
++			protectedIds: new Set(protectedMap.keys())
++		});
++		if (drafts.length === 0) return { results: [] };
++		const plan = planDelete(built.rows, drafts.map((entry) => entry.id), protectedMap);
++		return await this.executeDelete(plan, built, "auto");
++	}
+ 	/** Archive without re-acquiring the lock (used inside cycles). */
+ 	async archiveInternal(ids, source, currentSessionId) {
+ 		const results = [];
+@@ -1631,7 +1693,9 @@ function makePreviewRoute(service) {
+ 		handler: async (req, res) => {
+ 			if (!fenced(req, res)) return;
+ 			const id = new URL(req.url ?? "/", "http://localhost").searchParams.get("id") ?? "";
+-			if (!id.startsWith("session-")) {
++			// 本地补丁：导入会话的 id 形如 `codex-<thread-id>`，不再要求 session- 前缀；
++			// 这里只做空值、路径分隔符与上跳的清洗，口径与 idList 一致。
++			if (id === "" || id.includes("/") || id.includes("\\") || id.includes("..")) {
+ 				writeJson(res, 400, {
+ 					ok: false,
+ 					error: "invalid session id"

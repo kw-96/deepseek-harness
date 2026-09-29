@@ -1,0 +1,10 @@
+diff --git a/package.json b/package.json
+index 4c0e5c991993c633d68bae886a9e08319c99ec74..d6313c85aa442ae19dc5f9ed4779b6782cdfc490 100644
+--- a/package.json
++++ b/package.json
+@@ -1,4 +1,4 @@
+-﻿{
++{
+     "name":  "dsh-git-panel",
+     "version":  "0.1.15",
+     "description":  "DSH web GUI git panel: branch management, commit graph, VS Code-style side-by-side diff with merge-conflict resolution, and workspace file-tree change badges.",

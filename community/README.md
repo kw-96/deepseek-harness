@@ -1,0 +1,81 @@
+# community — vendored deploy assets
+
+English | [中文](README.zh.md)
+
+This directory makes the DeepSeek Harness checkout self-contained for deployment: community plugins, the skills the agent uses, and the web profile manifest all live here, outside the harness `packages/` pnpm workspace (the root `pnpm-workspace.yaml` globs `packages/*/*`, `vendor/*`, `apps/*`, and `website`; `community/` is none of those, so `pnpm install` at the repo root never tries to build or gate these external packages).
+
+## Layout
+
+```
+community/
+  plugins/            vendored plugin workspace (source + built tarballs)
+    packages/           manager · workorder-agent
+    tarballs/           pinned installable .tgz artifacts
+    scripts/            build/pack helpers
+  skills/             installed skills, copied to $DSH_HOME/skills at boot
+  home/               global home files, copied to $DSH_HOME/ (e.g. AGENTS.md)
+  profiles/web/       template for $DSH_HOME/profiles/web (manifest only)
+  seed.mjs            idempotent bootstrap, hooked into the repo's `dsh` script
+  doctor.mjs          read-only host report; names the command that fixes each problem
+  preflight.mjs       runtime versions, per-platform bundle limits, reachability probes
+  profile.mjs         profile manifest build and repair
+  README.md           this file
+```
+
+## Deploy on a fresh host
+
+Just the standard DeepSeek Harness commands:
+
+```sh
+git clone <this-repo> && cd deepseek-harness
+pnpm install
+pnpm run build
+pnpm dsh web
+```
+
+The repo's `dsh` script runs `community/seed.mjs` first. On the first boot it writes `$DSH_HOME/profiles/web` from `community/profiles/web/` (resolving the three `file:` deps to this checkout's `community/plugins/tarballs/`), copies the skills into `$DSH_HOME/skills/`, copies the global home files (the user-global `AGENTS.md`) into `$DSH_HOME/`, then `pnpm install`s the profile. Later boots converge an existing profile on the template: tarball paths left by a different checkout, bundles this host cannot install, bundles listed in `profiles/web/retired.json`, and the template's bundles, dependencies, `allowBuilds` and `minimumReleaseAgeExclude` entries the profile is missing. Bundles added beyond the template are never removed. Override the home with `DSH_HOME=/path`, rewrite the whole manifest with `node community/seed.mjs --force`, or skip the profile install with `DSH_SEED_SKIP_INSTALL=1`.
+
+## Check the host before deploying
+
+`node community/doctor.mjs` inspects the machine without changing anything, prints one line per check, and names the command that fixes each failure. It covers the Node and pnpm versions, Git, the Windows PowerShell execution policy, the CPU architecture, GitHub and registry reachability, the repository install, and whether the profile still matches this checkout. It exits non-zero when any check fails, so it also works as a preflight step in a script.
+
+## One command per host
+
+`node community/setup-host.mjs` runs the deploy chain above in order and is idempotent, so the same command works on a fresh clone, on a host that is already deployed, and on one that only needs a rebuild:
+
+| Mode | Effect |
+| --- | --- |
+| `check` (default) | Runs `preflight.mjs`, `doctor.mjs`, and `verify-profile.mjs`, then the known-trap checks below. Changes nothing. |
+| `install` | `pnpm install` → `pnpm run build` → `node community/seed.mjs` → the same self-check, then names the start command. |
+
+It adds no second implementation of any step; the value is ordering plus the trap checks we hit while operating this fleet, each of which otherwise fails far from its cause:
+
+- **Composition drift.** `verify-profile.mjs` reads every bundle's patch without starting the server: it fails on a duplicated insert-row id and reports any row whose package cannot be resolved from the profile, the repository, or the bundle's own dependency tree. This is the check that catches a plugin installed by hand — or half-installed — before the next boot, instead of after it.
+- **pnpm major drift.** A profile whose `node_modules` came from pnpm v10 and a host running pnpm v11 fails with `ERR_PNPM_UNEXPECTED_STORE` the moment any plugin is added. The check names both versions and the fix: install with the profile's pnpm major, or relink the profile deliberately (`pnpm install` inside it) after a backup.
+- **Git-hosted bundles.** A `github:` dependency whose build script pnpm blocks needs its exact key under `allowBuilds` in the profile's `pnpm-workspace.yaml`; the check reports a missing entry before the install fails.
+- **Dependency patches.** To patch an npm plugin, put the patch file under `community/profiles/web/patches/` and register it under `patchedDependencies` in the template's `pnpm-workspace.yaml`. A fresh seed copies both into the profile, and repairing an existing profile adds whichever of the two is missing, so a reinstall, a plugin upgrade, or a re-seed never drops the patch.
+- **Restart discipline.** Adding or changing a plugin's Remote methods requires restarting `dsh web`; the typert manifest is cached per package name and HMR does not refresh it.
+- **Snapshot before upgrades.** When `dsh-undo-savepoint` is installed, the check prints the snapshot command to run before upgrading or editing plugins.
+
+## Bundles this host cannot install
+
+`seed.mjs` never writes a profile whose `pnpm install` is guaranteed to fail. It drops each bundle whose dependency cannot be satisfied here and prints the reason:
+
+- **Registry** — a pinned version the chosen registry no longer serves, such as an unpublished package.
+- **Network** — a bundle whose dependency is a `github:` reference while github.com is unreachable.
+- **Architecture** — a bundle whose native dependency publishes no binary for this platform and CPU.
+- **Unsupplied** — a row no dependency declares and no module directory can resolve, such as a row a plugin wrote from its own catalog without the matching install.
+
+Only a fresh seed weighs the registry and the network, while nothing is installed yet to lose. Repairing an existing profile drops a bundle for the CPU architecture and for an unsupplied row, never on a reachability probe: an installed bundle keeps working offline, and a probe that wrongly reports a host unreachable would delete it. The per-platform table lives in `preflight.mjs`; add a row there when a new bundle gains a native dependency.
+
+## Rebuilding the plugins
+
+`community/plugins/` is an independent pnpm workspace. To rebuild one:
+
+```sh
+cd community/plugins
+pnpm install
+pnpm build            # or pnpm -r run build
+pnpm pack:check       # regenerates tarballs under each package's dist/
+# copy the .tgz from packages/<pkg>/dist/ into community/plugins/tarballs/
+```
