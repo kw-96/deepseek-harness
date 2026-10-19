@@ -189,14 +189,6 @@
           }
       ]
   }
-# 桌面面板：在浏览器里查看并操作本机桌面（含锁屏）。
-# native worker 由 community/plugins/packages/desktop-panel/native/install.ps1 安装为 SYSTEM 计划任务。
-- {
-    insert:
-      [
-        { id: dsh-desktop-panel, name: dsh-desktop-panel }
-      ]
-  }
 # BrowserSkill：用 DSH 原生 browser_* 工具驱动用户自己的浏览器（Edge 扩展 + bsk CLI），
 # 右栏「Browser Skill」显示实时画面；插件自带 browser-skill skill。
 # 未配置 bskPath 时插件从 PATH 查找 bsk；装在非 PATH 目录的主机再按本机路径补该项。

@@ -18,7 +18,6 @@
         "dsh-git-panel",
         "@linxin666/dsh-ssh",
         "dsh-remote-mobile",
-        "dsh-desktop-panel",
         "@wxg-prc-cpg/browser-skill-dsh-plugin"
       ],
       "patchReload": "startup"
@@ -37,7 +36,6 @@
     "@linxin666/dsh-ssh": "0.3.22",
     "@nanmicoder/dsh-agent-teams": "0.1.18",
     "@wxg-prc-cpg/browser-skill-dsh-plugin": "0.3.0",
-    "dsh-desktop-panel": "file:__COMMUNITY_TARBALLS__/dsh-desktop-panel-0.2.0.tgz",
     "dsh-doc": "0.1.1",
     "dsh-git-panel": "0.1.15",
     "dsh-mnemon": "0.5.8",
