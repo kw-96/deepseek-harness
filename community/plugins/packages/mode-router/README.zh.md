@@ -36,6 +36,11 @@
 
 0.1.7 之前预设是 `$DSH_HOME/.agent-presets/<id>/` 目录（`preset.yml` + `agent.cordis.yml`）；该目录已无人读取，仓库里的 `community/presets/` 已随本包声明一并删除。
 
+## 兼容性
+
+- 0.1.1 起兼容 DSH 0.2.1+：persona 行不再写 `suffix: Your working directory is {{cwd}}.`。DSH 0.2.1 不再注册 `cwd` 提示词变量，模板里出现未注册变量会让整轮运行在 prompt 组装阶段直接失败；官方 `standard` 预设也已删掉这一句。
+- 0.1.0 及更早版本只适用于注册过 `cwd` 变量的旧运行时（0.2.0 系列）。
+
 ## 证据落在哪里
 
 - 注入文本作为动态上下文进入模型请求，可从会话日志重建（`session.v3.jsonl.zstd` 为多帧 zstd，格式见仓库的会话持久化实现）。

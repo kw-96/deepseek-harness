@@ -1,6 +1,6 @@
 {
   "name": "dsh-mode-router",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Per-turn mode routing for DeepSeek Harness agent presets: classify each user turn into a verification focus (correctness / experience / research) and inject that focus as logged dynamic context.",
   "license": "MIT",
   "type": "module",
@@ -31,7 +31,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-mode-router-0.1.0.tgz mode-router"
+    "pack:check": "pnpm pack --pack-destination dist && node ../../scripts/verify-package.mjs dist/dsh-mode-router-0.1.2.tgz mode-router"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
