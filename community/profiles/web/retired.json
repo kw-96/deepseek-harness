@@ -11,5 +11,6 @@
   "@dap-dsh-plugins/netease-auth",
   "@linxin666/dsh-remote-web-ui",
   "dsh-plugin-manager",
-  "dsh-better-sidebar"
+  "dsh-better-sidebar",
+  "dsh-desktop-panel"
 ]
