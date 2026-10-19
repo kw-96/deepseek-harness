@@ -8,6 +8,10 @@
 # 预设行集 = 官方随附 `standard`（packages/bundle/web-app/presets/standard.patch.yml）
 # + 本地定制四处：persona 追加中文回复要求、启用 tool-ralph、去掉已下线的
 # tool-plugin-manager 行、末尾追加模式路由行。
+#
+# 0.1.1 起 persona 不再设 `suffix: Your working directory is {{cwd}}.`：DSH 0.2.1
+# 起不再注册 `cwd` 提示词变量，严格插值会让未注册变量在 prompt 组装阶段直接失败；
+# 官方 `standard` 预设同样删掉了这一句，工作目录改由 working-directory 服务提供。
 - insert:
     - id: preset-mode-router
       name: '@deepseek-ai/dsh-agent-preset'
@@ -20,15 +24,12 @@
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
-              suffix: Your working directory is {{cwd}}.
               prefix: >-
                 You are a coding agent powered by the {{model}} model.
                 Always respond to the user in Simplified Chinese (简体中文): conversations,
                 explanations, summaries, plans, and documentation are all written in Chinese.
                 Keep code, identifiers, commands, file names, and terminal output in English,
                 and keep code comments in Chinese.
-
-                思考过程（reasoning）必须用简体中文书写：无论对话中出现何种语言的工具输出、错误消息、日志、英文文档或历史上下文，都不改变这一点。代码、命令、文件路径、标识符与技术术语保持原文，不翻译。
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
             config:

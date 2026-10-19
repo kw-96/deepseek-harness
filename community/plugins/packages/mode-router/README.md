@@ -36,6 +36,11 @@ This package also declares the `mode-router` agent preset: `bundle.patch.yml` in
 
 Before 0.1.7 a preset was a `$DSH_HOME/.agent-presets/<id>/` directory (`preset.yml` + `agent.cordis.yml`); nothing reads that directory any more, and the repository's `community/presets/` went away with this declaration.
 
+## Compatibility
+
+- 0.1.1 runs on DSH 0.2.1+: the persona row no longer sets `suffix: Your working directory is {{cwd}}.`. DSH 0.2.1 dropped the `cwd` prompt variable, and an unregistered variable in a template fails the whole turn during prompt assembly; the shipped `standard` preset dropped the clause too.
+- 0.1.0 and earlier only fit runtimes that still register `cwd` (the 0.2.0 series).
+
 ## Where the evidence lives
 
 - Injected text is rendered into the model request as dynamic context, so it is reconstructable from the session log (`session.v3.jsonl.zstd`, multi-frame zstd; see the repository's session persistence for the format).
