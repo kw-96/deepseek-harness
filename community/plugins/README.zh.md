@@ -4,7 +4,6 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的社区维护插件源码。`packages/` 下的每个包都是可安装的 `dsh` bundle：
 
-- [`dsh-mode-router`](packages/mode-router) —— 为每轮对话分类，并把验证重点作为 agent 上下文注入。
 - [`workorder-agent`](packages/workorder-agent) —— 易协作工单巡检、字段复核、POPO 通知与控制面面板。
 
 ## 开发

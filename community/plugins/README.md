@@ -4,7 +4,6 @@ English | [中文](README.zh.md)
 
 Community-maintained plugin sources for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Every package under `packages/` is an installable `dsh` bundle:
 
-- [`dsh-mode-router`](packages/mode-router) — classify each user turn and inject the verification focus as agent context.
 - [`workorder-agent`](packages/workorder-agent) — EasyWork workorder inspection, field review, POPO notification, and a control panel.
 
 ## Development
