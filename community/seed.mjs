@@ -211,8 +211,7 @@ if (existsSync(homeSrc)) {
 
 // Agent presets: 0.1.7 reports presets through `@deepseek-ai/dsh-agent-preset`
 // declaration rows carried by bundle patches, so nothing is seeded into
-// `$DSH_HOME/.agent-presets` any more — no code reads that directory. This
-// repository's own preset travels inside the `dsh-mode-router` bundle; a
+// `$DSH_HOME/.agent-presets` any more — no code reads that directory. A
 // directory left by an earlier version is inert and stays where it is.
 
 const existing = await readProfileManifest()
